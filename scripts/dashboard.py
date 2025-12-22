@@ -405,20 +405,26 @@ if st.session_state['page'] == 'monitor':
     df_trend = run_query(sql_kpi, con)
     
     if not df_trend.empty:
-        # Latest Stats (Last available day)
+        # 30-Day Average Stats (instead of latest day)
+        avg_users = df_trend['users'].mean()
+        avg_ctr = df_trend['ctr'].mean()
+        avg_cvr = df_trend['cvr'].mean()
+        avg_orders = df_trend['orders'].mean()
+        
+        # Latest vs Previous for delta
         latest = df_trend.iloc[-1]
         prev = df_trend.iloc[-2] if len(df_trend) > 1 else latest
         
-        # KPI Cards
+        # KPI Cards (30-day average)
         k1, k2, k3, k4 = st.columns(4)
         with k1:
-            st.metric("Daily Active Users", f"{int(latest['users']):,}", f"{int(latest['users']-prev['users'])}")
+            st.metric("Daily Active Users (30d Avg)", f"{int(avg_users):,}", f"{int(latest['users']-prev['users'])}")
         with k2:
-            st.metric("Banner Click Rate (CTR)", f"{latest['ctr']*100:.2f}%", f"{(latest['ctr']-prev['ctr'])*100:.2f}%")
+            st.metric("Banner Click Rate (CTR)", f"{avg_ctr*100:.2f}%", f"{(latest['ctr']-prev['ctr'])*100:.2f}%")
         with k3:
-            st.metric("Conversion Rate (CVR)", f"{latest['cvr']*100:.2f}%", f"{(latest['cvr']-prev['cvr'])*100:.2f}%")
+            st.metric("Conversion Rate (CVR)", f"{avg_cvr*100:.2f}%", f"{(latest['cvr']-prev['cvr'])*100:.2f}%")
         with k4:
-             st.metric("Orders", f"{int(latest['orders']):,}", f"{int(latest['orders']-prev['orders'])}")
+             st.metric("Orders (30d Avg)", f"{int(avg_orders):,}", f"{int(latest['orders']-prev['orders'])}")
         
         st.divider()
         
