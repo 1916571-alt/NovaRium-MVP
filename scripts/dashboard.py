@@ -488,6 +488,21 @@ elif st.session_state['page'] == 'study':
                     for g in g_sel:
                         info = metrics_db[g]
                         st.caption(f"🛡️ **{g}**: {info['desc']}")
+                    
+                    st.write("")
+                    st.markdown("**허용 임계치 설정 (Threshold)**")
+                    st.caption("가드레일 지표가 이 값을 초과하면 실험 조기 종료를 권장합니다.")
+                    
+                    # For simplicity, use a single threshold for "Refund Rate" concept
+                    # In real scenario, each guardrail could have its own threshold
+                    guard_threshold = st.number_input(
+                        "환불률 허용 임계치 (%)",
+                        min_value=0.0, max_value=20.0, value=5.0, step=0.5,
+                        help="환불률이 이 값을 넘으면 위험 신호로 간주합니다."
+                    )
+                    st.info(f"💡 환불률이 **{guard_threshold}%**를 넘으면 조기 종료 경고가 표시됩니다.")
+                else:
+                    guard_threshold = 5.0  # Default
 
                 # Custom Metric
                 with st.expander("➕ 지표 직접 만들기 (Custom)"):
@@ -507,6 +522,8 @@ elif st.session_state['page'] == 'study':
                         st.session_state['hypothesis'] = hypo
                         st.session_state['metric'] = m_sel
                         st.session_state['guardrails'] = g_sel
+                        st.session_state['guard_threshold'] = guard_threshold
+                        st.session_state['guard_metric'] = "Refund Rate"  # Simplified for now
                         st.session_state['step'] = 2
                         st.rerun()
 
@@ -683,31 +700,6 @@ elif st.session_state['page'] == 'study':
                     """.format(base_cvr, target_metric, abs(target_metric - base_cvr), n))
                 
                 
-                st.write("")
-                st.divider()
-                
-                # --- Guardrail Metrics (Safety) ---
-                st.markdown("#### 🛡️ 가이드 지표 (Guardrail Settings)")
-                st.caption("실험의 부작용을 감지하기 위한 안전 장치입니다.")
-                
-                with st.expander("⚙️ 가이드 지표 설정", expanded=True):
-                    col_g1, col_g2 = st.columns(2)
-                    with col_g1:
-                        guard_metric = st.selectbox(
-                            "보조 지표 (Guardrail Metric)",
-                            ["Refund Rate (환불률)", "Unsubscribe Rate (구독 취소율)", "App Crash Rate (앱 크래시)"],
-                            index=0
-                        )
-                    with col_g2:
-                        guard_threshold = st.number_input(
-                            "허용 임계치 (Threshold %)",
-                            min_value=0.0, max_value=20.0, value=5.0, step=0.5,
-                            help="이 값을 초과하면 실험 조기 종료 경고가 표시됩니다."
-                        )
-                    
-                    metric_name = guard_metric.split('(')[0].strip()
-                    st.info(f"💡 **{metric_name}**가 **{guard_threshold}%**를 넘으면 위험 신호로 간주합니다.")
-                
                 
                 st.write("")
                 if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
@@ -717,11 +709,6 @@ elif st.session_state['page'] == 'study':
                     st.session_state['n_test'] = n_test
                     st.session_state['baseline_metric'] = base_cvr
                     st.session_state['target_metric'] = target_metric
-                    
-                    # Save metrics
-                    st.session_state['guard_metric'] = metric_name
-                    st.session_state['guard_threshold'] = guard_threshold
-                    
                     st.session_state['step'] = 3
                     st.rerun()
 
