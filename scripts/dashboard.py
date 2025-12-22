@@ -686,7 +686,9 @@ elif st.session_state['page'] == 'study':
                 st.write("")
                 if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
                     st.session_state['split'] = split
-                    st.session_state['n'] = n
+                    st.session_state['total_needed'] = total_needed
+                    st.session_state['n_control'] = n_control
+                    st.session_state['n_test'] = n_test
                     st.session_state['baseline_metric'] = base_cvr
                     st.session_state['target_metric'] = target_metric
                     st.session_state['step'] = 3
@@ -698,8 +700,10 @@ elif st.session_state['page'] == 'study':
         edu_guide("Event Logging (로그 적재)", "유저가 들어오면 <strong>Assignments</strong>(그룹 할당) 테이블에 남고, 행동을 하면 <strong>Events</strong>(클릭/구매) 테이블에 기록됩니다.")
 
         # Get target sample size from Step 2
-        target_total = st.session_state.get('n', 235) * 2  # Total needed (both groups)
+        target_total = st.session_state.get('total_needed', 470)  # Use the exact value from Step 2
         split_ratio = st.session_state.get('split', 50)
+        n_control = st.session_state.get('n_control', 235)
+        n_test = st.session_state.get('n_test', 235)
         
         # Check current data count (only count experiment users, not historical)
         current_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'", con).iloc[0,0]
