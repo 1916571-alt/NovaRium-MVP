@@ -1,8 +1,8 @@
 # NovaRium-MVP 구현 작업 목록
 
 ## 0단계: 프로젝트 설정 (Project Setup)
-- [x] Git 저장소 초기화 및 .gitignore 설정 <!-- id: git-init -->
-- [x] GitHub 퍼블릭 리포지토리 생성 및 업로드 <!-- id: git-push -->
+- [ ] Git 저장소 초기화 및 .gitignore 설정 <!-- id: git-init -->
+- [ ] GitHub 퍼블릭 리포지토리 생성 및 업로드 <!-- id: git-push -->
 
 ## 1단계: 데이터 생성 (The Generator)
 - [ ] Python 환경 설정 및 라이브러리 설치 (`faker`, `pandas`, `duckdb`, `scipy`) <!-- id: 0 -->

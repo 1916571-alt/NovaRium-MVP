@@ -1,43 +1,65 @@
-# NovaRium-MVP
+# 🎓 NovaRium Edu: A/B Testing Master Class
 
-**NovaRium-MVP**는 로컬 환경에서 데이터 분석의 전 과정을 시뮬레이션할 수 있는 "Minimum Viable Product" 프로젝트입니다.
-복잡한 인프라 없이 파이썬 스크립트 하나로 데이터를 생성하고, 로컬 데이터 웨어하우스(DuckDB)에 적재하여 분석하는 과정을 통해 데이터 엔지니어링과 분석 역량을 증명합니다.
+> **"Don't just read about A/B testing. Do it."**
 
-## 🎯 프로젝트 목표
-*   **실무 역량 증명**: 데이터 파이프라인 구축, SQL 활용 능력, 데이터 기반 논리적 사고력 입증.
-*   **간결성 (Simplicity)**: 최소한의 파일 구성으로 누구나 쉽게 실행하고 분석 과정을 재현 가능.
-*   **본질 집중**: 시각적 대시보드보다는 '데이터의 흐름'과 '실험 설계 논리'에 집중.
+NovaRium Edu is an interactive simulator that turns you into a Data Analyst.  
+Experience the full lifecycle of an experiment, from writing a hypothesis to calculating P-values.
 
-## 🛠️ 기술 스택 (Tech Stack)
-*   **Language**: Python 3.x
-*   **Generator**: `faker` (가상 데이터 생성)
-*   **Warehouse**: `duckdb` (서버리스 SQL OLAP 데이터베이스)
-*   **Analysis**: `pandas`, `scipy` (통계 검정), SQL
-*   **Environment**: Local Machine (No external server required)
+![App Screenshot](https://via.placeholder.com/800x400?text=NovaRium+Edu+Dashboard)
 
-## 📂 프로젝트 구조
-```
-NovaRium-MVP/
-├── raw_data/           # 생성된 CSV 데이터 (Users, Orders, Logs)
-├── novarium_local.db   # 로컬 DuckDB 데이터베이스 파일
-├── generating_data.py  # 데이터 생성 스크립트 (Coming Soon)
-├── analysis.ipynb      # 분석용 주피터 노트북 (Coming Soon)
-└── Tutorial.md         # AI Agent와의 협업 기록
-```
+## 🚀 Features
 
-## 🚀 시작하기 (Getting Started)
-*(구현 진행 중입니다. 아래는 예정된 실행 방법입니다.)*
+### 1. Hands-on Learning (5-Step Wizard)
+Follow the guided path to run a perfect experiment:
+-   **Step 1**: Write a hypothesis for the "NovaEats" food delivery app.
+-   **Step 2**: Calculate how many users you need (Power Analysis).
+-   **Step 3**: See how users are randomly split (Hashing).
+-   **Step 4**: Collect real-time logs in a local database.
+-   **Step 5**: Analyze SQL results and decide: **Ship or Kill?**
 
-1. **환경 설정**:
-   ```bash
-   pip install faker pandas duckdb scipy
-   ```
-2. **데이터 생성**:
-   ```bash
-   python generating_data.py
-   ```
-3. **분석 수행**:
-   `analysis.ipynb`를 열어 실행합니다.
+### 2. My Portfolio
+-   Save your experiment history.
+-   Write "Learning Notes" for every test.
+-   Build a portfolio to show future employers.
 
-## 📝 튜토리얼
-이 프로젝트는 AI Agent와 협업하여 만들어졌습니다. 개발 과정과 프롬프트 기록은 [Tutorial.md](./Tutorial.md)에서 확인할 수 있습니다.
+## 🛠️ Getting Started
+
+### Prerequisites
+-   Python 3.8+
+-   Pip
+
+### Installation
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/1916571-alt/NovaRium-MVP.git
+    cd NovaRium-MVP
+    ```
+
+2.  Install dependencies:
+    ```bash
+    # Create virtual environment (Optional but Recommended)
+    python -m venv venv
+    source venv/bin/activate  # Windows: venv\Scripts\activate
+
+    # Install libs
+    pip install streamlit duckdb pandas plotly scipy
+    ```
+
+3.  Initialize Database:
+    ```bash
+    python scripts/setup_warehouse.py
+    ```
+
+4.  **Run the App**:
+    ```bash
+    streamlit run scripts/dashboard.py
+    ```
+
+## 📂 Project Structure
+-   `scripts/dashboard.py`: Main application (Streamlit).
+-   `scripts/setup_warehouse.py`: Database initializer.
+-   `novarium_local.db`: Local DuckDB file (Auto-created).
+
+---
+**NovaRium Edu** - Built for detailed A/B testing education.
