@@ -565,8 +565,10 @@ elif st.session_state['page'] == 'study':
                 
                 # Target Input (User sets goal)
                 target_metric = st.number_input(f"**목표 {metric_label}** (실험 성공 시 도달할 목표)", 
-                                               min_value=auto_baseline, max_value=1.0, 
-                                               value=float(normal_target), step=0.01,
+                                               min_value=float(auto_baseline), 
+                                               max_value=1.0, 
+                                               value=float(normal_target), 
+                                               step=0.01,
                                                format="%.2f",
                                                help=f"정상 범위: {normal_target*100:.0f}%")
                 
