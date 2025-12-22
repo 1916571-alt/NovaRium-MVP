@@ -747,11 +747,16 @@ elif st.session_state['page'] == 'study':
             SELECT COUNT(DISTINCT user_id) as cnt
             FROM assignments 
             WHERE (user_id LIKE 'sim_%' OR user_id LIKE 'agent_%')
-            AND timestamp >= TIMESTAMP '{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
+            AND assigned_at >= TIMESTAMP '{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
         """
         
         result = run_query(sql_count, con)
-        current_n = int(result.iloc[0]['cnt']) if not result.empty else 0
+        
+        if isinstance(result, str):
+            st.error(f"데이터 조회 오류: {result}")
+            current_n = 0
+        else:
+            current_n = int(result.iloc[0]['cnt']) if not result.empty else 0
         
         remaining = max(0, target_total - current_n)
         progress_pct = min(100, (current_n / target_total * 100) if target_total > 0 else 0)
