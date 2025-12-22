@@ -591,6 +591,51 @@ elif st.session_state['page'] == 'study':
                 st.caption(f"총 필요 유저 수: **{n*2:,}명**")
                 st.caption(f"효과 크기가 클수록 적은 샘플로 감지 가능합니다.")
                 
+                # Educational Explainer
+                with st.expander("📐 계산 로직 보기 (How is this calculated?)"):
+                    st.markdown("""
+                    ### 표본 크기 계산 공식 (Sample Size Formula)
+                    
+                    A/B 테스트에서 필요한 샘플 수는 다음 공식으로 계산됩니다:
+                    
+                    ```
+                    n = 2 × p̄(1-p̄) × (Z_α/2 + Z_β)² / (p₁ - p₂)²
+                    ```
+                    
+                    **각 요소 설명:**
+                    
+                    1. **p₁, p₂**: 대조군(A)과 실험군(B)의 전환율
+                       - p₁ = 현재 클릭률 (예: 6.93%)
+                       - p₂ = 목표 클릭률 (예: 15%)
+                    
+                    2. **p̄ (Pooled Probability)**: 두 그룹의 평균 전환율
+                       - p̄ = (p₁ + p₂) / 2
+                       - 분산 계산에 사용
+                    
+                    3. **Z_α/2**: 유의수준(α)에 대한 Z-score
+                       - α = 0.05 (95% 신뢰도) → Z = 1.96
+                       - "5% 확률로 오판할 수 있음"을 의미
+                    
+                    4. **Z_β**: 검정력(Power)에 대한 Z-score
+                       - Power = 0.80 (80%) → Z = 0.84
+                       - "실제 차이가 있을 때 80% 확률로 감지"
+                    
+                    5. **(p₁ - p₂)²**: 효과 크기의 제곱
+                       - 차이가 클수록 적은 샘플로 감지 가능
+                       - 차이가 작을수록 더 많은 샘플 필요
+                    
+                    **직관적 이해:**
+                    - 🔍 작은 차이를 찾으려면 → 많은 샘플 필요
+                    - 🎯 큰 차이를 찾으려면 → 적은 샘플로도 충분
+                    - 📊 신뢰도를 높이려면 → 더 많은 샘플 필요
+                    
+                    **현재 계산값:**
+                    - 현재: {:.2%} → 목표: {:.2%}
+                    - 효과 크기: {:.2%}
+                    - 필요 샘플: {:,}명 (그룹당)
+                    """.format(base_cvr, target_metric, abs(target_metric - base_cvr), n))
+                
+                
                 st.write("")
                 if st.button("다음: 트래픽 분배 ➡️", type="primary", use_container_width=True):
                     st.session_state['n'] = n
