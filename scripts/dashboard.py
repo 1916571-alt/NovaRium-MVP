@@ -407,9 +407,22 @@ elif st.session_state['page'] == 'study':
                 # Hypothesis Builder
                 st.markdown("**가설 설정 (Hypothesis)**")
                 with st.expander("💡 가설 템플릿 사용하기"):
+                    # Context-Aware Logic
+                    t_ctx = st.session_state.get('target', '')
+                    def_what = "메인 배너 색상을 빨강으로 변경하면"
+                    def_why = "클릭률이 5% 상승할 것이다"
+                    
+                    if "메인 배너" in t_ctx:
+                        def_what = "메인 배너 문구를 '마감 임박'으로 변경하면"
+                        def_why = "클릭률(CTR)이 15%까지 회복될 것이다"
+                    elif "카테고리" in t_ctx:
+                        def_what = "카테고리 아이콘을 3D 스타일로 변경하면"
+                        def_why = "카테고리 탭 클릭 수가 20% 증가할 것이다"
+
                     h_who = st.selectbox("대상(Who)", ["모든 유저에게", "신규 유저에게", "재구매 유저에게"])
-                    h_what = st.text_input("무엇을(Changes)", "메인 배너 색상을 빨강으로 변경하면")
-                    h_why = st.text_input("기대 효과(Impact)", "클릭률이 5% 상승할 것이다")
+                    h_what = st.text_input("무엇을(Changes)", def_what)
+                    h_why = st.text_input("기대 효과(Impact)", def_why)
+                    
                     if st.button("템플릿 적용"):
                         st.session_state['temp_hypo'] = f"{h_who}, {h_what}, {h_why}."
                         st.rerun()
@@ -506,9 +519,43 @@ elif st.session_state['page'] == 'study':
         with c1:
             with st.container(border=True):
                 st.markdown("#### ⚙️ Parameters")
-                base_cvr = st.number_input("기존 전환율 (Baseline CVR)", 0.01, 1.0, 0.10, step=0.01)
+                
+                # Context-Aware Baseline (Fetch from DB)
+                selected_metric = st.session_state.get('metric', 'CTR (클릭률)')
+                
+                # Query latest metric value
+                if "CTR" in selected_metric:
+                    sql_baseline = """
+                    SELECT 
+                        (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / 
+                         NULLIF(COUNT(DISTINCT a.user_id), 0)) as metric_value
+                    FROM assignments a
+                    LEFT JOIN events e ON a.user_id = e.user_id
+                    WHERE a.user_id LIKE 'user_hist_%'
+                    AND a.assigned_at >= CURRENT_DATE - INTERVAL '3 days'
+                    """
+                    metric_label = "기존 클릭률 (Baseline CTR)"
+                    target_label = "클릭률"
+                else:  # CVR or other
+                    sql_baseline = """
+                    SELECT 
+                        (COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END)::FLOAT / 
+                         NULLIF(COUNT(DISTINCT a.user_id), 0)) as metric_value
+                    FROM assignments a
+                    LEFT JOIN events e ON a.user_id = e.user_id
+                    WHERE a.user_id LIKE 'user_hist_%'
+                    AND a.assigned_at >= CURRENT_DATE - INTERVAL '3 days'
+                    """
+                    metric_label = "기존 전환율 (Baseline CVR)"
+                    target_label = "전환율"
+                
+                df_baseline = run_query(sql_baseline, con)
+                auto_baseline = df_baseline.iloc[0, 0] if not df_baseline.empty and df_baseline.iloc[0, 0] else 0.10
+                
+                base_cvr = st.number_input(metric_label, 0.01, 1.0, float(auto_baseline), step=0.01, 
+                                          help=f"현재 측정된 {target_label}: {auto_baseline*100:.2f}%")
                 mde = st.slider("최소 감지 효과 (MDE)", 1, 50, 10, format="+%d%%")
-                st.caption(f"목표: 전환율이 {base_cvr*100:.0f}%에서 {base_cvr*(1+mde/100)*100:.1f}%로 오르는 것을 감지")
+                st.caption(f"목표: {target_label}이 {base_cvr*100:.1f}%에서 {base_cvr*(1+mde/100)*100:.1f}%로 오르는 것을 감지")
         
         with c2:
             with st.container(border=True):
