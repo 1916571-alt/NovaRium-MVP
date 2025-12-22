@@ -830,6 +830,17 @@ elif st.session_state['page'] == 'study':
                         base = st.session_state.get('baseline_metric', 0.10)
                         target = st.session_state.get('target_metric', 0.15)
                         
+                        # Get primary metric to determine event type
+                        primary_metric = st.session_state.get('metric', 'CTR (클릭률)')
+                        metric_event_map = {
+                            "CTR (클릭률)": "click_banner",
+                            "CVR (전환율)": "purchase",
+                            "AOV (평균 주문액)": "purchase",
+                            "Bounce Rate (이탈률)": "bounce",
+                            "Purchase Time (결제 시간)": "purchase"
+                        }
+                        event_type = metric_event_map.get(primary_metric, "click_banner")
+                        
                         # Guardrail settings
                         guard_metric = st.session_state.get('guard_metric', 'Refund Rate')
                         guard_threshold = st.session_state.get('guard_threshold', 5.0)
@@ -845,14 +856,13 @@ elif st.session_state['page'] == 'study':
                             
                             new_users.append((uid, 'exp_1', variant, datetime.now()))
                             
-                            # Purchase Logic
+                            # Event generation based on primary metric
                             rate = target if variant == 'B' else base
                             if np.random.random() < rate:
-                                new_events.append((f"evt_{uid}", uid, 'purchase', datetime.now()))
+                                new_events.append((f"evt_{uid}", uid, event_type, datetime.now()))
                                 
-                                # Guardrail Logic (Refund simulation)
-                                # Simulate B having higher refund rate mostly to trigger alert
-                                if "Refund" in guard_metric:
+                                # Guardrail Logic (Refund simulation) - only for purchase events
+                                if event_type == 'purchase' and guard_metric:
                                     refund_prob = 0.01 if variant == 'A' else (guard_threshold / 100) + 0.02
                                     if np.random.random() < refund_prob:
                                         # Refund happens 1-24 hours after purchase
@@ -869,7 +879,7 @@ elif st.session_state['page'] == 'study':
                             # events: event_id, user_id, event_name, timestamp
                             con.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", df_events.values.tolist())
                         
-                        st.toast(f"✅ {remaining:,}명 데이터 생성 완료! (환불 데이터 포함)")
+                        st.toast(f"✅ {remaining:,}명 데이터 생성 완료! ({primary_metric} 이벤트 포함)")
                         st.rerun()
                 
                 st.write("")
@@ -979,31 +989,64 @@ elif st.session_state['page'] == 'study':
         st.markdown(f"<h2>Step 4. 최종 분석 (Final Analysis)</h2>", unsafe_allow_html=True)
         edu_guide("P-value (유의 확률)", "결과가 우연히 나왔을 확률입니다. 보통 <strong>0.05 (5%)</strong>보다 낮으면 '통계적으로 유의미하다'고 판단하여 Test 안을 채택합니다.")
 
-        # SQL
-        sql = """
-        SELECT 
-            a.variant as 'Variant',
-            COUNT(DISTINCT a.user_id) as 'Users',
-            COUNT(DISTINCT e.user_id) as 'Conversions'
-        FROM assignments a
-        LEFT JOIN events e ON a.user_id = e.user_id 
-        GROUP BY 1 ORDER BY 1
-        """
+        # Get selected primary metric from Step 1
+        primary_metric = st.session_state.get('metric', 'CTR (클릭률)')
+        
+        # Map metric to event_name
+        metric_event_map = {
+            "CTR (클릭률)": "click_banner",
+            "CVR (전환율)": "purchase",
+            "AOV (평균 주문액)": "purchase",
+            "Bounce Rate (이탈률)": None,
+            "Purchase Time (결제 시간)": "purchase"
+        }
+        
+        event_name = metric_event_map.get(primary_metric, "click_banner")
+        
+        # SQL - Only count experiment users (sim_* and agent_*)
+        # Dynamic based on selected metric
+        if event_name:
+            sql = f"""
+            SELECT 
+                a.variant as 'Variant',
+                COUNT(DISTINCT a.user_id) as 'Users',
+                COUNT(DISTINCT e.user_id) as 'Conversions'
+            FROM assignments a
+            LEFT JOIN events e ON a.user_id = e.user_id AND e.event_name = '{event_name}'
+            WHERE a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%'
+            GROUP BY 1 ORDER BY 1
+            """
+        else:
+            # Fallback for metrics without event
+            sql = """
+            SELECT 
+                a.variant as 'Variant',
+                COUNT(DISTINCT a.user_id) as 'Users',
+                0 as 'Conversions'
+            FROM assignments a
+            WHERE a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%'
+            GROUP BY 1 ORDER BY 1
+            """
+        
         df = run_query(sql, con)
         
         # Calc Stats
         p_val = 1.0
         decision = "Inconclusive"
+        lift = 0
+        c_rate = 0
+        t_rate = 0
+        
         if len(df) == 2:
             c_users, c_conv = df.iloc[0,1], df.iloc[0,2]
             t_users, t_conv = df.iloc[1,1], df.iloc[1,2]
             
-            c_rate = c_conv/c_users
-            t_rate = t_conv/t_users
-            lift = (t_rate - c_rate) / c_rate
+            c_rate = c_conv/c_users if c_users > 0 else 0
+            t_rate = t_conv/t_users if t_users > 0 else 0
+            lift = (t_rate - c_rate) / c_rate if c_rate > 0 else 0
             
-            pooled_p = (c_conv + t_conv) / (c_users + t_users)
-            se = np.sqrt(pooled_p * (1 - pooled_p) * (1/c_users + 1/t_users))
+            pooled_p = (c_conv + t_conv) / (c_users + t_users) if (c_users + t_users) > 0 else 0
+            se = np.sqrt(pooled_p * (1 - pooled_p) * (1/c_users + 1/t_users)) if c_users > 0 and t_users > 0 else 0
             if se > 0:
                 z = (t_rate - c_rate) / se
                 p_val = stats.norm.sf(abs(z))*2
@@ -1021,7 +1064,10 @@ elif st.session_state['page'] == 'study':
                 st.markdown("#### 🏁 최종 성적표")
                 
                 if len(df) == 2:
-                    st.metric("Lift (개선율)", f"{lift*100:.2f}%", f"P-value: {p_val:.4f}")
+                    # Use +/- instead of arrow for P-value delta
+                    pval_display = f"+{p_val:.4f}" if p_val >= 0 else f"{p_val:.4f}"
+                    st.metric("Lift (개선율)", f"{lift*100:.2f}%", delta=None)
+                    st.caption(f"📊 P-value: **{p_val:.4f}**")
                     
                     if decision == "Significant":
                         st.success(f"**WINNER** (실험 성공!)")
@@ -1031,12 +1077,15 @@ elif st.session_state['page'] == 'study':
                 st.divider()
                 
                 # --- Guardrail Analysis ---
-                st.markdown("#### 🛡️ 가이드 지표 분석")
+                st.markdown("#### 🛡️ 가드레일 지표 분석")
                 guard_metric = st.session_state.get('guard_metric', 'Refund Rate')
                 guard_threshold = st.session_state.get('guard_threshold', 5.0)
                 
-                # Calculate Refund Rate per variant
-                if "Refund" in guard_metric and len(df) == 2:
+                # Calculate Refund Rate per variant (or other guardrail metrics)
+                # For now, we support Refund Rate, Bounce Rate, etc.
+                # Check if any refund-related metric is selected
+                if len(df) == 2 and guard_metric:
+                    # Query refund events (filter to experiment users only)
                     sql_refund = """
                     SELECT 
                         a.variant,
@@ -1044,13 +1093,10 @@ elif st.session_state['page'] == 'study':
                     FROM assignments a
                     JOIN events e ON a.user_id = e.user_id
                     WHERE e.event_name = 'refund'
+                    AND (a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%')
                     GROUP BY 1 ORDER BY 1
                     """
                     df_ref = run_query(sql_refund, con)
-                    
-                    # Merge with main df to get converters count
-                    # df has [Variant, Users, Conversions]
-                    # We need Refunds / Conversions
                     
                     # Simple lookup
                     ref_a = 0
@@ -1067,19 +1113,25 @@ elif st.session_state['page'] == 'study':
                     st.write(f"**{guard_metric}**")
                     col_r1, col_r2 = st.columns(2)
                     col_r1.metric("A (Control)", f"{rr_a:.2f}%")
-                    col_r2.metric("B (Test)", f"{rr_b:.2f}%", delta=f"{rr_b-rr_a:.2f}%", delta_color="inverse")
+                    # Use +/- format instead of arrow
+                    delta_val = rr_b - rr_a
+                    delta_str = f"+{delta_val:.2f}%" if delta_val >= 0 else f"{delta_val:.2f}%"
+                    col_r2.metric("B (Test)", f"{rr_b:.2f}%", delta=None)
+                    col_r2.caption(f"차이: **{delta_str}**")
                     
                     if rr_b > guard_threshold:
                         st.error(f"⚠️ **경고: {guard_metric} 급증!**")
                         st.markdown(f"""
                         <div style='background:rgba(255,0,0,0.1); padding:10px; border-radius:5px; border-left:3px solid red;'>
                             <strong>🚨 조기 종료 권장 (Early Stopping Recommended)</strong><br>
-                            B안의 환불률({rr_b:.2f}%)이 허용 임계치({guard_threshold}%)를 초과했습니다.
+                            B안의 {guard_metric}({rr_b:.2f}%)이 허용 임계치({guard_threshold}%)를 초과했습니다.
                             부정적인 사용자 경험이 우려되므로 실험을 중단하는 것이 좋습니다.
                         </div>
                         """, unsafe_allow_html=True)
                     else:
-                        st.success("✅ 가이드 지표 안전함")
+                        st.success("✅ 가드레일 지표 안전함")
+                else:
+                    st.info("💡 가드레일 지표가 설정되지 않았거나 데이터가 부족합니다.")
                 
                 st.divider()
                 note = st.text_area("배운 점 (Learning Note)", placeholder="이번 실험을 통해 무엇을 알게 되었나요?")
