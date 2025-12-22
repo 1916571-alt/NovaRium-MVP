@@ -668,6 +668,54 @@ elif st.session_state['page'] == 'study':
 
         with c2:
             with st.container(border=True):
+                st.markdown("#### 📊 분배 공정성 검증 (Distribution Test)")
+                st.caption("Hash 함수가 정말 공정하게 분배하는지 확인해봅시다.")
+                
+                if st.button("🎲 랜덤 100명 테스트", use_container_width=True):
+                    # Generate 100 random user IDs and assign them
+                    import random
+                    test_users = [f"test_user_{random.randint(10000, 99999)}" for _ in range(100)]
+                    assignments = [get_bucket(u) for u in test_users]
+                    
+                    # Count distribution
+                    group_a = sum(1 for b in assignments if b < 50)
+                    group_b = sum(1 for b in assignments if b >= 50)
+                    
+                    st.session_state['test_distribution'] = {'A': group_a, 'B': group_b}
+                
+                # Display results if test was run
+                if 'test_distribution' in st.session_state:
+                    dist = st.session_state['test_distribution']
+                    
+                    st.markdown(f"""
+                    <div style='background:rgba(255,255,255,0.05); padding:20px; border-radius:10px; margin-top:15px;'>
+                        <div style='margin-bottom:10px;'>
+                            <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
+                                <span>Group A (Control)</span>
+                                <span style='font-weight:bold;'>{dist['A']}명 ({dist['A']}%)</span>
+                            </div>
+                            <div style='height:20px; background:#64748B; border-radius:10px; width:{dist['A']}%;'></div>
+                        </div>
+                        <div>
+                            <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
+                                <span>Group B (Test)</span>
+                                <span style='font-weight:bold;'>{dist['B']}명 ({dist['B']}%)</span>
+                            </div>
+                            <div style='height:20px; background:#8B5CF6; border-radius:10px; width:{dist['B']}%;'></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Verdict
+                    diff = abs(dist['A'] - dist['B'])
+                    if diff <= 10:
+                        st.success(f"✅ 공정하게 분배되었습니다! (차이: {diff}명)")
+                    else:
+                        st.warning(f"⚠️ 약간의 편차가 있습니다. (차이: {diff}명)")
+                    
+                    st.caption("💡 Hash 함수는 완벽한 50/50을 보장하지 않지만, 충분히 큰 샘플에서는 거의 균등하게 분배됩니다.")
+                
+                st.divider()
                 st.markdown("#### 🎛️ 트래픽 비율 설정")
                 split = st.slider("테스트(B) 그룹 비율", 10, 90, 50, format="%d%%")
                 st.caption(f"Control(A): {100-split}% | Test(B): {split}%")
