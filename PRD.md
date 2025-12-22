@@ -6,20 +6,21 @@ NovaRium Edu is an interactive, **educational A/B testing simulator** designed t
 ## 2. Core Value Proposition
 -   **Learning by Doing**: Directly experience the 5-step process (Hypothesis -> Design -> Sampling -> Logging -> Analysis).
 -   **Visualizing the Invisible**: See how Hash algorithms divide users and how logs accumulate in a database.
--   **Portfolio Building**: Save experiment results to an archive to demonstrate growth and understanding.
+-   **Retrospective Growth**: Build a professional-grade "Experiment Retrospective" to document your learning journey.
 
 ## 3. Key Features
 
 ### 🎓 5-Step Master Class (Wizard Mode)
-1.  **Hypothesis & Metrics**: Define problems using a Mock App (NovaEats) and select core metrics (CTR, CVR).
+1.  **Hypothesis & Metrics**: Define problems using a Mock App (NovaEats), selecting **Primary (OEC)** and **Guardrail** metrics.
 2.  **Power Analysis**: Calculate required sample size (`scipy`) based on Alpha, Power, and MDE.
 3.  **Sampling**: Visualize deterministic Hash-based traffic allocation.
-4.  **Simulation**: Generate realistic event logs (`assignments`, `events`) in real-time.
+4.  **Simulation**: Generate realistic event logs (`assignments`, `experiments`) in real-time.
 5.  **Analysis**: Execute SQL queries on DuckDB to aggregate data and calculate P-values.
 
-### 🗄️ My Portfolio (Archive)
--   **History Tracking**: Automatically save every experiment's hypothesis, result, and learning notes.
--   **Growth Evidence**: A dedicated page to review past experiments and "Success/Fail" history.
+### 📚 Experiment Retrospective (Advanced Portfolio)
+-   **Detailed Reporting**: Save full experiment context (`Target`, `Sample Size`, `Lift`, `P-value`).
+-   **Drill-down View**: Expand any experiment card to see a comprehensive "Report Card" of the test.
+-   **Category Management**: Filter experiments by target area to track specific optimization efforts.
 
 ### 🛠️ Tech Stack
 -   **Frontend**: Streamlit (Python components, Session State)
@@ -32,4 +33,4 @@ NovaRium Edu is an interactive, **educational A/B testing simulator** designed t
 -   **`orders`**: Historical transaction data.
 -   **`assignments`**: Experiment group allocation logs.
 -   **`events`**: User behavior logs (clicks, purchases).
--   **`experiments`**: Meta-data archive for completed tests.
+-   **`experiments`**: Comprehensive archive with `target`, `guardrails`, `learning_note`, etc.

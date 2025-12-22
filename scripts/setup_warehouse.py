@@ -45,17 +45,18 @@ def load_data(con):
         )
     """)
     
-    # 3. Experiment Archive (Portfolio)
-    print("Creating 'experiments' table (Archive)...")
+    # 3. Experiment Retrospective (Updated Schema)
+    print("Creating 'experiments' table (Retrospective)...")
+    con.execute("DROP TABLE IF EXISTS experiments")
     con.execute("CREATE SEQUENCE IF NOT EXISTS exp_id_seq START 1")
-    # Note: We do NOT drop this table typically to persist history, 
-    # but for this setup script we might want to ensure schema is correct.
-    # We will use IF NOT EXISTS or handle gracefully.
     con.execute("""
-        CREATE TABLE IF NOT EXISTS experiments (
+        CREATE TABLE experiments (
             exp_id INTEGER DEFAULT nextval('exp_id_seq'),
+            target VARCHAR,
             hypothesis VARCHAR,
             primary_metric VARCHAR,
+            guardrails VARCHAR,
+            sample_size INTEGER,
             start_date DATE,
             end_date DATE,
             traffic_split FLOAT,

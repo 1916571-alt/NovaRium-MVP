@@ -195,7 +195,7 @@ with c_nav:
             st.session_state['page'] = 'study'
             st.rerun()
     with c2:
-        if st.button("🗄️ Portfolio", type="primary" if st.session_state['page']=='portfolio' else "secondary", use_container_width=True):
+        if st.button("📚 회고록 (Retro)", type="primary" if st.session_state['page']=='portfolio' else "secondary", use_container_width=True):
             st.session_state['page'] = 'portfolio'
             st.rerun()
 
@@ -246,7 +246,7 @@ if st.session_state['page'] == 'study':
                 with m2: 
                     st.markdown("🔔 👤")
                 
-                # Category Icons (New Feature)
+                # Category Icons
                 st.write("")
                 st.markdown("**카테고리 (Category)**")
                 cat_cols = st.columns(4)
@@ -569,40 +569,89 @@ if st.session_state['page'] == 'study':
                 st.divider()
                 note = st.text_area("배운 점 (Learning Note)", placeholder="이번 실험을 통해 무엇을 알게 되었나요?")
                 
-                if st.button("💾 포트폴리오에 저장", type="primary", use_container_width=True):
-                    con.execute(f"INSERT INTO experiments (hypothesis, primary_metric, p_value, decision, learning_note, created_at) VALUES ('{st.session_state.get('hypothesis','-')}', '{st.session_state.get('metric','-')}', {p_val}, '{decision}', '{note}', CURRENT_TIMESTAMP)")
+                if st.button("💾 실험 회고록에 저장 (Save Report)", type="primary", use_container_width=True):
+                    # Prepare Data
+                    h = st.session_state.get('hypothesis', '-')
+                    t = st.session_state.get('target', '-')
+                    pm = st.session_state.get('metric', '-')
+                    gr = str(st.session_state.get('guardrails', []))
+                    n = st.session_state.get('n', 0)
+                    split = st.session_state.get('split', 50)
+                    
+                    # Safe Insert
+                    con.execute(f"""
+                        INSERT INTO experiments (
+                            target, hypothesis, primary_metric, guardrails, sample_size, 
+                            traffic_split, p_value, decision, learning_note, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, [t, h, pm, gr, n, split, p_val, decision, note])
                     
                     # Cleanup
                     con.execute("DELETE FROM assignments")
                     con.execute("DELETE FROM events")
                     
-                    st.toast("저장되었습니다!")
+                    st.toast("회고록에 저장되었습니다! 📝")
                     st.session_state['page'] = 'portfolio'
                     st.session_state['step'] = 1
                     st.rerun()
 
 # =========================================================
-# PAGE: PORTFOLIO
+# PAGE: EXPERIMENT RETROSPECTIVE (PORTFOLIO)
 # =========================================================
 elif st.session_state['page'] == 'portfolio':
-    st.title("🗄️ 나의 실험 포트폴리오 (Portfolio)")
-    st.markdown("### 성장 기록 아카이브")
+    st.title("📚 실험 회고록 (Experiment Retrospective)")
+    st.markdown("### 내가 진행한 실험들의 성장 기록")
     
     df_history = run_query("SELECT * FROM experiments ORDER BY created_at DESC", con)
     
     if df_history.empty:
         st.info("아직 진행된 실험이 없습니다. 마스터 클래스에서 첫 실험을 시작해보세요!")
     else:
+        # 1. Filter Context
+        all_targets = ["All"] + list(df_history['target'].unique()) if 'target' in df_history.columns else ["All"]
+        all_targets = [t for t in all_targets if t is not None]
+        
+        selected_target = st.selectbox("📂 카테고리 필터 (Category)", all_targets, index=0)
+        
+        if selected_target != "All":
+            df_history = df_history[df_history['target'] == selected_target]
+            
+        st.divider()
+
+        # 2. Experiment Cards
         for _, row in df_history.iterrows():
             with st.container(border=True):
-                c1, c2 = st.columns([4, 1])
+                # Summary Row
+                c1, c2, c3 = st.columns([0.5, 3, 1.5])
                 with c1:
-                    st.markdown(f"#### {row['hypothesis']}")
-                    st.caption(f"날짜: {row['created_at']} | 지표: {row['primary_metric']}")
-                    if row['learning_note']:
-                        st.markdown(f"> *{row['learning_note']}*")
+                    st.markdown("🧪")
                 with c2:
-                    p = row['p_value']
-                    color = "#4ade80" if row['decision'] == 'Significant' else "#94a3b8"
-                    st.markdown(f"<div style='text-align:right; font-weight:bold; color:{color}; font-size:1.2rem;'>{row['decision']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='text-align:right; font-size:0.9rem; color:rgba(255,255,255,0.5);'>P = {p:.4f}</div>", unsafe_allow_html=True)
+                    st.markdown(f"**{row['hypothesis']}**")
+                    tgt_badge = f"<span style='background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; font-size:0.8rem;'>{row.get('target', 'General')}</span>"
+                    st.markdown(f"{tgt_badge} | {row['created_at'].strftime('%Y-%m-%d %H:%M')}", unsafe_allow_html=True)
+                with c3:
+                    decision = row['decision']
+                    color = "#4ade80" if decision == 'Significant' else "#94a3b8"
+                    st.markdown(f"<div style='text-align:right; color:{color}; font-weight:bold;'>{decision}</div>", unsafe_allow_html=True)
+
+                # Detail Report (Expander)
+                with st.expander("📄 상세 보고서 보기 (View Report)"):
+                    st.markdown("#### 1. 실험 설계 (Design)")
+                    d1, d2, d3 = st.columns(3)
+                    d1.metric("Target", row.get('target', '-'))
+                    d2.metric("Primary Metric", row['primary_metric'])
+                    d3.metric("Guardrails", row.get('guardrails', 'None'))
+                    
+                    st.markdown("#### 2. 실험 결과 (Results)")
+                    r1, r2, r3 = st.columns(3)
+                    r1.metric("Sample Size", f"{row.get('sample_size', 0):,}명")
+                    r2.metric("P-value", f"{row['p_value']:.4f}")
+                    r3.metric("Traffic Split", f"{row.get('traffic_split', 0)}%")
+                    
+                    if row['learning_note']:
+                        st.markdown(f"""
+                        <div style="background:rgba(139, 92, 246, 0.1); padding:15px; border-radius:8px; margin-top:10px;">
+                            <strong>💡 Learning Note:</strong><br>
+                            {row['learning_note']}
+                        </div>
+                        """, unsafe_allow_html=True)
