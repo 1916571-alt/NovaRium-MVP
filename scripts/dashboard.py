@@ -700,10 +700,41 @@ elif st.session_state['page'] == 'study':
         edu_guide("Event Logging (로그 적재)", "유저가 들어오면 <strong>Assignments</strong>(그룹 할당) 테이블에 남고, 행동을 하면 <strong>Events</strong>(클릭/구매) 테이블에 기록됩니다.")
 
         # Get target sample size from Step 2
-        target_total = st.session_state.get('total_needed', 470)  # Use the exact value from Step 2
+        # If not available, recalculate based on current session state
+        if 'total_needed' in st.session_state and st.session_state['total_needed'] < 5000:
+            target_total = st.session_state['total_needed']
+            n_control = st.session_state.get('n_control', 235)
+            n_test = st.session_state.get('n_test', 235)
+        else:
+            # Fallback: recalculate from baseline metrics
+            base_cvr = st.session_state.get('baseline_metric', 0.0693)
+            target_metric = st.session_state.get('target_metric', 0.15)
+            mde = abs(target_metric - base_cvr) / base_cvr
+            
+            # Recalculate sample size
+            from scipy import stats
+            alpha = 0.05
+            power = 0.80
+            p1 = base_cvr
+            p2 = target_metric
+            p_avg = (p1 + p2) / 2
+            z_alpha = stats.norm.ppf(1 - alpha/2)
+            z_beta = stats.norm.ppf(power)
+            n = int(2 * p_avg * (1 - p_avg) * ((z_alpha + z_beta) / (p2 - p1))**2) + 1
+            
+            split = st.session_state.get('split', 50)
+            if split == 50:
+                n_control = n
+                n_test = n
+                target_total = n * 2
+            else:
+                control_pct = (100 - split) / 100
+                test_pct = split / 100
+                target_total = int(n * 2 * max(1/control_pct, 1/test_pct))
+                n_control = int(target_total * control_pct)
+                n_test = int(target_total * test_pct)
+        
         split_ratio = st.session_state.get('split', 50)
-        n_control = st.session_state.get('n_control', 235)
-        n_test = st.session_state.get('n_test', 235)
         
         # Check current data count (only count experiment users, not historical)
         current_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'", con).iloc[0,0]
