@@ -177,7 +177,8 @@ def get_bucket(user_id, num_buckets=100):
     return int(hash_obj.hexdigest(), 16) % num_buckets
 
 # --- Initialize State ---
-if 'page' not in st.session_state: st.session_state['page'] = 'study'
+# Change Default Page to 'monitor'
+if 'page' not in st.session_state: st.session_state['page'] = 'monitor'
 if 'step' not in st.session_state: st.session_state['step'] = 1
 if 'custom_metrics' not in st.session_state: st.session_state['custom_metrics'] = []
 
@@ -187,15 +188,22 @@ con = duckdb.connect(DB_PATH) # Re-connect per run safely
 # Top bar with Logo and Tabs
 c_logo, c_nav = st.columns([1, 4])
 with c_logo:
-    st.markdown("### 🌌 NovaRium")
+    if st.button("🌌 NovaRium", type="secondary", use_container_width=True):
+        st.session_state['page'] = 'intro'
+        st.rerun()
+
 with c_nav:
     # Use standard buttons acting as tabs, styled as pills
-    c1, c2, c3 = st.columns([1, 1, 4])
+    c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
-        if st.button("🚀 Master Class", type="primary" if st.session_state['page']=='study' else "secondary", use_container_width=True):
-            st.session_state['page'] = 'study'
+        if st.button("🔍 모니터링 (Monitor)", type="primary" if st.session_state['page']=='monitor' else "secondary", use_container_width=True):
+            st.session_state['page'] = 'monitor'
             st.rerun()
     with c2:
+        if st.button("🚀 마스터 클래스 (Lab)", type="primary" if st.session_state['page']=='study' else "secondary", use_container_width=True):
+            st.session_state['page'] = 'study'
+            st.rerun()
+    with c3:
         if st.button("📚 회고록 (Retro)", type="primary" if st.session_state['page']=='portfolio' else "secondary", use_container_width=True):
             st.session_state['page'] = 'portfolio'
             st.rerun()
@@ -203,9 +211,135 @@ with c_nav:
 st.write("") # Spacer
 
 # =========================================================
+# PAGE: INTRO (BRAND IDENTITY)
+# =========================================================
+if st.session_state['page'] == 'intro':
+    st.markdown("""
+    <div style="text-align: center; padding: 50px 0;">
+        <h1 style="font-size: 3.5rem; background: linear-gradient(to right, #818CF8, #C084FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;">
+            Where Data Analysts are Born.
+        </h1>
+        <p style="font-size: 1.2rem; margin-bottom: 40px; color: rgba(255,255,255,0.7);">
+            "책으로만 배우는 A/B 테스트는 그만. 직접 경험하며 데이터 분석가로 다시 태어나세요."
+        </p>
+    </div>
+    
+    <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 50px;">
+        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; width: 45%; border: 1px solid rgba(255,255,255,0.1);">
+            <h3 style="color: #A78BFA; margin-bottom: 15px;">✨ Nova (New)</h3>
+            <p style="font-size: 1.1rem; line-height: 1.6;">
+                라틴어로 <strong>'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong>초신성(Supernova)</strong>을 의미합니다.<br>
+                데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.
+            </p>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; width: 45%; border: 1px solid rgba(255,255,255,0.1);">
+            <h3 style="color: #A78BFA; margin-bottom: 15px;">🏛️ Arium (Place)</h3>
+            <p style="font-size: 1.1rem; line-height: 1.6;">
+                라틴어 접미사로 <strong>'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다.<br>
+                예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.
+            </p>
+        </div>
+    </div>
+    
+    <div style="text-align: center;">
+        <div style="background: linear-gradient(90deg, #6366F1, #8B5CF6); padding: 15px 30px; border-radius: 50px; display: inline-block; font-weight: bold; font-size: 1.2rem; box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);">
+            🚀 Mission: "데이터로 비즈니스를 움직이는 초신성(Analyst)을 위한 실전 생태계"
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# =========================================================
+# PAGE: MONITORING DASHBOARD (HOME)
+# =========================================================
+if st.session_state['page'] == 'monitor':
+    st.markdown("## 📊 종합 상황실 (Monitoring Dashboard)")
+    st.caption("NovaEats 서비스의 핵심 지표를 실시간으로 모니터링합니다.")
+
+    # 1. Fetch KPI Logic (Last 30 days)
+    # Using 'user_hist_' IDs from history generator
+    sql_kpi = """
+    WITH daily_stats AS (
+        SELECT 
+            date_trunc('day', assigned_at) as day,
+            COUNT(DISTINCT a.user_id) as users,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END) as clicks,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as orders
+        FROM assignments a
+        LEFT JOIN events e ON a.user_id = e.user_id
+        WHERE a.user_id LIKE 'user_hist_%'
+        GROUP BY 1
+    )
+    SELECT *,
+        (clicks::FLOAT / NULLIF(users,0)) as ctr,
+        (orders::FLOAT / NULLIF(clicks,0)) as cvr
+    FROM daily_stats
+    ORDER BY day ASC
+    """
+    df_trend = run_query(sql_kpi, con)
+    
+    if not df_trend.empty:
+        # Latest Stats (Last available day)
+        latest = df_trend.iloc[-1]
+        prev = df_trend.iloc[-2] if len(df_trend) > 1 else latest
+        
+        # KPI Cards
+        k1, k2, k3, k4 = st.columns(4)
+        with k1:
+            st.metric("Daily Active Users", f"{int(latest['users']):,}", f"{int(latest['users']-prev['users'])}")
+        with k2:
+            st.metric("Banner Click Rate (CTR)", f"{latest['ctr']*100:.2f}%", f"{(latest['ctr']-prev['ctr'])*100:.2f}%")
+        with k3:
+            st.metric("Conversion Rate (CVR)", f"{latest['cvr']*100:.2f}%", f"{(latest['cvr']-prev['cvr'])*100:.2f}%")
+        with k4:
+             st.metric("Orders", f"{int(latest['orders']):,}", f"{int(latest['orders']-prev['orders'])}")
+        
+        st.divider()
+        
+        # 2. Crisis Alert Logic
+        # If CTR drops below 5% (simulated crisis is ~4%)
+        if latest['ctr'] < 0.05:
+            st.error(f"🚨 **[Critical Alert]** 메인 배너 클릭률(CTR)이 급격히 하락했습니다! (현재: {latest['ctr']*100:.1f}%)")
+            
+            c_alert, c_action = st.columns([3, 1])
+            with c_alert:
+                st.markdown("최근 3일간 지표가 정상 범위(15%)에서 위험 수준(4%)으로 떨어졌습니다. 원인을 파악하고 해결 실험을 진행하세요.")
+            with c_action:
+                if st.button("🛠️ 실험으로 해결하기 (Start Test)", type="primary", use_container_width=True):
+                    st.session_state['page'] = 'study'
+                    st.session_state['step'] = 1
+                    st.session_state['target'] = "메인 배너 (할인 문구)" # Auto-context
+                    st.rerun()
+        else:
+            st.success("✅ 모든 서비스 지표가 정상 범위입니다.")
+
+        # 3. Trend Charts
+        st.markdown("### 📈 30일 지표 트렌드 (Metric Trends)")
+        
+        tab_ctr, tab_cvr = st.tabs(["클릭률 (CTR)", "구매 전환율 (CVR)"])
+        
+        with tab_ctr:
+            fig = px.line(df_trend, x='day', y='ctr', markers=True, 
+                          title='Daily Banner CTR', template='plotly_dark')
+            fig.update_traces(line_color='#ef4444' if latest['ctr'] < 0.05 else '#4ade80', line_width=4)
+            fig.add_hrect(y0=0.14, y1=0.16, line_width=0, fillcolor="green", opacity=0.1, annotation_text="Target Range")
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with tab_cvr:
+            fig2 = px.line(df_trend, x='day', y='cvr', markers=True, 
+                           title='Daily Purchase CVR (Click to Order)', template='plotly_dark')
+            fig2.update_traces(line_color='#8B5CF6', line_width=3)
+            st.plotly_chart(fig2, use_container_width=True)
+
+    else:
+        st.warning("데이터가 없습니다. `generate_history.py`를 실행해주세요.")
+        if st.button("데이터 생성하기"):
+             # Call script via simple trigger? (Would need restart, but let's just guide user)
+             st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
+
+# =========================================================
 # PAGE: STUDY (WIZARD)
 # =========================================================
-if st.session_state['page'] == 'study':
+elif st.session_state['page'] == 'study':
     
     # --- Progress Indicators (Nebula Style) ---
     steps = ["Hypothesis", "Design", "Sampling", "Collection", "Analysis"]
