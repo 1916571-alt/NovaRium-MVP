@@ -697,25 +697,46 @@ elif st.session_state['page'] == 'study':
         st.markdown(f"<h2>Step 3. 데이터 수집 (Collection)</h2>", unsafe_allow_html=True)
         edu_guide("Event Logging (로그 적재)", "유저가 들어오면 <strong>Assignments</strong>(그룹 할당) 테이블에 남고, 행동을 하면 <strong>Events</strong>(클릭/구매) 테이블에 기록됩니다.")
 
-        # Check current data count
-        total_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments", con).iloc[0,0]
+        # Get target sample size from Step 2
+        target_total = st.session_state.get('n', 235) * 2  # Total needed (both groups)
+        split_ratio = st.session_state.get('split', 50)
+        
+        # Check current data count (only count experiment users, not historical)
+        current_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'", con).iloc[0,0]
+        remaining = max(0, target_total - current_n)
+        progress_pct = min(100, (current_n / target_total * 100) if target_total > 0 else 0)
         
         # Centered container
         col_center = st.columns([1, 2, 1])
         with col_center[1]:
             with st.container(border=True):
                 st.markdown("### 📊 데이터 생성 방식 선택")
-                st.caption(f"현재 누적 유저 수: **{total_n:,}명**")
+                
+                # Progress Display
+                st.markdown(f"""
+                <div style='background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin-bottom:20px;'>
+                    <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>
+                        <span style='color:rgba(255,255,255,0.7);'>현재 진행률</span>
+                        <span style='font-weight:bold; color:#8B5CF6;'>{current_n:,}명 / {target_total:,}명</span>
+                    </div>
+                    <div style='background:rgba(255,255,255,0.1); height:10px; border-radius:5px; overflow:hidden;'>
+                        <div style='background:linear-gradient(90deg, #8B5CF6, #C084FC); height:100%; width:{progress_pct}%;'></div>
+                    </div>
+                    <div style='text-align:center; margin-top:10px; color:rgba(255,255,255,0.6); font-size:0.9rem;'>
+                        {progress_pct:.1f}% 완료 | 남은 인원: {remaining:,}명
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 st.write("")
                 
                 # Button 1: Quick Simulation
                 with st.expander("ℹ️ ⚡ 빠른 시뮬레이션 (1초, 교육용)"):
-                    st.markdown("""
+                    st.markdown(f"""
                     **Python 코드로 확률 계산하여 즉시 생성**
                     
-                    1. 가상 User ID 1,000개 생성
-                    2. Hash 함수로 A/B 그룹 할당
+                    1. 남은 인원({remaining:,}명)만큼 가상 User ID 생성
+                    2. Hash 함수로 A/B 그룹 할당 ({100-split_ratio}/{split_ratio})
                     3. 확률로 클릭/구매 결정
                     4. DB에 직접 입력
                     
@@ -723,24 +744,25 @@ elif st.session_state['page'] == 'study':
                     **단점:** 현실성 낮음
                     """)
                 
-                if st.button("⚡ 빠른 시뮬레이션 (1,000명)", type="primary", use_container_width=True):
-                    with st.spinner("데이터 생성 중..."):
-                        split = st.session_state.get('split', 50)/100
-                        base = 0.10
-                        lift = base * 1.15
+                if st.button(f"⚡ 빠른 시뮬레이션 ({remaining:,}명 생성)", type="primary", use_container_width=True, disabled=(remaining==0)):
+                    with st.spinner(f"데이터 생성 중... ({remaining:,}명)"):
+                        split = split_ratio / 100
+                        base = st.session_state.get('baseline_metric', 0.10)
+                        target = st.session_state.get('target_metric', 0.15)
                         
                         current_count = run_query("SELECT COUNT(*) FROM assignments", con).iloc[0,0]
                         new_users = []
                         new_events = []
                         
-                        for i in range(1000):
+                        for i in range(remaining):
                             uid = f"sim_{current_count + i}"
                             is_test = get_bucket(uid) >= (100 * (1 - split))
                             variant = 'B' if is_test else 'A'
                             
                             new_users.append((uid, 'exp_1', variant, datetime.now()))
                             
-                            rate = lift if variant == 'B' else base
+                            # Use actual target metrics from Step 2
+                            rate = target if variant == 'B' else base
                             if np.random.random() < rate:
                                 new_events.append((f"evt_{uid}", uid, 'purchase', datetime.now()))
                         
@@ -752,35 +774,36 @@ elif st.session_state['page'] == 'study':
                             df_events = pd.DataFrame(new_events, columns=['eid','uid','name','ts'])
                             con.execute("INSERT INTO events SELECT * FROM df_events")
                         
-                        st.toast("✅ 1,000명 데이터 생성 완료!")
+                        st.toast(f"✅ {remaining:,}명 데이터 생성 완료!")
                         st.rerun()
                 
                 st.write("")
                 
                 # Button 2: Agent Swarm
-                with st.expander("ℹ️ 🤖 에이전트 투입 (30초, 실전)"):
-                    st.markdown("""
+                with st.expander("ℹ️ 🤖 에이전트 투입 (실전)"):
+                    st.markdown(f"""
                     **실제 HTTP 요청으로 앱 방문 후 판단**
                     
-                    1. 5가지 행동 유형의 에이전트 생성
-                    2. `localhost:8000` 실제 접속
-                    3. 화면 보고 판단하여 행동
+                    1. 남은 인원({remaining:,}명)만큼 에이전트 생성
+                    2. 5가지 행동 유형으로 분산 (충동/계산/윈도우쇼핑/목적/신중)
+                    3. `localhost:8000` 실제 접속하여 판단
                     4. DB 자동 기록
                     
                     **장점:** 현실적, 실전 시뮬레이션  
-                    **단점:** 30초 소요, Target App 필요
+                    **단점:** 시간 소요, Target App 필요
                     """)
                 
-                if st.button("🤖 에이전트 투입 (100명)", type="secondary", use_container_width=True):
+                if st.button(f"🤖 에이전트 투입 ({remaining:,}명)", type="secondary", use_container_width=True, disabled=(remaining==0)):
+                    # Calculate agent distribution based on remaining
                     agent_config = {
-                        "impulsive": 20,
-                        "calculator": 25,
-                        "browser": 25,
-                        "mission": 20,
-                        "cautious": 10
+                        "impulsive": int(remaining * 0.2),
+                        "calculator": int(remaining * 0.25),
+                        "browser": int(remaining * 0.25),
+                        "mission": int(remaining * 0.2),
+                        "cautious": int(remaining * 0.1)
                     }
                     
-                    with st.spinner("🤖 에이전트 투입 중... (30초 소요)"):
+                    with st.spinner(f"🤖 에이전트 투입 중... ({remaining:,}명)"):
                         try:
                             import sys
                             import os
@@ -797,7 +820,7 @@ elif st.session_state['page'] == 'study':
                             results = run_agent_swarm(agent_config, update_progress)
                             
                             st.success(f"✅ 에이전트 {results['total']}명 투입 완료!")
-                            st.info(f"📊 클릭: {results['clicked']}명 ({results['clicked']/results['total']*100:.1f}%) | 구매: {results['purchased']}명")
+                            st.info(f"📊 클릭: {results['clicked']}명 | 구매: {results['purchased']}명")
                             
                             st.rerun()
                         
@@ -809,12 +832,13 @@ elif st.session_state['page'] == 'study':
                 st.divider()
                 
                 # Next button
-                if total_n > 0:
+                if current_n >= target_total:
+                    st.success(f"✅ 목표 달성! ({current_n:,}/{target_total:,}명)")
                     if st.button("다음: 결과 분석 ➡️", type="primary", use_container_width=True):
                         st.session_state['step'] = 4
                         st.rerun()
                 else:
-                    st.info("💡 위 버튼 중 하나를 선택하여 데이터를 생성하세요.")
+                    st.info(f"💡 위 버튼 중 하나를 선택하여 데이터를 생성하세요. (남은 인원: {remaining:,}명)")
     
 
 
