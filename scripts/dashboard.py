@@ -862,12 +862,12 @@ elif st.session_state['page'] == 'study':
                         if new_users:
                             df_users = pd.DataFrame(new_users, columns=['uid','eid','var','ts'])
                             # assignments: user_id, experiment_id, variant, assigned_at
-                            con.execute("INSERT INTO assignments VALUES (?, ?, ?, ?)", df_users.values.tolist())
+                            con.executemany("INSERT INTO assignments VALUES (?, ?, ?, ?)", df_users.values.tolist())
                         
                         if new_events:
                             df_events = pd.DataFrame(new_events, columns=['eid','uid','name','ts'])
                             # events: event_id, user_id, event_name, timestamp
-                            con.execute("INSERT INTO events VALUES (?, ?, ?, ?)", df_events.values.tolist())
+                            con.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", df_events.values.tolist())
                         
                         st.toast(f"✅ {remaining:,}명 데이터 생성 완료! (환불 데이터 포함)")
                         st.rerun()
@@ -948,7 +948,7 @@ elif st.session_state['page'] == 'study':
                             if new_refunds:
                                 df_refunds = pd.DataFrame(new_refunds, columns=['eid','uid','name','ts'])
                                 # events: event_id, user_id, event_name, timestamp
-                                con.execute("INSERT INTO events VALUES (?, ?, ?, ?)", df_refunds.values.tolist())
+                                con.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", df_refunds.values.tolist())
                             
                             cnt_refunds = len(new_refunds)
                             st.success(f"✅ 에이전트 {results['total']}명 투입 완료! (성공: {results['success']}명, 환불: {cnt_refunds}건)")
