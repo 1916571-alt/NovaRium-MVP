@@ -880,9 +880,46 @@ elif st.session_state['page'] == 'study':
                             key=f"agent_{key}"
                         )
                 
+                
                 if st.button("🤖 에이전트 100명 투입", type="secondary", use_container_width=True):
-                    st.info("🚧 에이전트 기능은 현재 개발 중입니다. 빠른 시뮬레이션을 사용해주세요.")
-                    # TODO: Implement agent swarm integration
+                    # Prepare config from UI
+                    run_config = {
+                        "impulsive": agent_config["impulsive"]["count"],
+                        "calculator": agent_config["calculator"]["count"],
+                        "browser": agent_config["browser"]["count"],
+                        "mission": agent_config["mission"]["count"],
+                        "cautious": agent_config["cautious"]["count"]
+                    }
+                    
+                    # Run agent swarm
+                    with st.spinner("🤖 에이전트 투입 중... (30초 소요)"):
+                        try:
+                            from agent_swarm.runner import run_agent_swarm
+                            
+                            # Progress tracking
+                            progress_placeholder = st.empty()
+                            
+                            def update_progress(current, total, msg):
+                                progress_placeholder.progress(current / total, text=f"{msg} ({current}/{total})")
+                            
+                            results = run_agent_swarm(run_config, update_progress)
+                            
+                            # Display results
+                            st.success(f"✅ 에이전트 {results['total']}명 투입 완료!")
+                            st.info(f"📊 클릭: {results['clicked']}명 ({results['clicked']/results['total']*100:.1f}%) | 구매: {results['purchased']}명 ({results['purchased']/results['total']*100:.1f}%)")
+                            
+                            # Detailed breakdown
+                            with st.expander("📈 행동 유형별 상세 결과"):
+                                for trait, stats in results['by_trait'].items():
+                                    ctr = stats['clicked'] / stats['total'] * 100 if stats['total'] > 0 else 0
+                                    cvr = stats['purchased'] / stats['clicked'] * 100 if stats['clicked'] > 0 else 0
+                                    st.caption(f"**{trait}**: CTR={ctr:.1f}% | CVR={cvr:.1f}%")
+                            
+                            st.rerun()
+                        
+                        except Exception as e:
+                            st.error(f"❌ 에이전트 실행 실패: {str(e)}")
+                            st.info("💡 Tip: Target App (localhost:8000)이 실행 중인지 확인하세요.")
 
         # Stats Display
         st.divider()
