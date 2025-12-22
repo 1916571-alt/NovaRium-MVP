@@ -534,8 +534,8 @@ elif st.session_state['page'] == 'study':
                     WHERE a.user_id LIKE 'user_hist_%'
                     AND a.assigned_at >= CURRENT_DATE - INTERVAL '3 days'
                     """
-                    metric_label = "기존 클릭률 (Baseline CTR)"
-                    target_label = "클릭률"
+                    metric_label = "클릭률 (CTR)"
+                    normal_target = 0.15  # Normal CTR is 15%
                 else:  # CVR or other
                     sql_baseline = """
                     SELECT 
@@ -546,31 +546,54 @@ elif st.session_state['page'] == 'study':
                     WHERE a.user_id LIKE 'user_hist_%'
                     AND a.assigned_at >= CURRENT_DATE - INTERVAL '3 days'
                     """
-                    metric_label = "기존 전환율 (Baseline CVR)"
-                    target_label = "전환율"
+                    metric_label = "전환율 (CVR)"
+                    normal_target = 0.20  # Normal CVR is 20%
                 
                 df_baseline = run_query(sql_baseline, con)
                 auto_baseline = df_baseline.iloc[0, 0] if not df_baseline.empty and df_baseline.iloc[0, 0] else 0.10
                 
-                base_cvr = st.number_input(metric_label, 0.01, 1.0, float(auto_baseline), step=0.01, 
-                                          help=f"현재 측정된 {target_label}: {auto_baseline*100:.2f}%")
-                mde = st.slider("최소 감지 효과 (MDE)", 1, 50, 10, format="+%d%%")
-                st.caption(f"목표: {target_label}이 {base_cvr*100:.1f}%에서 {base_cvr*(1+mde/100)*100:.1f}%로 오르는 것을 감지")
+                # Display Current (Read-only style)
+                st.markdown(f"**현재 {metric_label}** (자동 감지)")
+                st.markdown(f"""
+                <div style='padding:15px; background:rgba(239, 68, 68, 0.1); border:2px solid #ef4444; border-radius:10px; text-align:center;'>
+                    <div style='font-size:2rem; font-weight:bold; color:#ef4444;'>{auto_baseline*100:.2f}%</div>
+                    <div style='font-size:0.9rem; color:rgba(255,255,255,0.6); margin-top:5px;'>최근 3일 평균</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.write("")
+                
+                # Target Input (User sets goal)
+                target_metric = st.number_input(f"**목표 {metric_label}** (실험 성공 시 도달할 목표)", 
+                                               min_value=auto_baseline, max_value=1.0, 
+                                               value=float(normal_target), step=0.01,
+                                               format="%.2f",
+                                               help=f"정상 범위: {normal_target*100:.0f}%")
+                
+                # Calculate MDE internally
+                mde = (target_metric - auto_baseline) / auto_baseline if auto_baseline > 0 else 0
+                
+                st.caption(f"💡 목표: {auto_baseline*100:.2f}% → {target_metric*100:.2f}% (상승폭: +{mde*100:.1f}%)")
+                
+                base_cvr = auto_baseline  # Use detected baseline for calculation
         
         with c2:
             with st.container(border=True):
                 st.markdown("#### 🧮 필요 표본 수 (Required Sample)")
-                n = calculate_sample_size(base_cvr, mde/100)
+                n = calculate_sample_size(base_cvr, mde)
                 
                 st.markdown(f"<div class='big-stat'>{n:,}</div>", unsafe_allow_html=True)
                 st.markdown("**명 (그룹 당)**")
                 
-                st.progress(0.7)
-                st.caption(f"총 필요 유저 수: {n*2:,} 명")
+                st.progress(min(1.0, 0.3 + (mde * 2)))  # Dynamic progress based on effect size
+                st.caption(f"총 필요 유저 수: **{n*2:,}명**")
+                st.caption(f"효과 크기가 클수록 적은 샘플로 감지 가능합니다.")
                 
                 st.write("")
                 if st.button("다음: 트래픽 분배 ➡️", type="primary", use_container_width=True):
                     st.session_state['n'] = n
+                    st.session_state['baseline_metric'] = base_cvr
+                    st.session_state['target_metric'] = target_metric
                     st.session_state['step'] = 3
                     st.rerun()
 
