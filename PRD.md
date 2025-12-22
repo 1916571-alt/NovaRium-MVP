@@ -11,10 +11,10 @@ NovaRium Edu is an interactive, **educational A/B testing simulator** designed t
 ## 3. Key Features
 
 ### 🎓 5-Step Master Class (Wizard Mode)
-1.  **Hypothesis & Metrics**: Define problems using a Mock App (NovaEats), selecting **Primary (OEC)** and **Guardrail** metrics.
+1.  **Hypothesis & Metrics**: Define problems using a Mock App (NovaEats), selecting **Primary (OEC)** and **Guardrail** metrics (e.g., Refund Rate).
 2.  **Power Analysis**: Calculate required sample size (`scipy`) based on Alpha, Power, and MDE.
 3.  **Sampling**: Visualize deterministic Hash-based traffic allocation.
-4.  **Simulation**: Generate realistic event logs (`assignments`, `experiments`) in real-time.
+4.  **Simulation**: Generate realistic event logs (`assignments`, `experiments`) using **Agent Swarm** (AI personas) or fast simulation.
 5.  **Analysis**: Execute SQL queries on DuckDB to aggregate data and calculate P-values.
 
 ### 📚 Experiment Retrospective (Advanced Portfolio)
