@@ -355,7 +355,7 @@ elif st.session_state['page'] == 'study':
         cols[i].markdown(f"""
         <div style="text-align:center;">
             <div style="height:4px; width:100%; background:{color}; border-radius:2px; margin-bottom:8px; box-shadow:{'0 0 10px #8B5CF6' if is_active else 'none'}"></div>
-            <span style="color:{text_color}; font-weight:{weight}; font-size:0.9rem;">{i+1}. {s}</span>
+            <span style="color:{text_color}; font-weight:{weight}; font-size:0.9rem;">{s}</span>
         </div>
         """, unsafe_allow_html=True)
     
