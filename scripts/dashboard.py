@@ -342,7 +342,7 @@ if st.session_state['page'] == 'monitor':
 elif st.session_state['page'] == 'study':
     
     # --- Progress Indicators (Nebula Style) ---
-    steps = ["Hypothesis", "Design", "Sampling", "Collection", "Analysis"]
+    steps = ["1. Hypothesis", "2. Design", "3. Collection", "4. Analysis"]
     curr = st.session_state['step']
     
     cols = st.columns(len(steps))
@@ -510,10 +510,42 @@ elif st.session_state['page'] == 'study':
                         st.session_state['step'] = 2
                         st.rerun()
 
-    # --- STEP 2: DESIGN ---
+    # --- STEP 2: EXPERIMENT DESIGN (Unified: Traffic + Power Analysis) ---
     elif curr == 2:
-        st.markdown(f"<h2>Step 2. 실험 설계 (Power Analysis)</h2>", unsafe_allow_html=True)
-        edu_guide("Sample Size (표본 크기)", "실험 인원이 너무 적으면 결과를 신뢰할 수 없습니다. 통계적 유의성(Alpha)과 검정력(Power)을 고려해 <strong>최소 몇 명이 필요한지</strong> 계산합니다.")
+        st.markdown(f"<h2>Step 2. 실험 설계 (Experiment Design)</h2>", unsafe_allow_html=True)
+        edu_guide("실험 설계의 3요소", "트래픽 비율 → 목표 설정 → 필요 표본 계산 순서로 진행합니다. <strong>트래픽 비율이 표본 크기에 영향</strong>을 주므로 먼저 결정해야 합니다.")
+        
+        # === PART 1: Traffic Ratio Selection ===
+        st.markdown("### 1️⃣ 트래픽 비율 설정")
+        
+        col_ratio = st.columns([1, 1], gap="large")
+        with col_ratio[0]:
+            with st.container(border=True):
+                st.markdown("#### 🎛️ 비율 선택")
+                with st.expander("💡 비율 선택 가이드"):
+                    st.markdown("""
+                    | 비율 | 상황 | 예시 |
+                    |------|------|------|
+                    | **50/50** | 표준 실험 | UI 색상, 문구 변경 |
+                    | **90/10** | 고위험 실험 | 결제 플로우, 핵심 기능 |
+                    | **10/90** | 저위험 + 확신 | 명백한 개선사항 빠른 적용 |
+                    
+                    **현재 상황:** 배너 문구 변경 → 추천 **50/50**
+                    """)
+                split = st.slider("테스트(B) 그룹 비율", 10, 90, 50, format="%d%%")
+                st.caption(f"Control(A): {100-split}% | Test(B): {split}%")
+        
+        with col_ratio[1]:
+            with st.container(border=True):
+                st.markdown("#### 🔍 Hash 검증")
+                uid = st.text_input("User ID", "user_cosmic_99", key="hash_uid")
+                b = get_bucket(uid)
+                threshold = 100 - split
+                grp = "B" if b >= threshold else "A"
+                st.markdown(f"**Hash: {b}** → Group **{grp}**")
+        
+        st.divider()
+        st.markdown("### 2️⃣ 목표 설정 및 표본 계산")
 
         c1, c2 = st.columns(2, gap="large")
         with c1:
@@ -584,12 +616,27 @@ elif st.session_state['page'] == 'study':
                 st.markdown("#### 🧮 필요 표본 수 (Required Sample)")
                 n = calculate_sample_size(base_cvr, mde)
                 
-                st.markdown(f"<div class='big-stat'>{n:,}</div>", unsafe_allow_html=True)
-                st.markdown("**명 (그룹 당)**")
+                # Adjust for traffic ratio
+                if split == 50:
+                    n_control = n
+                    n_test = n
+                    total_needed = n * 2
+                else:
+                    # For unequal splits, adjust proportionally
+                    control_pct = (100 - split) / 100
+                    test_pct = split / 100
+                    # Keep total sample size but distribute by ratio
+                    total_needed = int(n * 2 * max(1/control_pct, 1/test_pct))
+                    n_control = int(total_needed * control_pct)
+                    n_test = int(total_needed * test_pct)
                 
-                st.progress(min(1.0, 0.3 + (mde * 2)))  # Dynamic progress based on effect size
-                st.caption(f"총 필요 유저 수: **{n*2:,}명**")
-                st.caption(f"효과 크기가 클수록 적은 샘플로 감지 가능합니다.")
+                st.markdown(f"<div class='big-stat'>{total_needed:,}</div>", unsafe_allow_html=True)
+                st.markdown("**명 (총 필요 유저 수)**")
+                
+                st.progress(min(1.0, 0.3 + (mde * 2)))
+                st.caption(f"• Control (A): **{n_control:,}명** ({100-split}%)")
+                st.caption(f"• Test (B): **{n_test:,}명** ({split}%)")
+                st.caption(f"💡 트래픽 비율에 따라 각 그룹의 필요 인원이 조정됩니다.")
                 
                 # Educational Explainer
                 with st.expander("📐 계산 로직 보기 (How is this calculated?)"):
@@ -637,147 +684,17 @@ elif st.session_state['page'] == 'study':
                 
                 
                 st.write("")
-                if st.button("다음: 트래픽 분배 ➡️", type="primary", use_container_width=True):
+                if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
+                    st.session_state['split'] = split
                     st.session_state['n'] = n
                     st.session_state['baseline_metric'] = base_cvr
                     st.session_state['target_metric'] = target_metric
                     st.session_state['step'] = 3
                     st.rerun()
 
-    # --- STEP 3: SAMPLING ---
+    # --- STEP 3: COLLECTION (formerly Step 4) ---
     elif curr == 3:
-        st.markdown(f"<h2>Step 3. 트래픽 분배 (Sampling)</h2>", unsafe_allow_html=True)
-        edu_guide("Hashing (해시 할당)", "유저를 A/B 그룹으로 나눌 때 가장 공평한 방법은 Random입니다. 우리는 유저 ID를 <strong>Hash 함수</strong>에 넣어 고정된 그룹을 부여합니다.")
-
-        # REORDERED: Traffic Split FIRST, then Hash Simulator
-        c1, c2 = st.columns([1, 1], gap="large")
-        
-        # LEFT: Traffic Split Configuration
-        with c1:
-            with st.container(border=True):
-                st.markdown("#### 🎛️ 트래픽 비율 설정")
-                
-                # Educational Guide for Split Selection
-                with st.expander("💡 비율 선택 가이드 (When to use what?)"):
-                    st.markdown("""
-                    **트래픽 비율은 실험의 위험도에 따라 결정합니다:**
-                    
-                    | 비율 | 상황 | 예시 |
-                    |------|------|------|
-                    | **50/50** | 표준 실험 | UI 색상, 문구 변경 |
-                    | **90/10** | 고위험 실험 | 결제 플로우, 핵심 기능 |
-                    | **10/90** | 저위험 + 확신 | 명백한 개선사항 빠른 적용 |
-                    
-                    **선택 기준:**
-                    - 🎯 **50/50**: 가장 빠른 통계적 유의성 확보
-                    - 🛡️ **90/10**: "혹시 망하면 피해 최소화"
-                    - 🚀 **10/90**: "확신 있으니 빨리 많은 사람에게"
-                    
-                    **현재 상황 (CTR 급락):**
-                    - 위험도: 중간 (배너 문구 변경)
-                    - 추천: **50/50** (표준 실험)
-                    """)
-                
-                split = st.slider("테스트(B) 그룹 비율", 10, 90, 50, format="%d%%", 
-                                 help="실험군에 할당할 트래픽 비율을 설정하세요.")
-                
-                st.markdown(f"""
-                <div style='background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin-top:10px;'>
-                    <div style='display:flex; justify-content:space-between;'>
-                        <div>
-                            <div style='color:#64748B; font-weight:bold;'>Control (A)</div>
-                            <div style='font-size:1.5rem;'>{100-split}%</div>
-                        </div>
-                        <div style='text-align:right;'>
-                            <div style='color:#8B5CF6; font-weight:bold;'>Test (B)</div>
-                            <div style='font-size:1.5rem;'>{split}%</div>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # RIGHT: Hash Simulator (now uses the selected split)
-        with c2:
-            with st.container(border=True):
-                st.markdown("#### 🔍 해시 시뮬레이터 (Hash Simulator)")
-                st.caption(f"설정한 비율({split}%)로 실제 분배가 잘 되는지 확인해봅시다.")
-                
-                # Single User Test
-                uid = st.text_input("테스트 User ID 입력", "user_cosmic_99", key="hash_test_uid")
-                b = get_bucket(uid)
-                
-                # Apply the selected split ratio
-                threshold = 100 - split  # If split=50, threshold=50
-                grp = "B (Test)" if b >= threshold else "A (Control)"
-                color = "#8B5CF6" if grp.startswith("B") else "#64748B"
-                
-                st.markdown(f"""
-                <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; text-align:center; margin-bottom:15px;">
-                    <div style="font-family:monospace; color:rgba(255,255,255,0.5); font-size:0.9rem;">MD5("{uid}") % 100</div>
-                    <div style="font-size:2rem; font-weight:bold; color:white; margin:10px 0;">{b}</div>
-                    <div style="color:{color}; font-weight:bold; font-size:1.1rem;">➜ Group {grp}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Batch Distribution Test
-                st.divider()
-                st.markdown("**📊 분배 공정성 검증**")
-                
-                if st.button("🎲 랜덤 100명 테스트", use_container_width=True):
-                    import random
-                    test_users = [f"test_user_{random.randint(10000, 99999)}" for _ in range(100)]
-                    assignments = [get_bucket(u) for u in test_users]
-                    
-                    # Count based on current split setting
-                    group_a = sum(1 for b in assignments if b < threshold)
-                    group_b = sum(1 for b in assignments if b >= threshold)
-                    
-                    st.session_state['test_distribution'] = {'A': group_a, 'B': group_b, 'target_split': split}
-                
-                # Display results
-                if 'test_distribution' in st.session_state:
-                    dist = st.session_state['test_distribution']
-                    
-                    st.markdown(f"""
-                    <div style='background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin-top:10px;'>
-                        <div style='margin-bottom:10px;'>
-                            <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
-                                <span>Group A (Control)</span>
-                                <span style='font-weight:bold;'>{dist['A']}명 ({dist['A']}%)</span>
-                            </div>
-                            <div style='height:15px; background:#64748B; border-radius:5px; width:{dist['A']}%;'></div>
-                        </div>
-                        <div>
-                            <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
-                                <span>Group B (Test)</span>
-                                <span style='font-weight:bold;'>{dist['B']}명 ({dist['B']}%)</span>
-                            </div>
-                            <div style='height:15px; background:#8B5CF6; border-radius:5px; width:{dist['B']}%;'></div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Verdict (compare to target)
-                    expected_b = dist['target_split']
-                    actual_b = dist['B']
-                    diff = abs(expected_b - actual_b)
-                    
-                    if diff <= 10:
-                        st.success(f"✅ 목표({expected_b}%)와 거의 일치합니다! (차이: {diff}%)")
-                    else:
-                        st.info(f"ℹ️ 샘플이 작아 약간의 편차가 있습니다. (차이: {diff}%)")
-        
-        st.write("")
-        col_btn = st.columns([2, 1, 2])
-        with col_btn[1]:
-            if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
-                st.session_state['split'] = split
-                st.session_state['step'] = 4
-                st.rerun()
-
-    # --- STEP 4: COLLECTION ---
-    elif curr == 4:
-        st.markdown(f"<h2>Step 4. 데이터 수집 (Collection)</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2>Step 3. 데이터 수집 (Collection)</h2>", unsafe_allow_html=True)
         edu_guide("Event Logging (로그 적재)", "유저가 들어오면 <strong>Assignments</strong>(그룹 할당) 테이블에 남고, 행동을 하면 <strong>Events</strong>(클릭/구매) 테이블에 기록됩니다.")
 
         # Check current data count
@@ -799,13 +716,11 @@ elif st.session_state['page'] == 'study':
                     
                     1. 가상 User ID 1,000개 생성
                     2. Hash 함수로 A/B 그룹 할당
-                    3. 확률로 클릭/구매 결정:
-                       - Control(A): 10% 전환율
-                       - Test(B): 11.5% 전환율 (+15%)
-                    4. DB에 직접 입력 (앱 방문 없음)
+                    3. 확률로 클릭/구매 결정
+                    4. DB에 직접 입력
                     
-                    **장점:** 1초 이내 완료, 빠른 학습  
-                    **단점:** 현실성 낮음 (순수 랜덤)
+                    **장점:** 1초 이내 완료  
+                    **단점:** 현실성 낮음
                     """)
                 
                 if st.button("⚡ 빠른 시뮬레이션 (1,000명)", type="primary", use_container_width=True):
@@ -847,12 +762,7 @@ elif st.session_state['page'] == 'study':
                     st.markdown("""
                     **실제 HTTP 요청으로 앱 방문 후 판단**
                     
-                    1. 5가지 행동 유형의 에이전트 생성:
-                       - 🔥 충동형: 20명 (긴급 문구에 즉시 반응)
-                       - 🧮 계산형: 25명 (할인율 꼼꼼히 계산)
-                       - 🛍️ 윈도우쇼핑: 25명 (클릭만, 구매 드물게)
-                       - 🎯 목적형: 20명 (검색 → 바로 구매)
-                       - 🐌 신중형: 10명 (리뷰 확인 후 며칠 고민)
+                    1. 5가지 행동 유형의 에이전트 생성
                     2. `localhost:8000` 실제 접속
                     3. 화면 보고 판단하여 행동
                     4. DB 자동 기록
@@ -901,14 +811,16 @@ elif st.session_state['page'] == 'study':
                 # Next button
                 if total_n > 0:
                     if st.button("다음: 결과 분석 ➡️", type="primary", use_container_width=True):
-                        st.session_state['step'] = 5
+                        st.session_state['step'] = 4
                         st.rerun()
                 else:
                     st.info("💡 위 버튼 중 하나를 선택하여 데이터를 생성하세요.")
+    
 
-    # --- STEP 5: ANALYSIS ---
-    elif curr == 5:
-        st.markdown(f"<h2>Step 5. 최종 분석 (Final Analysis)</h2>", unsafe_allow_html=True)
+
+    # --- STEP 4: ANALYSIS (formerly Step 5) ---
+    elif curr == 4:
+        st.markdown(f"<h2>Step 4. 최종 분석 (Final Analysis)</h2>", unsafe_allow_html=True)
         edu_guide("P-value (유의 확률)", "결과가 우연히 나왔을 확률입니다. 보통 <strong>0.05 (5%)</strong>보다 낮으면 '통계적으로 유의미하다'고 판단하여 Test 안을 채택합니다.")
 
         # SQL
