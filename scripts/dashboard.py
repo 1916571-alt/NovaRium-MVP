@@ -260,7 +260,7 @@ if st.session_state['page'] == 'monitor':
     has_history = not check_history.empty and check_history.iloc[0, 0] > 0
     
     if not has_history:
-        st.warning("데이터가 없습니다. generate_history.py를 실행해주세요.")
+        st.warning("데이터가 없습니다. 30일치 히스토리를 생성하세요.")
         
         if st.button("🔄 데이터 생성하기 (30일치)", type="primary"):
             with st.spinner("30일치 히스토리 데이터 생성 중..."):
@@ -317,6 +317,70 @@ if st.session_state['page'] == 'monitor':
                 st.rerun()
         
         st.stop()
+    else:
+        # Data exists - show regenerate option with warning
+        with st.expander("⚙️ 데이터 관리"):
+            st.warning("⚠️ 기존 30일치 히스토리 데이터가 존재합니다.")
+            st.caption(f"현재 {check_history.iloc[0, 0]:,}명의 히스토리 사용자가 있습니다.")
+            
+            if st.button("🔄 데이터 재생성 (기존 데이터 삭제)", type="secondary"):
+                st.error("⚠️ 정말로 기존 데이터를 삭제하고 재생성하시겠습니까?")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ 예, 재생성"):
+                        # Same generation logic as above
+                        with st.spinner("30일치 히스토리 데이터 재생성 중..."):
+                            DAYS_HISTORY = 30
+                            DAILY_USERS = 500
+                            
+                            con.execute("DELETE FROM assignments WHERE user_id LIKE 'user_hist_%'")
+                            con.execute("DELETE FROM events WHERE user_id LIKE 'user_hist_%'")
+                            
+                            users = []
+                            events = []
+                            
+                            end_date = datetime.now()
+                            start_date = end_date - timedelta(days=DAYS_HISTORY)
+                            user_counter = 10000
+                            
+                            for day in range(DAYS_HISTORY):
+                                current_date = start_date + timedelta(days=day)
+                                is_crisis = (DAYS_HISTORY - day) <= 3
+                                
+                                if is_crisis:
+                                    ctr = 0.04
+                                    cvr = 0.15
+                                    traffic_vol = int(DAILY_USERS * 0.9)
+                                else:
+                                    ctr = 0.15
+                                    cvr = 0.20
+                                    traffic_vol = DAILY_USERS + np.random.randint(-50, 50)
+                                
+                                for _ in range(traffic_vol):
+                                    user_counter += 1
+                                    uid = f"user_hist_{user_counter}"
+                                    visit_time = current_date + timedelta(seconds=np.random.randint(0, 86400))
+                                    users.append((uid, 'history_load', 'A', visit_time))
+                                    
+                                    if np.random.random() < ctr:
+                                        click_time = visit_time + timedelta(seconds=np.random.randint(2, 60))
+                                        events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time))
+                                        
+                                        if np.random.random() < cvr:
+                                            order_time = click_time + timedelta(seconds=np.random.randint(30, 300))
+                                            events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time))
+                            
+                            df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts'])
+                            df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts'])
+                            
+                            con.execute("INSERT INTO assignments SELECT uid, eid, var, ts FROM df_u")
+                            con.execute("INSERT INTO events SELECT eid, uid, name, ts FROM df_e")
+                            
+                            st.success("✅ 30일치 데이터 재생성 완료!")
+                            st.rerun()
+                with col2:
+                    if st.button("❌ 취소"):
+                        st.rerun()
 
     # 1. Fetch KPI Logic (Last 30 days)
     # Using 'user_hist_' IDs from history generator
