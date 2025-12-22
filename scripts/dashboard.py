@@ -735,6 +735,8 @@ elif st.session_state['page'] == 'study':
                 n_test = int(target_total * test_pct)
         
         
+        split_ratio = st.session_state.get('split', 50)
+        
         # Check current data count (only count THIS experiment's users)
         # Store a timestamp when first entering Step 3
         if 'step3_start_time' not in st.session_state:
