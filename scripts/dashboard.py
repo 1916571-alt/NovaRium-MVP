@@ -649,82 +649,131 @@ elif st.session_state['page'] == 'study':
         st.markdown(f"<h2>Step 3. 트래픽 분배 (Sampling)</h2>", unsafe_allow_html=True)
         edu_guide("Hashing (해시 할당)", "유저를 A/B 그룹으로 나눌 때 가장 공평한 방법은 Random입니다. 우리는 유저 ID를 <strong>Hash 함수</strong>에 넣어 고정된 그룹을 부여합니다.")
 
+        # REORDERED: Traffic Split FIRST, then Hash Simulator
         c1, c2 = st.columns([1, 1], gap="large")
+        
+        # LEFT: Traffic Split Configuration
         with c1:
             with st.container(border=True):
+                st.markdown("#### 🎛️ 트래픽 비율 설정")
+                
+                # Educational Guide for Split Selection
+                with st.expander("💡 비율 선택 가이드 (When to use what?)"):
+                    st.markdown("""
+                    **트래픽 비율은 실험의 위험도에 따라 결정합니다:**
+                    
+                    | 비율 | 상황 | 예시 |
+                    |------|------|------|
+                    | **50/50** | 표준 실험 | UI 색상, 문구 변경 |
+                    | **90/10** | 고위험 실험 | 결제 플로우, 핵심 기능 |
+                    | **10/90** | 저위험 + 확신 | 명백한 개선사항 빠른 적용 |
+                    
+                    **선택 기준:**
+                    - 🎯 **50/50**: 가장 빠른 통계적 유의성 확보
+                    - 🛡️ **90/10**: "혹시 망하면 피해 최소화"
+                    - 🚀 **10/90**: "확신 있으니 빨리 많은 사람에게"
+                    
+                    **현재 상황 (CTR 급락):**
+                    - 위험도: 중간 (배너 문구 변경)
+                    - 추천: **50/50** (표준 실험)
+                    """)
+                
+                split = st.slider("테스트(B) 그룹 비율", 10, 90, 50, format="%d%%", 
+                                 help="실험군에 할당할 트래픽 비율을 설정하세요.")
+                
+                st.markdown(f"""
+                <div style='background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin-top:10px;'>
+                    <div style='display:flex; justify-content:space-between;'>
+                        <div>
+                            <div style='color:#64748B; font-weight:bold;'>Control (A)</div>
+                            <div style='font-size:1.5rem;'>{100-split}%</div>
+                        </div>
+                        <div style='text-align:right;'>
+                            <div style='color:#8B5CF6; font-weight:bold;'>Test (B)</div>
+                            <div style='font-size:1.5rem;'>{split}%</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # RIGHT: Hash Simulator (now uses the selected split)
+        with c2:
+            with st.container(border=True):
                 st.markdown("#### 🔍 해시 시뮬레이터 (Hash Simulator)")
-                uid = st.text_input("테스트 User ID 입력", "user_cosmic_99")
+                st.caption(f"설정한 비율({split}%)로 실제 분배가 잘 되는지 확인해봅시다.")
+                
+                # Single User Test
+                uid = st.text_input("테스트 User ID 입력", "user_cosmic_99", key="hash_test_uid")
                 b = get_bucket(uid)
-                grp = "B (Test)" if b >= 50 else "A (Control)" # Default 50/50 visual
+                
+                # Apply the selected split ratio
+                threshold = 100 - split  # If split=50, threshold=50
+                grp = "B (Test)" if b >= threshold else "A (Control)"
                 color = "#8B5CF6" if grp.startswith("B") else "#64748B"
                 
                 st.markdown(f"""
-                <div style="background:rgba(255,255,255,0.05); padding:20px; border-radius:15px; text-align:center;">
-                    <div style="font-family:monospace; color:rgba(255,255,255,0.5);">MD5("{uid}") % 100</div>
-                    <div style="font-size:3rem; font-weight:bold; color:white;">{b}</div>
-                    <div style="color:{color}; font-weight:bold; font-size:1.2rem;">➜ Group {grp}</div>
+                <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; text-align:center; margin-bottom:15px;">
+                    <div style="font-family:monospace; color:rgba(255,255,255,0.5); font-size:0.9rem;">MD5("{uid}") % 100</div>
+                    <div style="font-size:2rem; font-weight:bold; color:white; margin:10px 0;">{b}</div>
+                    <div style="color:{color}; font-weight:bold; font-size:1.1rem;">➜ Group {grp}</div>
                 </div>
                 """, unsafe_allow_html=True)
-
-        with c2:
-            with st.container(border=True):
-                st.markdown("#### 📊 분배 공정성 검증 (Distribution Test)")
-                st.caption("Hash 함수가 정말 공정하게 분배하는지 확인해봅시다.")
+                
+                # Batch Distribution Test
+                st.divider()
+                st.markdown("**📊 분배 공정성 검증**")
                 
                 if st.button("🎲 랜덤 100명 테스트", use_container_width=True):
-                    # Generate 100 random user IDs and assign them
                     import random
                     test_users = [f"test_user_{random.randint(10000, 99999)}" for _ in range(100)]
                     assignments = [get_bucket(u) for u in test_users]
                     
-                    # Count distribution
-                    group_a = sum(1 for b in assignments if b < 50)
-                    group_b = sum(1 for b in assignments if b >= 50)
+                    # Count based on current split setting
+                    group_a = sum(1 for b in assignments if b < threshold)
+                    group_b = sum(1 for b in assignments if b >= threshold)
                     
-                    st.session_state['test_distribution'] = {'A': group_a, 'B': group_b}
+                    st.session_state['test_distribution'] = {'A': group_a, 'B': group_b, 'target_split': split}
                 
-                # Display results if test was run
+                # Display results
                 if 'test_distribution' in st.session_state:
                     dist = st.session_state['test_distribution']
                     
                     st.markdown(f"""
-                    <div style='background:rgba(255,255,255,0.05); padding:20px; border-radius:10px; margin-top:15px;'>
+                    <div style='background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin-top:10px;'>
                         <div style='margin-bottom:10px;'>
                             <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
                                 <span>Group A (Control)</span>
                                 <span style='font-weight:bold;'>{dist['A']}명 ({dist['A']}%)</span>
                             </div>
-                            <div style='height:20px; background:#64748B; border-radius:10px; width:{dist['A']}%;'></div>
+                            <div style='height:15px; background:#64748B; border-radius:5px; width:{dist['A']}%;'></div>
                         </div>
                         <div>
                             <div style='display:flex; justify-content:space-between; margin-bottom:5px;'>
                                 <span>Group B (Test)</span>
                                 <span style='font-weight:bold;'>{dist['B']}명 ({dist['B']}%)</span>
                             </div>
-                            <div style='height:20px; background:#8B5CF6; border-radius:10px; width:{dist['B']}%;'></div>
+                            <div style='height:15px; background:#8B5CF6; border-radius:5px; width:{dist['B']}%;'></div>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Verdict
-                    diff = abs(dist['A'] - dist['B'])
-                    if diff <= 10:
-                        st.success(f"✅ 공정하게 분배되었습니다! (차이: {diff}명)")
-                    else:
-                        st.warning(f"⚠️ 약간의 편차가 있습니다. (차이: {diff}명)")
+                    # Verdict (compare to target)
+                    expected_b = dist['target_split']
+                    actual_b = dist['B']
+                    diff = abs(expected_b - actual_b)
                     
-                    st.caption("💡 Hash 함수는 완벽한 50/50을 보장하지 않지만, 충분히 큰 샘플에서는 거의 균등하게 분배됩니다.")
-                
-                st.divider()
-                st.markdown("#### 🎛️ 트래픽 비율 설정")
-                split = st.slider("테스트(B) 그룹 비율", 10, 90, 50, format="%d%%")
-                st.caption(f"Control(A): {100-split}% | Test(B): {split}%")
-                
-                st.write("")
-                if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
-                    st.session_state['split'] = split
-                    st.session_state['step'] = 4
-                    st.rerun()
+                    if diff <= 10:
+                        st.success(f"✅ 목표({expected_b}%)와 거의 일치합니다! (차이: {diff}%)")
+                    else:
+                        st.info(f"ℹ️ 샘플이 작아 약간의 편차가 있습니다. (차이: {diff}%)")
+        
+        st.write("")
+        col_btn = st.columns([2, 1, 2])
+        with col_btn[1]:
+            if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
+                st.session_state['split'] = split
+                st.session_state['step'] = 4
+                st.rerun()
 
     # --- STEP 4: COLLECTION ---
     elif curr == 4:
