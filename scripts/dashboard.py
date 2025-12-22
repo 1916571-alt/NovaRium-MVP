@@ -8,6 +8,7 @@ import os
 import hashlib
 from scipy import stats
 from datetime import datetime, timedelta
+import streamlit.components.v1 as components
 
 # Page Config
 st.set_page_config(
@@ -233,49 +234,28 @@ if st.session_state['page'] == 'study':
 
         col_mock, col_form = st.columns([1.5, 1], gap="large")
         
-        # 1. Mock App (Inside Glass Card)
+        # 1. Real Target App (Iframe)
         with col_mock:
             with st.container(border=True):
-                st.markdown("#### 📱 NovaEats 앱 (실험 대상)")
-                st.caption("실제 앱 화면이라고 가정하고 개선할 부분을 선택해주세요.")
+                st.markdown("#### 📱 NovaEats (Live Target)")
+                st.caption("실제 구동 중인 웹 서버(FastAPI) 화면입니다. 에이전트들이 이곳을 방문하게 됩니다.")
                 
-                # App Header
-                m1, m2 = st.columns([3, 1])
-                with m1: 
-                    st.text_input("검색어를 입력하세요...", disabled=True, label_visibility="collapsed")
-                with m2: 
-                    st.markdown("🔔 👤")
+                # Embedding the FastAPI app
+                try:
+                    components.iframe("http://localhost:8000", height=600, scrolling=True)
+                except Exception:
+                    st.error("서버 연결 실패: Target App이 실행 중인지 확인하세요.")
                 
-                # Category Icons
-                st.write("")
-                st.markdown("**카테고리 (Category)**")
-                cat_cols = st.columns(4)
-                categories = ["치킨", "피자", "버거", "한식"]
-                for i, cat in enumerate(categories):
-                    with cat_cols[i]:
-                        if st.button(f"{cat}", key=f"cat_{i}", use_container_width=True):
-                            st.session_state['target'] = f"카테고리 아이콘 ({cat})"
-                
-                st.write("")
-                
-                # Main Banner
-                st.info("🎁 **[첫 주문 이벤트]** 3,000원 할인 쿠폰 받기")
-                if st.button("👉 배너 선택 (클릭)", use_container_width=True):
-                    st.session_state['target'] = "메인 배너 (할인 문구)"
-                
-                st.write("")
-                st.markdown("**🔥 인기 맛집 (Featured)**")
-                r1, r2 = st.columns(2)
-                with r1:
-                    st.image("https://placehold.co/200x120/1e1e2d/FFF?text=Burger", use_container_width=True)
-                    st.markdown("**버거킹덤 강남점** (⭐ 4.8)")
-                    if st.button("주문하기 A", use_container_width=True):
-                        st.session_state['target'] = "주문 버튼 A (Text/Color)"
-                with r2:
-                    st.image("https://placehold.co/200x120/1e1e2d/FFF?text=Sushi", use_container_width=True)
-                    st.markdown("**갓스시 역삼점** (⭐ 4.9)")
-                    if st.button("주문하기 B", use_container_width=True):
-                        st.session_state['target'] = "주문 버튼 B (Layout)"
+                # Target Selection (Manual Override for Education)
+                st.divider()
+                st.caption("실험 타겟 설정 (Manual Setup)")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("👉 메인 배너 실험", use_container_width=True):
+                        st.session_state['target'] = "메인 배너 (할인 문구)"
+                with c2:
+                    if st.button("👉 카테고리 아이콘 실험", use_container_width=True):
+                        st.session_state['target'] = "카테고리 아이콘 (치킨)"
 
         # 2. Form (Glass Card)
         with col_form:
