@@ -780,51 +780,128 @@ elif st.session_state['page'] == 'study':
         st.markdown(f"<h2>Step 4. 데이터 수집 (Collection)</h2>", unsafe_allow_html=True)
         edu_guide("Event Logging (로그 적재)", "유저가 들어오면 <strong>Assignments</strong>(그룹 할당) 테이블에 남고, 행동을 하면 <strong>Events</strong>(클릭/구매) 테이블에 기록됩니다.")
 
-        if st.button("⚡ 가상 유저 1,000명 주입 (Simulate)", type="primary"):
-            req_n = st.session_state.get('n', 1000)
-            split = st.session_state.get('split', 50)/100
-            base = 0.1
-            lift = base * 1.15
-            
-            # Generate Logic
-            current_count = run_query("SELECT COUNT(*) FROM assignments", con).iloc[0,0]
-            new_users = []
-            new_events = []
-            
-            for i in range(1000):
-                uid = f"u_{current_count + i}"
-                is_test = get_bucket(uid) >= (100 * (1 - split))
-                variant = 'B' if is_test else 'A'
-                
-                new_users.append((uid, 'exp_1', variant, datetime.now()))
-                
-                rate = lift if variant == 'B' else base
-                if np.random.random() < rate:
-                    new_events.append((f"evt_{uid}", uid, 'purchase', datetime.now()))
-            
-            # Insert
-            if new_users: 
-                df_users = pd.DataFrame(new_users, columns=['uid','eid','var','ts'])
-                con.execute("INSERT INTO assignments SELECT * FROM df_users")
-            
-            if new_events: 
-                df_events = pd.DataFrame(new_events, columns=['eid','uid','name','ts'])
-                con.execute("INSERT INTO events SELECT * FROM df_events")
-            
-            st.toast(f"유저 1,000명 데이터 생성 완료!")
-
-        # Stats
-        total_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments", con).iloc[0,0]
-        st.write("")
-        col_main, col_db = st.columns([1, 2], gap="large")
+        # Two-Mode Selection
+        col_mode1, col_mode2 = st.columns(2, gap="large")
         
-        with col_main:
+        # MODE 1: Quick Simulation
+        with col_mode1:
             with st.container(border=True):
-                st.markdown("#### 수집 현황 (Status)")
+                st.markdown("#### ⚡ 빠른 시뮬레이션")
+                st.caption("확률 기반으로 즉시 데이터 생성 (교육용)")
+                
+                with st.expander("ℹ️ 작동 원리"):
+                    st.markdown("""
+                    **Python 코드로 확률 계산하여 즉시 생성**
+                    
+                    1. 가상 User ID 1,000개 생성
+                    2. Hash 함수로 A/B 그룹 할당
+                    3. 확률로 클릭/구매 결정:
+                       - Control(A): 10% 전환율
+                       - Test(B): 11.5% 전환율 (+15%)
+                    4. DB에 직접 입력 (앱 방문 없음)
+                    
+                    **장점:** 1초 이내 완료, 빠른 학습
+                    **단점:** 현실성 낮음 (순수 랜덤)
+                    """)
+                
+                if st.button("⚡ 1,000명 즉시 생성", type="primary", use_container_width=True):
+                    split = st.session_state.get('split', 50)/100
+                    base = 0.10
+                    lift = base * 1.15
+                    
+                    current_count = run_query("SELECT COUNT(*) FROM assignments", con).iloc[0,0]
+                    new_users = []
+                    new_events = []
+                    
+                    for i in range(1000):
+                        uid = f"sim_{current_count + i}"
+                        is_test = get_bucket(uid) >= (100 * (1 - split))
+                        variant = 'B' if is_test else 'A'
+                        
+                        new_users.append((uid, 'exp_1', variant, datetime.now()))
+                        
+                        rate = lift if variant == 'B' else base
+                        if np.random.random() < rate:
+                            new_events.append((f"evt_{uid}", uid, 'purchase', datetime.now()))
+                    
+                    if new_users:
+                        df_users = pd.DataFrame(new_users, columns=['uid','eid','var','ts'])
+                        con.execute("INSERT INTO assignments SELECT * FROM df_users")
+                    
+                    if new_events:
+                        df_events = pd.DataFrame(new_events, columns=['eid','uid','name','ts'])
+                        con.execute("INSERT INTO events SELECT * FROM df_events")
+                    
+                    st.toast("✅ 1,000명 데이터 생성 완료!")
+                    st.rerun()
+        
+        # MODE 2: Agent-based
+        with col_mode2:
+            with st.container(border=True):
+                st.markdown("#### 🤖 에이전트 투입 (고급)")
+                st.caption("AI 봇이 실제로 앱을 방문하여 행동 (실전)")
+                
+                with st.expander("ℹ️ 작동 원리"):
+                    st.markdown("""
+                    **실제 HTTP 요청으로 앱 방문 후 판단**
+                    
+                    1. 5가지 행동 유형의 에이전트 생성
+                    2. `localhost:8000` 실제 접속
+                    3. 화면 보고 판단:
+                       - "빨간 배너네? 클릭!"
+                       - "할인율이 적네, 패스"
+                    4. 행동 수행 → DB 자동 기록
+                    
+                    **장점:** 현실적, 실전 시뮬레이션
+                    **단점:** 30초 소요, 복잡도 높음
+                    """)
+                
+                # Agent Distribution (Default)
+                st.markdown("**📋 고객 구성 (행동 패턴 기반)**")
+                
+                agent_config = {
+                    "impulsive": {"name": "🔥 충동형", "count": 20, "desc": "긴급 문구에 즉시 반응"},
+                    "calculator": {"name": "🧮 계산형", "count": 25, "desc": "할인율 꼼꼼히 계산"},
+                    "browser": {"name": "🛍️ 윈도우쇼핑", "count": 25, "desc": "클릭만, 구매 드물게"},
+                    "mission": {"name": "🎯 목적형", "count": 20, "desc": "검색 → 바로 구매"},
+                    "cautious": {"name": "🐌 신중형", "count": 10, "desc": "리뷰 확인 후 며칠 고민"}
+                }
+                
+                for key, cfg in agent_config.items():
+                    st.caption(f"{cfg['name']}: {cfg['count']}명 ({cfg['desc']})")
+                
+                # Advanced Customization (Optional)
+                with st.expander("🔧 고급: 직접 설정하기"):
+                    st.warning("⚠️ 고급 사용자 전용: 에이전트 비율을 직접 조정할 수 있습니다.")
+                    for key in agent_config:
+                        agent_config[key]['count'] = st.slider(
+                            agent_config[key]['name'],
+                            0, 50, agent_config[key]['count'],
+                            key=f"agent_{key}"
+                        )
+                
+                if st.button("🤖 에이전트 100명 투입", type="secondary", use_container_width=True):
+                    st.info("🚧 에이전트 기능은 현재 개발 중입니다. 빠른 시뮬레이션을 사용해주세요.")
+                    # TODO: Implement agent swarm integration
+
+        # Stats Display
+        st.divider()
+        total_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments", con).iloc[0,0]
+        
+        col_status, col_db = st.columns([1, 2], gap="large")
+        
+        with col_status:
+            with st.container(border=True):
+                st.markdown("#### 📊 수집 현황 (Status)")
                 st.metric("누적 유저 수", f"{total_n:,}")
-                st.progress(min(total_n / (st.session_state.get('n', 1000)*2), 1.0))
+                
+                target_n = st.session_state.get('n', 1000) * 2
+                progress = min(total_n / target_n, 1.0) if target_n > 0 else 0
+                st.progress(progress)
+                st.caption(f"목표: {target_n:,}명 | 진행률: {progress*100:.1f}%")
                 
                 if total_n > 0:
+                    st.write("")
                     if st.button("다음: 결과 분석 ➡️", type="primary", use_container_width=True):
                         st.session_state['step'] = 5
                         st.rerun()
