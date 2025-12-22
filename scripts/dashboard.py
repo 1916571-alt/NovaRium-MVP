@@ -493,16 +493,21 @@ elif st.session_state['page'] == 'study':
                     st.markdown("**허용 임계치 설정 (Threshold)**")
                     st.caption("가드레일 지표가 이 값을 초과하면 실험 조기 종료를 권장합니다.")
                     
-                    # For simplicity, use a single threshold for "Refund Rate" concept
-                    # In real scenario, each guardrail could have its own threshold
+                    # Use the first selected guardrail metric for threshold
+                    primary_guardrail = g_sel[0] if g_sel else "Refund Rate"
+                    
                     guard_threshold = st.number_input(
-                        "환불률 허용 임계치 (%)",
+                        f"{primary_guardrail} 허용 임계치 (%)",
                         min_value=0.0, max_value=20.0, value=5.0, step=0.5,
-                        help="환불률이 이 값을 넘으면 위험 신호로 간주합니다."
+                        help=f"{primary_guardrail}이(가) 이 값을 넘으면 위험 신호로 간주합니다."
                     )
-                    st.info(f"💡 환불률이 **{guard_threshold}%**를 넘으면 조기 종료 경고가 표시됩니다.")
+                    st.info(f"💡 **{primary_guardrail}**이(가) **{guard_threshold}%**를 넘으면 조기 종료 경고가 표시됩니다.")
+                    
+                    # Store the metric name for later use
+                    guard_metric_name = primary_guardrail
                 else:
                     guard_threshold = 5.0  # Default
+                    guard_metric_name = "Refund Rate"
 
                 # Custom Metric
                 with st.expander("➕ 지표 직접 만들기 (Custom)"):
@@ -523,7 +528,7 @@ elif st.session_state['page'] == 'study':
                         st.session_state['metric'] = m_sel
                         st.session_state['guardrails'] = g_sel
                         st.session_state['guard_threshold'] = guard_threshold
-                        st.session_state['guard_metric'] = "Refund Rate"  # Simplified for now
+                        st.session_state['guard_metric'] = guard_metric_name
                         st.session_state['step'] = 2
                         st.rerun()
 
