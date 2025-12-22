@@ -255,6 +255,69 @@ if st.session_state['page'] == 'monitor':
     st.markdown("## 📊 종합 상황실 (Monitoring Dashboard)")
     st.caption("NovaEats 서비스의 핵심 지표를 실시간으로 모니터링합니다.")
 
+    # Check if history data exists
+    check_history = run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'", con)
+    has_history = not check_history.empty and check_history.iloc[0, 0] > 0
+    
+    if not has_history:
+        st.warning("데이터가 없습니다. generate_history.py를 실행해주세요.")
+        
+        if st.button("🔄 데이터 생성하기 (30일치)", type="primary"):
+            with st.spinner("30일치 히스토리 데이터 생성 중..."):
+                # Inline history generation
+                DAYS_HISTORY = 30
+                DAILY_USERS = 500
+                
+                # Clean old history
+                con.execute("DELETE FROM assignments WHERE user_id LIKE 'user_hist_%'")
+                con.execute("DELETE FROM events WHERE user_id LIKE 'user_hist_%'")
+                
+                users = []
+                events = []
+                
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=DAYS_HISTORY)
+                user_counter = 10000
+                
+                for day in range(DAYS_HISTORY):
+                    current_date = start_date + timedelta(days=day)
+                    is_crisis = (DAYS_HISTORY - day) <= 3
+                    
+                    if is_crisis:
+                        ctr = 0.04
+                        cvr = 0.15
+                        traffic_vol = int(DAILY_USERS * 0.9)
+                    else:
+                        ctr = 0.15
+                        cvr = 0.20
+                        traffic_vol = DAILY_USERS + np.random.randint(-50, 50)
+                    
+                    for _ in range(traffic_vol):
+                        user_counter += 1
+                        uid = f"user_hist_{user_counter}"
+                        visit_time = current_date + timedelta(seconds=np.random.randint(0, 86400))
+                        users.append((uid, 'history_load', 'A', visit_time))
+                        
+                        if np.random.random() < ctr:
+                            click_time = visit_time + timedelta(seconds=np.random.randint(2, 60))
+                            events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time))
+                            
+                            if np.random.random() < cvr:
+                                order_time = click_time + timedelta(seconds=np.random.randint(30, 300))
+                                events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time))
+                
+                # Bulk insert
+                df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts'])
+                df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts'])
+                
+                con.execute("INSERT INTO assignments SELECT uid, eid, var, ts FROM df_u")
+                con.execute("INSERT INTO events SELECT eid, uid, name, ts FROM df_e")
+                
+                st.success("✅ 30일치 데이터 생성 완료!")
+                st.rerun()
+        
+        st.stop()
+
     # 1. Fetch KPI Logic (Last 30 days)
     # Using 'user_hist_' IDs from history generator
     sql_kpi = """
@@ -819,9 +882,6 @@ elif st.session_state['page'] == 'study':
                     2. Hash 함수로 A/B 그룹 할당 ({100-split_ratio}/{split_ratio})
                     3. 확률로 클릭/구매 결정
                     4. DB에 직접 입력
-                    
-                    **장점:** 1초 이내 완료  
-                    **단점:** 현실성 낮음
                     """)
                 
                 if st.button(f"⚡ 빠른 시뮬레이션 ({remaining:,}명 생성)", type="primary", use_container_width=True, disabled=(remaining==0)):
@@ -885,27 +945,78 @@ elif st.session_state['page'] == 'study':
                 st.write("")
                 
                 # Button 2: Agent Swarm
-                with st.expander("ℹ️ 🤖 에이전트 투입 (실전)"):
+                with st.expander("ℹ️ 🤖 에이전트 투입 (실전)", expanded=False):
                     st.markdown(f"""
-                    **실제 HTTP 요청으로 앱 방문 후 판단**
+                    **실제 HTTP 요청으로 웹 앱 방문 후 행동 판단**
                     
-                    1. 남은 인원({remaining:,}명)만큼 에이전트 생성
-                    2. 5가지 행동 유형으로 분산 (충동/계산/윈도우쇼핑/목적/신중)
-                    3. `localhost:8000` 실제 접속하여 판단
-                    4. DB 자동 기록
-                    
-                    **장점:** 현실적, 실전 시뮬레이션  
-                    **단점:** 시간 소요, Target App 필요
+                    1. 남은 인원({remaining:,}명)을 5가지 행동 유형으로 분산
+                    2. `localhost:8000` 실제 접속하여 A/B 배너 확인
+                    3. 각 유형의 성향에 따라 클릭/구매 결정
+                    4. DB 자동 기록 (실제 사용자와 동일한 흐름)
                     """)
+                    
+                    st.markdown("#### 🎭 에이전트 유형별 행동 패턴")
+                    
+                    col_a1, col_a2 = st.columns(2)
+                    with col_a1:
+                        st.markdown("""
+                        **💥 Impulsive (충동형)**
+                        - 빨간색, "긴급" 문구에 즉각 반응
+                        - 클릭률: 30% (B안 +25%)
+                        - 구매율: 25%
+                        
+                        **🧮 Calculator (계산형)**
+                        - 할인율을 꼼꼼히 계산
+                        - 클릭률: 20% (B안 +10%)
+                        - 구매율: 20%
+                        
+                        **🛍️ Browser (윈도우쇼핑)**
+                        - 클릭은 많이 하지만 구매는 드뭄
+                        - 클릭률: 50%
+                        - 구매율: 2%
+                        """)
+                    
+                    with col_a2:
+                        st.markdown("""
+                        **🎯 Mission (목적형)**
+                        - 원하는 게 명확, 빠르게 구매
+                        - 클릭률: 15%
+                        - 구매율: 40%
+                        
+                        **🤔 Cautious (신중형)**
+                        - 리뷰 읽고 고민, 낮은 전환율
+                        - 클릭률: 8%
+                        - 구매율: 10%
+                        """)
+                    
+                    st.divider()
+                    st.markdown("#### ⚙️ 에이전트 분포 조정")
+                    st.caption("각 유형의 비율을 조정하여 다양한 사용자 구성을 시뮬레이션하세요.")
+                    
+                    col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
+                    with col_s1:
+                        pct_impulsive = st.number_input("💥 충동형 (%)", 0, 100, 20, 5, key="pct_imp")
+                    with col_s2:
+                        pct_calculator = st.number_input("🧮 계산형 (%)", 0, 100, 25, 5, key="pct_calc")
+                    with col_s3:
+                        pct_browser = st.number_input("🛍️ 쇼핑형 (%)", 0, 100, 25, 5, key="pct_brow")
+                    with col_s4:
+                        pct_mission = st.number_input("🎯 목적형 (%)", 0, 100, 20, 5, key="pct_miss")
+                    with col_s5:
+                        pct_cautious = st.number_input("🤔 신중형 (%)", 0, 100, 10, 5, key="pct_caut")
+                    
+                    total_pct = pct_impulsive + pct_calculator + pct_browser + pct_mission + pct_cautious
+                    if total_pct != 100:
+                        st.warning(f"⚠️ 합계가 100%가 아닙니다. (현재: {total_pct}%)")
                 
-                if st.button(f"🤖 에이전트 투입 ({remaining:,}명)", type="secondary", use_container_width=True, disabled=(remaining==0)):
-                    # Calculate agent distribution based on remaining
+                if st.button(f"🤖 에이전트 투입 ({remaining:,}명)", type="secondary", use_container_width=True, disabled=(remaining==0 or total_pct != 100)):
+                    # Calculate agent distribution based on user input
                     agent_config = {
-                        "impulsive": int(remaining * 0.2),
-                        "calculator": int(remaining * 0.25),
-                        "browser": int(remaining * 0.25),
-                        "mission": int(remaining * 0.2),
-                        "cautious": int(remaining * 0.1)
+                        "impulsive": int(remaining * pct_impulsive / 100),
+                        "calculator": int(remaining * pct_calculator / 100),
+                        "browser": int(remaining * pct_browser / 100),
+                        "mission": int(remaining * pct_mission / 100),
+                        "cautious": int(remaining * pct_cautious / 100)
                     }
                     
                     with st.spinner(f"🤖 에이전트 투입 중... ({remaining:,}명)"):
@@ -960,11 +1071,33 @@ elif st.session_state['page'] == 'study':
                                 # events: event_id, user_id, event_name, timestamp
                                 con.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", df_refunds.values.tolist())
                             
-                            cnt_refunds = len(new_refunds)
-                            st.success(f"✅ 에이전트 {results['total']}명 투입 완료! (성공: {results['success']}명, 환불: {cnt_refunds}건)")
-                            st.info(f"📊 클릭: {results['clicked']}명 | 구매: {results['purchased']}명")
                             
-                            st.rerun()
+                            cnt_refunds = len(new_refunds)
+                            
+                            # Verify DB data
+                            agent_count = run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'agent_%'", con)
+                            agent_events = run_query("SELECT COUNT(*) as cnt FROM events WHERE user_id LIKE 'agent_%'", con)
+                            
+                            actual_agents = agent_count.iloc[0, 0] if not agent_count.empty else 0
+                            actual_events = agent_events.iloc[0, 0] if not agent_events.empty else 0
+                            
+                            st.success(f"✅ 에이전트 {results['total']}명 투입 완료!")
+                            st.info(f"""
+                            📊 **실행 결과:**
+                            - 성공: {results['success']}명
+                            - 클릭: {results['clicked']}명
+                            - 구매: {results['purchased']}명
+                            - 환불: {cnt_refunds}건
+                            
+                            💾 **DB 기록:**
+                            - Assignments: {actual_agents:,}명
+                            - Events: {actual_events:,}건
+                            """)
+                            
+                            if actual_agents == 0:
+                                st.error("⚠️ DB에 데이터가 기록되지 않았습니다! Target App (localhost:8000)이 실행 중인지 확인하세요.")
+                            else:
+                                st.rerun()
                         
                         except Exception as e:
                             st.error(f"❌ 에이전트 실행 실패: {str(e)}")
@@ -1153,9 +1286,10 @@ elif st.session_state['page'] == 'study':
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """, [t, h, pm, gr, n, split, p_val, decision, note])
                     
-                    # Cleanup
-                    con.execute("DELETE FROM assignments")
-                    con.execute("DELETE FROM events")
+                    
+                    # Cleanup - Only delete experiment data, preserve history
+                    con.execute("DELETE FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
+                    con.execute("DELETE FROM events WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
                     
                     st.toast("회고록에 저장되었습니다! 📝")
                     st.session_state['page'] = 'portfolio'
