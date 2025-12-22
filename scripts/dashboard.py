@@ -684,6 +684,32 @@ elif st.session_state['page'] == 'study':
                 
                 
                 st.write("")
+                st.divider()
+                
+                # --- Guardrail Metrics (Safety) ---
+                st.markdown("#### 🛡️ 가이드 지표 (Guardrail Settings)")
+                st.caption("실험의 부작용을 감지하기 위한 안전 장치입니다.")
+                
+                with st.expander("⚙️ 가이드 지표 설정", expanded=True):
+                    col_g1, col_g2 = st.columns(2)
+                    with col_g1:
+                        guard_metric = st.selectbox(
+                            "보조 지표 (Guardrail Metric)",
+                            ["Refund Rate (환불률)", "Unsubscribe Rate (구독 취소율)", "App Crash Rate (앱 크래시)"],
+                            index=0
+                        )
+                    with col_g2:
+                        guard_threshold = st.number_input(
+                            "허용 임계치 (Threshold %)",
+                            min_value=0.0, max_value=20.0, value=5.0, step=0.5,
+                            help="이 값을 초과하면 실험 조기 종료 경고가 표시됩니다."
+                        )
+                    
+                    metric_name = guard_metric.split('(')[0].strip()
+                    st.info(f"💡 **{metric_name}**가 **{guard_threshold}%**를 넘으면 위험 신호로 간주합니다.")
+                
+                
+                st.write("")
                 if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
                     st.session_state['split'] = split
                     st.session_state['total_needed'] = total_needed
@@ -691,6 +717,11 @@ elif st.session_state['page'] == 'study':
                     st.session_state['n_test'] = n_test
                     st.session_state['baseline_metric'] = base_cvr
                     st.session_state['target_metric'] = target_metric
+                    
+                    # Save metrics
+                    st.session_state['guard_metric'] = metric_name
+                    st.session_state['guard_threshold'] = guard_threshold
+                    
                     st.session_state['step'] = 3
                     st.rerun()
 
@@ -807,6 +838,10 @@ elif st.session_state['page'] == 'study':
                         base = st.session_state.get('baseline_metric', 0.10)
                         target = st.session_state.get('target_metric', 0.15)
                         
+                        # Guardrail settings
+                        guard_metric = st.session_state.get('guard_metric', 'Refund Rate')
+                        guard_threshold = st.session_state.get('guard_threshold', 5.0)
+                        
                         current_count = run_query("SELECT COUNT(*) FROM assignments", con).iloc[0,0]
                         new_users = []
                         new_events = []
@@ -818,20 +853,31 @@ elif st.session_state['page'] == 'study':
                             
                             new_users.append((uid, 'exp_1', variant, datetime.now()))
                             
-                            # Use actual target metrics from Step 2
+                            # Purchase Logic
                             rate = target if variant == 'B' else base
                             if np.random.random() < rate:
                                 new_events.append((f"evt_{uid}", uid, 'purchase', datetime.now()))
+                                
+                                # Guardrail Logic (Refund simulation)
+                                # Simulate B having higher refund rate mostly to trigger alert
+                                if "Refund" in guard_metric:
+                                    refund_prob = 0.01 if variant == 'A' else (guard_threshold / 100) + 0.02
+                                    if np.random.random() < refund_prob:
+                                        # Refund happens 1-24 hours after purchase
+                                        ts = datetime.now() + timedelta(hours=np.random.randint(1, 24))
+                                        new_events.append((f"ref_{uid}", uid, 'refund', ts))
                         
                         if new_users:
                             df_users = pd.DataFrame(new_users, columns=['uid','eid','var','ts'])
-                            con.execute("INSERT INTO assignments SELECT * FROM df_users")
+                            # assignments: user_id, experiment_id, variant, assigned_at
+                            con.execute("INSERT INTO assignments VALUES (?, ?, ?, ?)", df_users.values.tolist())
                         
                         if new_events:
                             df_events = pd.DataFrame(new_events, columns=['eid','uid','name','ts'])
-                            con.execute("INSERT INTO events SELECT * FROM df_events")
+                            # events: event_id, user_id, event_name, timestamp
+                            con.execute("INSERT INTO events VALUES (?, ?, ?, ?)", df_events.values.tolist())
                         
-                        st.toast(f"✅ {remaining:,}명 데이터 생성 완료!")
+                        st.toast(f"✅ {remaining:,}명 데이터 생성 완료! (환불 데이터 포함)")
                         st.rerun()
                 
                 st.write("")
@@ -876,7 +922,44 @@ elif st.session_state['page'] == 'study':
                             
                             results = run_agent_swarm(agent_config, update_progress)
                             
-                            st.success(f"✅ 에이전트 {results['total']}명 투입 완료!")
+                            # Post-process for Guardrail (Refunds)
+                            # Find agents who purchased recently
+                            start_time = st.session_state.get('step3_start_time')
+                            # Assuming agents start with 'agent_'
+                            recent_buyers = run_query(f"""
+                                SELECT DISTINCT e.user_id, a.variant 
+                                FROM events e
+                                JOIN assignments a ON e.user_id = a.user_id
+                                WHERE e.event_name = 'purchase' 
+                                AND e.user_id LIKE 'agent_%'
+                                AND e.assigned_at >= TIMESTAMP '{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
+                            """, con)
+                            
+                            new_refunds = []
+                            # Determine threshold (from session or default)
+                            guard_threshold = st.session_state.get('guard_threshold', 5.0)
+                            
+                            # Handle case where run_query returns string error
+                            if isinstance(recent_buyers, str):
+                                st.error("환불 데이터 생성 중 DB 조회 오류")
+                            elif not recent_buyers.empty:
+                                for _, row in recent_buyers.iterrows():
+                                    uid = row['user_id']
+                                    variant = row['variant']
+                                    
+                                    # Higher refund rate for B
+                                    refund_prob = 0.01 if variant == 'A' else (guard_threshold / 100) + 0.02
+                                    if np.random.random() < refund_prob:
+                                        ts = datetime.now() + timedelta(hours=np.random.randint(1, 24))
+                                        new_refunds.append((f"ref_{uid}", uid, 'refund', ts))
+                            
+                            if new_refunds:
+                                df_refunds = pd.DataFrame(new_refunds, columns=['eid','uid','name','ts'])
+                                # events: event_id, user_id, event_name, timestamp
+                                con.execute("INSERT INTO events VALUES (?, ?, ?, ?)", df_refunds.values.tolist())
+                            
+                            cnt_refunds = len(new_refunds)
+                            st.success(f"✅ 에이전트 {results['total']}명 투입 완료! (성공: {results['success']}명, 환불: {cnt_refunds}건)")
                             st.info(f"📊 클릭: {results['clicked']}명 | 구매: {results['purchased']}명")
                             
                             st.rerun()
@@ -952,6 +1035,59 @@ elif st.session_state['page'] == 'study':
                         st.success(f"**WINNER** (실험 성공!)")
                     else:
                         st.warning(f"**TIE** (차이 없음)")
+                
+                st.divider()
+                
+                # --- Guardrail Analysis ---
+                st.markdown("#### 🛡️ 가이드 지표 분석")
+                guard_metric = st.session_state.get('guard_metric', 'Refund Rate')
+                guard_threshold = st.session_state.get('guard_threshold', 5.0)
+                
+                # Calculate Refund Rate per variant
+                if "Refund" in guard_metric and len(df) == 2:
+                    sql_refund = """
+                    SELECT 
+                        a.variant,
+                        COUNT(DISTINCT e.user_id) as refunds
+                    FROM assignments a
+                    JOIN events e ON a.user_id = e.user_id
+                    WHERE e.event_name = 'refund'
+                    GROUP BY 1 ORDER BY 1
+                    """
+                    df_ref = run_query(sql_refund, con)
+                    
+                    # Merge with main df to get converters count
+                    # df has [Variant, Users, Conversions]
+                    # We need Refunds / Conversions
+                    
+                    # Simple lookup
+                    ref_a = 0
+                    ref_b = 0
+                    
+                    if not isinstance(df_ref, str) and not df_ref.empty:
+                        for _, row in df_ref.iterrows():
+                            if row['variant'] == 'A': ref_a = row['refunds']
+                            elif row['variant'] == 'B': ref_b = row['refunds']
+                        
+                    rr_a = (ref_a / c_conv * 100) if c_conv > 0 else 0.0
+                    rr_b = (ref_b / t_conv * 100) if t_conv > 0 else 0.0
+                    
+                    st.write(f"**{guard_metric}**")
+                    col_r1, col_r2 = st.columns(2)
+                    col_r1.metric("A (Control)", f"{rr_a:.2f}%")
+                    col_r2.metric("B (Test)", f"{rr_b:.2f}%", delta=f"{rr_b-rr_a:.2f}%", delta_color="inverse")
+                    
+                    if rr_b > guard_threshold:
+                        st.error(f"⚠️ **경고: {guard_metric} 급증!**")
+                        st.markdown(f"""
+                        <div style='background:rgba(255,0,0,0.1); padding:10px; border-radius:5px; border-left:3px solid red;'>
+                            <strong>🚨 조기 종료 권장 (Early Stopping Recommended)</strong><br>
+                            B안의 환불률({rr_b:.2f}%)이 허용 임계치({guard_threshold}%)를 초과했습니다.
+                            부정적인 사용자 경험이 우려되므로 실험을 중단하는 것이 좋습니다.
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.success("✅ 가이드 지표 안전함")
                 
                 st.divider()
                 note = st.text_area("배운 점 (Learning Note)", placeholder="이번 실험을 통해 무엇을 알게 되었나요?")
