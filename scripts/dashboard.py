@@ -868,7 +868,7 @@ elif st.session_state['page'] == 'study':
                 }
                 
                 for key, cfg in agent_config.items():
-                    st.caption(f"{cfg['name']}: {cfg['count']}명 ({cfg['desc']})")
+                    st.markdown(f"<span style='color:white;'>{cfg['name']}: {cfg['count']}명 ({cfg['desc']})</span>", unsafe_allow_html=True)
                 
                 # Advanced Customization (Optional)
                 with st.expander("🔧 고급: 직접 설정하기"):
@@ -894,6 +894,13 @@ elif st.session_state['page'] == 'study':
                     # Run agent swarm
                     with st.spinner("🤖 에이전트 투입 중... (30초 소요)"):
                         try:
+                            # Fix import path
+                            import sys
+                            import os
+                            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                            if project_root not in sys.path:
+                                sys.path.insert(0, project_root)
+                            
                             from agent_swarm.runner import run_agent_swarm
                             
                             # Progress tracking
