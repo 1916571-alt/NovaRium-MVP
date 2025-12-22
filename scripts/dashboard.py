@@ -734,10 +734,26 @@ elif st.session_state['page'] == 'study':
                 n_control = int(target_total * control_pct)
                 n_test = int(target_total * test_pct)
         
-        split_ratio = st.session_state.get('split', 50)
         
-        # Check current data count (only count experiment users, not historical)
-        current_n = run_query("SELECT COUNT(DISTINCT user_id) FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'", con).iloc[0,0]
+        # Check current data count (only count THIS experiment's users)
+        # Use experiment_id to track current session, or timestamp-based filtering
+        experiment_id = st.session_state.get('experiment_id', 'exp_current')
+        
+        # For now, let's count users created AFTER entering Step 3
+        # Store a timestamp when first entering Step 3
+        if 'step3_start_time' not in st.session_state:
+            st.session_state['step3_start_time'] = datetime.now()
+        
+        start_time = st.session_state['step3_start_time']
+        
+        # Count only users created after Step 3 started
+        current_n = run_query(f"""
+            SELECT COUNT(DISTINCT user_id) 
+            FROM assignments 
+            WHERE (user_id LIKE 'sim_%' OR user_id LIKE 'agent_%')
+            AND timestamp >= '{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
+        """, con).iloc[0,0]
+        
         remaining = max(0, target_total - current_n)
         progress_pct = min(100, (current_n / target_total * 100) if target_total > 0 else 0)
         
