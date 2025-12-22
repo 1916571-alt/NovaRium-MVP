@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaEats - Order Now</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f4f6; }
+        .banner-a { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .banner-b { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; } /* Red for urgency */
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+    <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border border-gray-200">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-slate-800">🍔 NovaEats</h1>
+            <div class="text-sm text-gray-400">User: {{ uid }} <span class="bg-slate-200 px-2 py-1 rounded text-xs text-slate-600 ml-1">{{ variant }}</span></div>
+        </div>
+
+        <!-- EXPERIMENT ZONE: Main Banner -->
+        <!-- Variant A: Blue (Standard) -->
+        {% if variant == 'A' %}
+        <div id="hero-banner" class="banner-a p-6 rounded-xl mb-6 shadow-lg transform transition hover:scale-105 cursor-pointer text-center" onclick="trackClick('banner_A')">
+            <div class="text-sm font-medium opacity-80 mb-1">Welcome Back!</div>
+            <h2 class="text-2xl font-bold mb-2">맛있는 음식이<br>기다리고 있어요</h2>
+            <button class="mt-2 bg-white text-blue-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm hover:bg-gray-50">주문하기</button>
+        </div>
+        {% else %}
+        <!-- Variant B: Red (Urgency/Promotion) -->
+        <div id="hero-banner" class="banner-b p-6 rounded-xl mb-6 shadow-lg transform transition hover:scale-105 cursor-pointer text-center" onclick="trackClick('banner_B')">
+            <div class="text-sm font-medium opacity-80 mb-1">⏰ 마감 임박</div>
+            <h2 class="text-2xl font-bold mb-2">첫 주문 기회!<br>3,000원 쿠폰</h2>
+            <button class="mt-2 bg-white text-red-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm hover:bg-gray-50">쿠폰 받고 주문하기</button>
+        </div>
+        {% endif %}
+
+        <!-- Food List -->
+        <div class="space-y-4">
+            <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition cursor-pointer" onclick="trackClick('item_1')">
+                <div class="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center text-2xl">🍕</div>
+                <div>
+                    <div class="font-bold text-slate-800">Chesse Pizza</div>
+                    <div class="text-sm text-gray-500">$12.00</div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition cursor-pointer" onclick="trackClick('item_2')">
+                <div class="w-16 h-16 bg-yellow-100 rounded-lg flex items-center justify-center text-2xl">🍔</div>
+                <div>
+                    <div class="font-bold text-slate-800">Classic Burger</div>
+                    <div class="text-sm text-gray-500">$8.50</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 pt-4 border-t border-gray-100 text-center text-xs text-gray-400">
+            NovaRium Edu Virtual Environment
+        </div>
+    </div>
+
+    <script>
+        const uid = "{{ uid }}";
+
+        async function trackClick(element) {
+            console.log("Click tracked:", element);
+            
+            // Visual Feedback
+            const banner = document.getElementById('hero-banner');
+            banner.style.opacity = '0.7';
+            setTimeout(() => banner.style.opacity = '1.0', 200);
+
+            // API Call
+            const formData = new FormData();
+            formData.append("uid", uid);
+            formData.append("element", element);
+
+            try {
+                await fetch("/click", {
+                    method: "POST",
+                    body: formData
+                });
+                
+                // If it's a banner click, simulate conversion/purchase chance
+                if(element.includes('banner')) {
+                    // Random purchase simulation for visual effect (client-side only for demo)
+                    if(Math.random() > 0.7) {
+                        // Purchase!
+                        const orderData = new FormData();
+                        orderData.append("uid", uid);
+                        orderData.append("amount", 25000);
+                        await fetch("/order", { method: "POST", body: orderData });
+                        alert("🎉 주문 완료! (Conversion Tracked)");
+                    }
+                }
+
+            } catch(e) {
+                console.error("Tracking failed", e);
+            }
+        }
+    </script>
+</body>
+</html>
