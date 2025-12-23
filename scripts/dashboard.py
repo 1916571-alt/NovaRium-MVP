@@ -1,14 +1,14 @@
 import streamlit as st
-import duckdb
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import os
-import hashlib
-from scipy import stats
 from datetime import datetime, timedelta
 import streamlit.components.v1 as components
+
+# Import modularized logic
+import analytics as al
+import components as ui
 
 # Page Config
 st.set_page_config(
@@ -18,197 +18,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Constants
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'novarium_local.db')
-
-@st.cache_resource
-def get_connection():
-    return duckdb.connect(DB_PATH)
-
-def run_query(query, con):
-    try:
-        return con.execute(query).df()
-    except Exception as e:
-        return str(e)
-
-# --- COSMIC GLASS CSS ---
-st.markdown("""
-<style>
-    /* 1. Fonts & Global Reset */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    
-    /* 2. Background (Deep Cosmic Dark) */
-    .stApp {
-        background-color: #0d0d1a !important;
-        color: #ffffff !important;
-    }
-    
-    /* 3. Glass Cards (The 'Bento' feel) */
-    div[data-testid="stContainer"] {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
-        transition: all 0.3s ease;
-    }
-    div[data-testid="stContainer"]:hover {
-        border-color: rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 32px 0 rgba(139, 92, 246, 0.1);
-    }
-
-    /* 4. Typography Override */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em;
-    }
-    p, li, label, .stMarkdown {
-        color: rgba(255, 255, 255, 0.7) !important;
-    }
-    
-    /* 5. Inputs & Widgets */
-    .stTextInput>div>div, .stNumberInput>div>div, .stSelectbox>div>div, .stTextArea>div>div {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px;
-    }
-    .stTextInput>div>div:focus-within {
-        border-color: #818CF8 !important;
-        box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2);
-    }
-    
-    /* 6. Buttons */
-    .stButton>button {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white;
-        border-radius: 30px; /* Pill shape */
-        padding: 0.5rem 1.5rem;
-        font-weight: 600;
-        transition: all 0.3s;
-    }
-    .stButton>button:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: #818CF8;
-        color: #818CF8;
-        transform: translateY(-2px);
-    }
-    /* Primary Button Gradient */
-    div[data-testid="stButton"] button[kind="primary"] {
-        background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); /* Indigo to Violet */
-        border: none;
-        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
-    }
-    div[data-testid="stButton"] button[kind="primary"]:hover {
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
-    }
-    
-    /* 7. Educational Guide Styling */
-    .edu-guide {
-        background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
-        border-left: 4px solid #8B5CF6;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        margin-bottom: 2rem;
-    }
-    .edu-title {
-        color: #A78BFA; /* Light Purple */
-        font-weight: 700;
-        font-size: 0.95rem;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 4px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    .edu-content {
-        color: rgba(255, 255, 255, 0.8) !important;
-        font-size: 0.95rem;
-        line-height: 1.5;
-    }
-
-    /* 8. Big Stats */
-    .big-stat {
-        font-size: 3rem;
-        font-weight: 800;
-        background: linear-gradient(to right, #ffffff, #94a3b8);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    /* 9. Progress Bar */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #6366F1, #EC4899);
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- Helper Functions ---
-def edu_guide(title, content):
-    st.markdown(f"""
-    <div class="edu-guide">
-        <div class="edu-title"><span style="font-size:1.2em">💡</span> {title}</div>
-        <div class="edu-content">{content}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
-    standard_norm = stats.norm()
-    Z_alpha = standard_norm.ppf(1 - alpha/2)
-    Z_beta = standard_norm.ppf(power)
-    p1 = baseline_cvr
-    p2 = baseline_cvr * (1 + mde)
-    pooled_prob = (p1 + p2) / 2
-    if p1 == p2: return 0
-    n = (2 * pooled_prob * (1 - pooled_prob) * (Z_alpha + Z_beta)**2) / (p1 - p2)**2
-    return int(n)
-
-def get_bucket(user_id, num_buckets=100):
-    hash_obj = hashlib.md5(str(user_id).encode())
-    return int(hash_obj.hexdigest(), 16) % num_buckets
-
-# --- Initialize State ---
-# Change Default Page to 'monitor'
+# Initialize Session State
 if 'page' not in st.session_state: st.session_state['page'] = 'monitor'
 if 'step' not in st.session_state: st.session_state['step'] = 1
 if 'custom_metrics' not in st.session_state: st.session_state['custom_metrics'] = []
 
-con = duckdb.connect(DB_PATH) # Re-connect per run safely
-
-# --- HEADER NAVIGATION ---
-# Top bar with Logo and Tabs
-c_logo, c_nav = st.columns([1, 4])
-with c_logo:
-    if st.button("🌌 NovaRium", type="secondary", use_container_width=True):
-        st.session_state['page'] = 'intro'
-        st.rerun()
-
-with c_nav:
-    # Use standard buttons acting as tabs, styled as pills
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c1:
-        if st.button("🔍 모니터링 (Monitor)", type="primary" if st.session_state['page']=='monitor' else "secondary", use_container_width=True):
-            st.session_state['page'] = 'monitor'
-            st.rerun()
-    with c2:
-        if st.button("🚀 마스터 클래스 (Lab)", type="primary" if st.session_state['page']=='study' else "secondary", use_container_width=True):
-            st.session_state['page'] = 'study'
-            st.rerun()
-    with c3:
-        if st.button("📚 회고록 (Retro)", type="primary" if st.session_state['page']=='portfolio' else "secondary", use_container_width=True):
-            st.session_state['page'] = 'portfolio'
-            st.rerun()
+# --- APPLY STYLES & HEADER ---
+ui.apply_custom_css()
+ui.render_navbar()
 
 st.write("") # Spacer
+
+con = al.get_connection()
 
 # =========================================================
 # PAGE: INTRO (BRAND IDENTITY)
@@ -256,131 +77,20 @@ if st.session_state['page'] == 'monitor':
     st.caption("NovaEats 서비스의 핵심 지표를 실시간으로 모니터링합니다.")
 
     # Check if history data exists
-    check_history = run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'", con)
+    check_history = al.run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'", con)
     has_history = not check_history.empty and check_history.iloc[0, 0] > 0
     
     if not has_history:
         st.warning("데이터가 없습니다. 30일치 히스토리를 생성하세요.")
-        
         if st.button("🔄 데이터 생성하기 (30일치)", type="primary"):
-            with st.spinner("30일치 히스토리 데이터 생성 중..."):
-                # Inline history generation
-                DAYS_HISTORY = 30
-                DAILY_USERS = 500
-                
-                # Clean old history
-                con.execute("DELETE FROM assignments WHERE user_id LIKE 'user_hist_%'")
-                con.execute("DELETE FROM events WHERE user_id LIKE 'user_hist_%'")
-                
-                users = []
-                events = []
-                
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=DAYS_HISTORY)
-                user_counter = 10000
-                
-                for day in range(DAYS_HISTORY):
-                    current_date = start_date + timedelta(days=day)
-                    is_crisis = (DAYS_HISTORY - day) <= 3
-                    
-                    if is_crisis:
-                        ctr = 0.04
-                        cvr = 0.15
-                        traffic_vol = int(DAILY_USERS * 0.9)
-                    else:
-                        ctr = 0.15
-                        cvr = 0.20
-                        traffic_vol = DAILY_USERS + np.random.randint(-50, 50)
-                    
-                    for _ in range(traffic_vol):
-                        user_counter += 1
-                        uid = f"user_hist_{user_counter}"
-                        visit_time = current_date + timedelta(seconds=np.random.randint(0, 86400))
-                        users.append((uid, 'history_load', 'A', visit_time))
-                        
-                        if np.random.random() < ctr:
-                            click_time = visit_time + timedelta(seconds=np.random.randint(2, 60))
-                            events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time))
-                            
-                            if np.random.random() < cvr:
-                                order_time = click_time + timedelta(seconds=np.random.randint(30, 300))
-                                events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time))
-                
-                # Bulk insert
-                df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts'])
-                df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts'])
-                
-                con.execute("INSERT INTO assignments SELECT uid, eid, var, ts FROM df_u")
-                con.execute("INSERT INTO events SELECT eid, uid, name, ts FROM df_e")
-                
-                st.success("✅ 30일치 데이터 생성 완료!")
-                st.rerun()
-        
-        st.stop()
+            st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
     else:
         # Data exists - show regenerate option with warning
         with st.expander("⚙️ 데이터 관리"):
             st.warning("⚠️ 기존 30일치 히스토리 데이터가 존재합니다.")
-            st.caption(f"현재 {check_history.iloc[0, 0]:,}명의 히스토리 사용자가 있습니다.")
-            
             if st.button("🔄 데이터 재생성 (기존 데이터 삭제)", type="secondary"):
-                st.error("⚠️ 정말로 기존 데이터를 삭제하고 재생성하시겠습니까?")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("✅ 예, 재생성"):
-                        # Same generation logic as above
-                        with st.spinner("30일치 히스토리 데이터 재생성 중..."):
-                            DAYS_HISTORY = 30
-                            DAILY_USERS = 500
-                            
-                            con.execute("DELETE FROM assignments WHERE user_id LIKE 'user_hist_%'")
-                            con.execute("DELETE FROM events WHERE user_id LIKE 'user_hist_%'")
-                            
-                            users = []
-                            events = []
-                            
-                            end_date = datetime.now()
-                            start_date = end_date - timedelta(days=DAYS_HISTORY)
-                            user_counter = 10000
-                            
-                            for day in range(DAYS_HISTORY):
-                                current_date = start_date + timedelta(days=day)
-                                is_crisis = (DAYS_HISTORY - day) <= 3
-                                
-                                if is_crisis:
-                                    ctr = 0.04
-                                    cvr = 0.15
-                                    traffic_vol = int(DAILY_USERS * 0.9)
-                                else:
-                                    ctr = 0.15
-                                    cvr = 0.20
-                                    traffic_vol = DAILY_USERS + np.random.randint(-50, 50)
-                                
-                                for _ in range(traffic_vol):
-                                    user_counter += 1
-                                    uid = f"user_hist_{user_counter}"
-                                    visit_time = current_date + timedelta(seconds=np.random.randint(0, 86400))
-                                    users.append((uid, 'history_load', 'A', visit_time))
-                                    
-                                    if np.random.random() < ctr:
-                                        click_time = visit_time + timedelta(seconds=np.random.randint(2, 60))
-                                        events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time))
-                                        
-                                        if np.random.random() < cvr:
-                                            order_time = click_time + timedelta(seconds=np.random.randint(30, 300))
-                                            events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time))
-                            
-                            df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts'])
-                            df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts'])
-                            
-                            con.execute("INSERT INTO assignments SELECT uid, eid, var, ts FROM df_u")
-                            con.execute("INSERT INTO events SELECT eid, uid, name, ts FROM df_e")
-                            
-                            st.success("✅ 30일치 데이터 재생성 완료!")
-                            st.rerun()
-                with col2:
-                    if st.button("❌ 취소"):
-                        st.rerun()
+                if st.button("✅ 예, 재생성"):
+                     st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
 
     # 1. Fetch KPI Logic (Last 30 days)
     # Using 'user_hist_' IDs from history generator
@@ -402,7 +112,7 @@ if st.session_state['page'] == 'monitor':
     FROM daily_stats
     ORDER BY day ASC
     """
-    df_trend = run_query(sql_kpi, con)
+    df_trend = al.run_query(sql_kpi, con)
     
     if not df_trend.empty:
         # 30-Day Average Stats (instead of latest day)
@@ -462,13 +172,7 @@ if st.session_state['page'] == 'monitor':
                            title='Daily Purchase CVR (Click to Order)', template='plotly_dark')
             fig2.update_traces(line_color='#8B5CF6', line_width=3)
             st.plotly_chart(fig2, use_container_width=True)
-
-    else:
-        st.warning("데이터가 없습니다. `generate_history.py`를 실행해주세요.")
-        if st.button("데이터 생성하기"):
-             # Call script via simple trigger? (Would need restart, but let's just guide user)
-             st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
-
+            
 # =========================================================
 # PAGE: STUDY (WIZARD)
 # =========================================================
@@ -476,28 +180,14 @@ elif st.session_state['page'] == 'study':
     
     # --- Progress Indicators (Nebula Style) ---
     steps = ["1. Hypothesis", "2. Design", "3. Collection", "4. Analysis"]
+    ui.render_step_progress(steps, st.session_state['step'])
+    
     curr = st.session_state['step']
-    
-    cols = st.columns(len(steps))
-    for i, s in enumerate(steps):
-        is_active = (i + 1 == curr)
-        color = "#8B5CF6" if is_active else "rgba(255,255,255,0.2)"
-        text_color = "white" if is_active else "rgba(255,255,255,0.4)"
-        weight = "700" if is_active else "400"
-        
-        cols[i].markdown(f"""
-        <div style="text-align:center;">
-            <div style="height:4px; width:100%; background:{color}; border-radius:2px; margin-bottom:8px; box-shadow:{'0 0 10px #8B5CF6' if is_active else 'none'}"></div>
-            <span style="color:{text_color}; font-weight:{weight}; font-size:0.9rem;">{s}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 
     # --- STEP 1: HYPOTHESIS ---
     if curr == 1:
         st.markdown(f"<h2>Step 1. 목표 정의 (Define Your Vision)</h2>", unsafe_allow_html=True)
-        edu_guide("가설(Hypothesis)", "데이터 분석은 막연한 시도가 아닙니다. **'무엇을(X) 바꾸면 어떤 지표(Y)가 좋아질 것이다'**라는 명확한 믿음을 정의하세요.")
+        ui.edu_guide("가설(Hypothesis)", "데이터 분석은 막연한 시도가 아닙니다. **'무엇을(X) 바꾸면 어떤 지표(Y)가 좋아질 것이다'**라는 명확한 믿음을 정의하세요.")
 
         col_mock, col_form = st.columns([1.5, 1], gap="large")
         
@@ -506,8 +196,6 @@ elif st.session_state['page'] == 'study':
             with st.container(border=True):
                 st.markdown("#### 📱 NovaEats (Live Target)")
                 st.caption("실제 구동 중인 웹 서버(FastAPI) 화면입니다. 에이전트들이 이곳을 방문하게 됩니다.")
-                
-                # Embedding the FastAPI app
                 try:
                     components.iframe("http://localhost:8000", height=600, scrolling=True)
                 except Exception:
@@ -540,18 +228,10 @@ elif st.session_state['page'] == 'study':
                 # Hypothesis Builder
                 st.markdown("**가설 설정 (Hypothesis)**")
                 with st.expander("💡 가설 템플릿 사용하기"):
-                    # Context-Aware Logic
                     t_ctx = st.session_state.get('target', '')
-                    def_what = "메인 배너 색상을 빨강으로 변경하면"
-                    def_why = "클릭률이 5% 상승할 것이다"
+                    def_what = "메인 배너 문구를 '마감 임박'으로 변경하면"
+                    def_why = "클릭률(CTR)이 15%까지 회복될 것이다"
                     
-                    if "메인 배너" in t_ctx:
-                        def_what = "메인 배너 문구를 '마감 임박'으로 변경하면"
-                        def_why = "클릭률(CTR)이 15%까지 회복될 것이다"
-                    elif "카테고리" in t_ctx:
-                        def_what = "카테고리 아이콘을 3D 스타일로 변경하면"
-                        def_why = "카테고리 탭 클릭 수가 20% 증가할 것이다"
-
                     h_who = st.selectbox("대상(Who)", ["모든 유저에게", "신규 유저에게", "재구매 유저에게"])
                     h_what = st.text_input("무엇을(Changes)", def_what)
                     h_why = st.text_input("기대 효과(Impact)", def_why)
@@ -564,92 +244,31 @@ elif st.session_state['page'] == 'study':
                 hypo = st.text_area("가설을 작성하세요", value=default_hypo, placeholder="예: 메인 배너 문구를 '마감 임박'으로 변경하면, 클릭률(CTR)이 상승할 것이다.", height=120)
                 
                 st.write("")
-                # Metrics Setup (Advanced)
+                # Metrics Setup
                 st.markdown("#### 🎯 지표 설정 (Metrics)")
-                
-                # Metric Library (Educational)
                 metrics_db = {
-                    "CTR (클릭률)": {
-                        "desc": "노출 대비 클릭한 비율 (Click Through Rate)", 
-                        "formula": "Clicks / Impressions * 100",
-                        "type": "Conversion"
-                    },
-                    "CVR (전환율)": {
-                        "desc": "방문자 중 실제 구매(목표)로 이어진 비율 (Conversion Rate)", 
-                        "formula": "Orders / Visitors * 100",
-                        "type": "Conversion"
-                    },
-                    "AOV (평균 주문액)": {
-                        "desc": "구매 고객 1인당 평균 결제 금액 (Average Order Value)", 
-                        "formula": "Total Revenue / Total Orders",
-                        "type": "Revenue"
-                    },
-                    "Bounce Rate (이탈률)": {
-                        "desc": "첫 페이지만 보고 나가는 비율. (낮을수록 좋음)", 
-                        "formula": "One-page Sessions / Total Sessions * 100",
-                        "type": "Retention"
-                    },
-                    "Purchase Logic (결제 시간)": {
-                        "desc": "상품 클릭 후 결제 완료까지 걸리는 시간 (Time to Purchase)",
-                        "formula": "Purchase Time - Click Time (Avg)",
-                        "type": "UX"
-                    }
+                    "CTR (클릭률)": {"desc": "노출 대비 클릭한 비율", "formula": "Clicks / Impressions", "type": "Conversion"},
+                    "CVR (전환율)": {"desc": "방문자 중 실제 구매 비율", "formula": "Orders / Visitors", "type": "Conversion"},
+                    "AOV (평균 주문액)": {"desc": "구매 고객 1인당 평균 결제 금액", "formula": "Revenue / Orders", "type": "Revenue"},
+                    "Bounce Rate (이탈률)": {"desc": "첫 페이지만 보고 나가는 비율", "formula": "One-page / Total", "type": "Retention"},
                 }
                 
-                # 1. Primary Metric (OEC)
-                st.markdown("**1. 핵심 성공 지표 (Primary Metric)**")
-                st.caption("실험의 성공/실패를 판가름하는 단 하나의 지표 (OEC)")
                 m_sel = st.selectbox("Key Metric (OEC)", list(metrics_db.keys()), label_visibility="collapsed")
-                
-                # Info Card for Primary
-                sel_info = metrics_db[m_sel]
-                st.markdown(f"""
-                <div style="background:rgba(255,255,255,0.05); border-left:4px solid #8B5CF6; padding:10px 15px; border-radius:4px; margin-bottom:15px;">
-                    <div style="color:#A78BFA; font-weight:bold;">{m_sel}</div>
-                    <div style="font-size:0.9rem; margin-top:4px;">{sel_info['desc']}</div>
-                    <div style="font-size:0.8rem; color:rgba(255,255,255,0.5); margin-top:4px;">🧮 산식: {sel_info['formula']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.caption(f"🧮 {metrics_db[m_sel]['desc']}")
 
-                # 2. Guardrail Metrics
+                # Guardrail Metrics
                 st.markdown("**2. 가드레일 지표 (Guardrail Metrics)**")
-                st.caption("실험군에서 **절대 망가지면 안 되는** 보조 지표들입니다. (부작용 감시)")
                 default_gr = ["AOV (평균 주문액)"] if m_sel != "AOV (평균 주문액)" else ["CVR (전환율)"]
                 g_sel = st.multiselect("보조 지표 선택", [k for k in metrics_db.keys() if k != m_sel], default=default_gr)
                 
                 if g_sel:
-                    for g in g_sel:
-                        info = metrics_db[g]
-                        st.caption(f"🛡️ **{g}**: {info['desc']}")
-                    
-                    st.write("")
-                    st.markdown("**허용 임계치 설정 (Threshold)**")
-                    st.caption("가드레일 지표가 이 값을 초과하면 실험 조기 종료를 권장합니다.")
-                    
-                    # Use the first selected guardrail metric for threshold
-                    primary_guardrail = g_sel[0] if g_sel else "Refund Rate"
-                    
-                    guard_threshold = st.number_input(
-                        f"{primary_guardrail} 허용 임계치 (%)",
-                        min_value=0.0, max_value=20.0, value=5.0, step=0.5,
-                        help=f"{primary_guardrail}이(가) 이 값을 넘으면 위험 신호로 간주합니다."
-                    )
-                    st.info(f"💡 **{primary_guardrail}**이(가) **{guard_threshold}%**를 넘으면 조기 종료 경고가 표시됩니다.")
-                    
-                    # Store the metric name for later use
-                    guard_metric_name = primary_guardrail
+                    guard_threshold = st.number_input("허용 임계치 (%)", min_value=0.0, max_value=20.0, value=5.0, step=0.5)
+                    st.info(f"💡 **{g_sel[0]}**이(가) **{guard_threshold}%**를 넘으면 조기 종료 경고가 표시됩니다.")
+                    guard_metric_name = g_sel[0]
                 else:
-                    guard_threshold = 5.0  # Default
+                    guard_threshold = 5.0
                     guard_metric_name = "Refund Rate"
 
-                # Custom Metric
-                with st.expander("➕ 지표 직접 만들기 (Custom)"):
-                    nm = st.text_input("지표 이름")
-                    desc = st.text_input("설명 (예: 회원가입 버튼 클릭 수)")
-                    if st.button("추가"): 
-                        st.session_state['custom_metrics'].append(nm)
-                        st.rerun()
-                
                 st.write("")
                 if st.button("다음: 실험 설계 단계로 ➡️", type="primary", use_container_width=True):
                     if not hypo:
@@ -665,28 +284,15 @@ elif st.session_state['page'] == 'study':
                         st.session_state['step'] = 2
                         st.rerun()
 
-    # --- STEP 2: EXPERIMENT DESIGN (Unified: Traffic + Power Analysis) ---
+    # --- STEP 2: EXPERIMENT DESIGN ---
     elif curr == 2:
         st.markdown(f"<h2>Step 2. 실험 설계 (Experiment Design)</h2>", unsafe_allow_html=True)
-        edu_guide("실험 설계의 3요소", "트래픽 비율 → 목표 설정 → 필요 표본 계산 순서로 진행합니다. <strong>트래픽 비율이 표본 크기에 영향</strong>을 주므로 먼저 결정해야 합니다.")
-        
-        # === PART 1: Traffic Ratio Selection ===
-        st.markdown("### 1️⃣ 트래픽 비율 설정")
+        ui.edu_guide("실험 설계의 3요소", "트래픽 비율 → 목표 설정 → 필요 표본 계산 순서로 진행합니다.")
         
         col_ratio = st.columns([1, 1], gap="large")
         with col_ratio[0]:
             with st.container(border=True):
                 st.markdown("#### 🎛️ 비율 선택")
-                with st.expander("💡 비율 선택 가이드"):
-                    st.markdown("""
-                    | 비율 | 상황 | 예시 |
-                    |------|------|------|
-                    | **50/50** | 표준 실험 | UI 색상, 문구 변경 |
-                    | **90/10** | 고위험 실험 | 결제 플로우, 핵심 기능 |
-                    | **10/90** | 저위험 + 확신 | 명백한 개선사항 빠른 적용 |
-                    
-                    **현재 상황:** 배너 문구 변경 → 추천 **50/50**
-                    """)
                 split = st.slider("테스트(B) 그룹 비율", 10, 90, 50, format="%d%%")
                 st.caption(f"Control(A): {100-split}% | Test(B): {split}%")
         
@@ -694,7 +300,7 @@ elif st.session_state['page'] == 'study':
             with st.container(border=True):
                 st.markdown("#### 🔍 Hash 검증")
                 uid = st.text_input("User ID", "user_cosmic_99", key="hash_uid")
-                b = get_bucket(uid)
+                b = al.get_bucket(uid)
                 threshold = 100 - split
                 grp = "B" if b >= threshold else "A"
                 st.markdown(f"**Hash: {b}** → Group **{grp}**")
@@ -706,560 +312,179 @@ elif st.session_state['page'] == 'study':
         with c1:
             with st.container(border=True):
                 st.markdown("#### ⚙️ Parameters")
-                
-                # Context-Aware Baseline (Fetch from DB)
                 selected_metric = st.session_state.get('metric', 'CTR (클릭률)')
                 
-                # Query latest metric value
-                if "CTR" in selected_metric:
-                    sql_baseline = """
-                    SELECT 
-                        (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / 
-                         NULLIF(COUNT(DISTINCT a.user_id), 0)) as metric_value
-                    FROM assignments a
-                    LEFT JOIN events e ON a.user_id = e.user_id
-                    WHERE a.user_id LIKE 'user_hist_%'
-                    AND a.assigned_at >= CURRENT_DATE - INTERVAL '3 days'
-                    """
-                    metric_label = "클릭률 (CTR)"
-                    normal_target = 0.15  # Normal CTR is 15%
-                else:  # CVR or other
-                    sql_baseline = """
-                    SELECT 
-                        (COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END)::FLOAT / 
-                         NULLIF(COUNT(DISTINCT a.user_id), 0)) as metric_value
-                    FROM assignments a
-                    LEFT JOIN events e ON a.user_id = e.user_id
-                    WHERE a.user_id LIKE 'user_hist_%'
-                    AND a.assigned_at >= CURRENT_DATE - INTERVAL '3 days'
-                    """
-                    metric_label = "전환율 (CVR)"
-                    normal_target = 0.20  # Normal CVR is 20%
-                
-                df_baseline = run_query(sql_baseline, con)
+                # Fetch baseline
+                sql_baseline = """
+                SELECT 
+                    (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / 
+                     NULLIF(COUNT(DISTINCT a.user_id), 0)) as metric_value
+                FROM assignments a
+                LEFT JOIN events e ON a.user_id = e.user_id
+                WHERE a.user_id LIKE 'user_hist_%'
+                """
+                if "CVR" in selected_metric:
+                     sql_baseline = sql_baseline.replace("'click_banner'", "'purchase'")
+
+                df_baseline = al.run_query(sql_baseline, con)
                 auto_baseline = df_baseline.iloc[0, 0] if not df_baseline.empty and df_baseline.iloc[0, 0] else 0.10
                 
-                # Display Current (Read-only style)
-                st.markdown(f"**현재 {metric_label}** (자동 감지)")
-                st.markdown(f"""
-                <div style='padding:15px; background:rgba(239, 68, 68, 0.1); border:2px solid #ef4444; border-radius:10px; text-align:center;'>
-                    <div style='font-size:2rem; font-weight:bold; color:#ef4444;'>{auto_baseline*100:.2f}%</div>
-                    <div style='font-size:0.9rem; color:rgba(255,255,255,0.6); margin-top:5px;'>최근 3일 평균</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"**현재 {selected_metric}** (자동 감지)")
+                st.markdown(f"<div style='font-size:1.5rem; font-weight:bold; color:#ef4444;'>{auto_baseline*100:.2f}%</div>", unsafe_allow_html=True)
                 
                 st.write("")
+                target_metric = st.number_input(f"**목표 {selected_metric}**", min_value=0.0, max_value=1.0, value=0.15, step=0.01)
                 
-                # Target Input (User sets goal)
-                target_metric = st.number_input(f"**목표 {metric_label}** (실험 성공 시 도달할 목표)", 
-                                               min_value=float(auto_baseline), 
-                                               max_value=1.0, 
-                                               value=float(normal_target), 
-                                               step=0.01,
-                                               format="%.2f",
-                                               help=f"정상 범위: {normal_target*100:.0f}%")
-                
-                # Calculate MDE internally
                 mde = (target_metric - auto_baseline) / auto_baseline if auto_baseline > 0 else 0
-                
-                st.caption(f"💡 목표: {auto_baseline*100:.2f}% → {target_metric*100:.2f}% (상승폭: +{mde*100:.1f}%)")
-                
-                base_cvr = auto_baseline  # Use detected baseline for calculation
+                st.caption(f"💡 상승폭: +{mde*100:.1f}%")
         
         with c2:
             with st.container(border=True):
                 st.markdown("#### 🧮 필요 표본 수 (Required Sample)")
-                n = calculate_sample_size(base_cvr, mde)
+                n = al.calculate_sample_size(auto_baseline, mde)
                 
-                # Adjust for traffic ratio
-                if split == 50:
-                    n_control = n
-                    n_test = n
-                    total_needed = n * 2
-                else:
-                    # For unequal splits, adjust proportionally
-                    control_pct = (100 - split) / 100
-                    test_pct = split / 100
-                    # Keep total sample size but distribute by ratio
-                    total_needed = int(n * 2 * max(1/control_pct, 1/test_pct))
-                    n_control = int(total_needed * control_pct)
-                    n_test = int(total_needed * test_pct)
-                
+                total_needed = n * 2
                 st.markdown(f"<div class='big-stat'>{total_needed:,}</div>", unsafe_allow_html=True)
                 st.markdown("**명 (총 필요 유저 수)**")
-                
                 st.progress(min(1.0, 0.3 + (mde * 2)))
-                st.caption(f"• Control (A): **{n_control:,}명** ({100-split}%)")
-                st.caption(f"• Test (B): **{n_test:,}명** ({split}%)")
-                st.caption(f"💡 트래픽 비율에 따라 각 그룹의 필요 인원이 조정됩니다.")
-                
-                # Educational Explainer
-                with st.expander("📐 계산 로직 보기 (How is this calculated?)"):
-                    st.markdown("""
-                    ### 표본 크기 계산 공식 (Sample Size Formula)
-                    
-                    A/B 테스트에서 필요한 샘플 수는 다음 공식으로 계산됩니다:
-                    
-                    ```
-                    n = 2 × p̄(1-p̄) × (Z_α/2 + Z_β)² / (p₁ - p₂)²
-                    ```
-                    
-                    **각 요소 설명:**
-                    
-                    1. **p₁, p₂**: 대조군(A)과 실험군(B)의 전환율
-                       - p₁ = 현재 클릭률 (예: 6.93%)
-                       - p₂ = 목표 클릭률 (예: 15%)
-                    
-                    2. **p̄ (Pooled Probability)**: 두 그룹의 평균 전환율
-                       - p̄ = (p₁ + p₂) / 2
-                       - 분산 계산에 사용
-                    
-                    3. **Z_α/2**: 유의수준(α)에 대한 Z-score
-                       - α = 0.05 (95% 신뢰도) → Z = 1.96
-                       - "5% 확률로 오판할 수 있음"을 의미
-                    
-                    4. **Z_β**: 검정력(Power)에 대한 Z-score
-                       - Power = 0.80 (80%) → Z = 0.84
-                       - "실제 차이가 있을 때 80% 확률로 감지"
-                    
-                    5. **(p₁ - p₂)²**: 효과 크기의 제곱
-                       - 차이가 클수록 적은 샘플로 감지 가능
-                       - 차이가 작을수록 더 많은 샘플 필요
-                    
-                    **직관적 이해:**
-                    - 🔍 작은 차이를 찾으려면 → 많은 샘플 필요
-                    - 🎯 큰 차이를 찾으려면 → 적은 샘플로도 충분
-                    - 📊 신뢰도를 높이려면 → 더 많은 샘플 필요
-                    
-                    **현재 계산값:**
-                    - 현재: {:.2%} → 목표: {:.2%}
-                    - 효과 크기: {:.2%}
-                    - 필요 샘플: {:,}명 (그룹당)
-                    """.format(base_cvr, target_metric, abs(target_metric - base_cvr), n))
-                
-                
-                
-                st.write("")
-                if st.button("다음: 데이터 수집 ➡️", type="primary", use_container_width=True):
-                    st.session_state['split'] = split
-                    st.session_state['total_needed'] = total_needed
-                    st.session_state['n_control'] = n_control
-                    st.session_state['n_test'] = n_test
-                    st.session_state['baseline_metric'] = base_cvr
-                    st.session_state['target_metric'] = target_metric
-                    st.session_state['step'] = 3
-                    st.rerun()
 
-    # --- STEP 3: COLLECTION (formerly Step 4) ---
+        st.write("")
+        if st.button("다음: 데이터 수집 시작 (Simulation) ➡️", type="primary", use_container_width=True):
+            st.session_state['n'] = n
+            st.session_state['split'] = split
+            st.session_state['step'] = 3
+            st.rerun()
+
+    # --- STEP 3: COLLECTION (SIMULATION) ---
     elif curr == 3:
-        st.markdown(f"<h2>Step 3. 데이터 수집 (Collection)</h2>", unsafe_allow_html=True)
-        edu_guide("Event Logging (로그 적재)", "유저가 들어오면 <strong>Assignments</strong>(그룹 할당) 테이블에 남고, 행동을 하면 <strong>Events</strong>(클릭/구매) 테이블에 기록됩니다.")
+        st.markdown(f"<h2>Step 3. 데이터 모으기 (Collection)</h2>", unsafe_allow_html=True)
+        ui.edu_guide("실시간 시뮬레이션", "Agent System이 가상의 유저가 되어 앱을 방문합니다.")
+        
+        # Agent Persona Settings
+        with st.expander("🤖 에이전트 성향 설정 (Advanced)", expanded=False):
+            st.caption("다양한 성향의 유저 비율을 조정해보세요.")
+            c_p1, c_p2, c_p3, c_p4, c_p5 = st.columns(5)
+            # Default distribution
+            p_impulsive = c_p1.slider("충동형", 0, 100, 20)
+            p_rational = c_p2.slider("계산형", 0, 100, 20)
+            p_window = c_p3.slider("아이쇼핑", 0, 100, 40)
+            p_mission = c_p4.slider("목적형", 0, 100, 10)
+            p_cautious = c_p5.slider("신중형", 0, 100, 10)
+            
+            total_p = p_impulsive + p_rational + p_window + p_mission + p_cautious
+            if total_p != 100:
+                st.warning(f"합계가 100%가 되어야 합니다. (현재: {total_p}%)")
 
-        # Get target sample size from Step 2
-        # If not available, recalculate based on current session state
-        if 'total_needed' in st.session_state and st.session_state['total_needed'] < 5000:
-            target_total = st.session_state['total_needed']
-            n_control = st.session_state.get('n_control', 235)
-            n_test = st.session_state.get('n_test', 235)
-        else:
-            # Fallback: recalculate from baseline metrics
-            base_cvr = st.session_state.get('baseline_metric', 0.0693)
-            target_metric = st.session_state.get('target_metric', 0.15)
-            mde = abs(target_metric - base_cvr) / base_cvr
-            
-            # Recalculate sample size
-            from scipy import stats
-            alpha = 0.05
-            power = 0.80
-            p1 = base_cvr
-            p2 = target_metric
-            p_avg = (p1 + p2) / 2
-            z_alpha = stats.norm.ppf(1 - alpha/2)
-            z_beta = stats.norm.ppf(power)
-            n = int(2 * p_avg * (1 - p_avg) * ((z_alpha + z_beta) / (p2 - p1))**2) + 1
-            
-            split = st.session_state.get('split', 50)
-            if split == 50:
-                n_control = n
-                n_test = n
-                target_total = n * 2
-            else:
-                control_pct = (100 - split) / 100
-                test_pct = split / 100
-                target_total = int(n * 2 * max(1/control_pct, 1/test_pct))
-                n_control = int(target_total * control_pct)
-                n_test = int(target_total * test_pct)
+        col_sim, col_chart = st.columns([1, 1], gap="large")
         
-        
-        split_ratio = st.session_state.get('split', 50)
-        
-        # Check current data count (only count THIS experiment's users)
-        # Store a timestamp when first entering Step 3
-        if 'step3_start_time' not in st.session_state:
-            st.session_state['step3_start_time'] = datetime.now()
-        
-        start_time = st.session_state['step3_start_time']
-        
-        # Count only users created after Step 3 started
-        sql_count = f"""
-            SELECT COUNT(DISTINCT user_id) as cnt
-            FROM assignments 
-            WHERE (user_id LIKE 'sim_%' OR user_id LIKE 'agent_%')
-            AND assigned_at >= TIMESTAMP '{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
-        """
-        
-        result = run_query(sql_count, con)
-        
-        if isinstance(result, str):
-            st.error(f"데이터 조회 오류: {result}")
-            current_n = 0
-        else:
-            current_n = int(result.iloc[0]['cnt']) if not result.empty else 0
-        
-        remaining = max(0, target_total - current_n)
-        progress_pct = min(100, (current_n / target_total * 100) if target_total > 0 else 0)
-        
-        # Centered container
-        col_center = st.columns([1, 2, 1])
-        with col_center[1]:
+        with col_sim:
             with st.container(border=True):
-                st.markdown("### 📊 데이터 생성 방식 선택")
+                st.markdown("#### 🚀 시뮬레이션 제어")
+                st.info(f"Target: {st.session_state['n'] * 2:,}명 방문 예정")
                 
-                # Progress Display
-                st.markdown(f"""
-                <div style='background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin-bottom:20px;'>
-                    <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>
-                        <span style='color:rgba(255,255,255,0.7);'>현재 진행률</span>
-                        <span style='font-weight:bold; color:#8B5CF6;'>{current_n:,}명 / {target_total:,}명</span>
-                    </div>
-                    <div style='background:rgba(255,255,255,0.1); height:10px; border-radius:5px; overflow:hidden;'>
-                        <div style='background:linear-gradient(90deg, #8B5CF6, #C084FC); height:100%; width:{progress_pct}%;'></div>
-                    </div>
-                    <div style='text-align:center; margin-top:10px; color:rgba(255,255,255,0.6); font-size:0.9rem;'>
-                        {progress_pct:.1f}% 완료 | 남은 인원: {remaining:,}명
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.write("")
-                
-                # Button 1: Quick Simulation
-                with st.expander("ℹ️ ⚡ 빠른 시뮬레이션 (1초, 교육용)"):
-                    st.markdown(f"""
-                    **Python 코드로 확률 계산하여 즉시 생성**
-                    
-                    1. 남은 인원({remaining:,}명)만큼 가상 User ID 생성
-                    2. Hash 함수로 A/B 그룹 할당 ({100-split_ratio}/{split_ratio})
-                    3. 확률로 클릭/구매 결정
-                    4. DB에 직접 입력
-                    """)
-                
-                if st.button(f"⚡ 빠른 시뮬레이션 ({remaining:,}명 생성)", type="primary", use_container_width=True, disabled=(remaining==0)):
-                    with st.spinner(f"데이터 생성 중... ({remaining:,}명)"):
-                        split = split_ratio / 100
-                        base = st.session_state.get('baseline_metric', 0.10)
-                        target = st.session_state.get('target_metric', 0.15)
+                if st.button("▶️ Agent Swarm 투입 (Start)", type="primary", use_container_width=True):
+                    with st.spinner("에이전트들이 쇼핑몰을 방문 중입니다..."):
+                        # In a real scenario, this would trigger external scripts
+                        # For now, we use synthetic data injection (same logic as before)
+                        import scripts.generating_data as gen # Re-use generation logic
                         
-                        # Get primary metric to determine event type
-                        primary_metric = st.session_state.get('metric', 'CTR (클릭률)')
-                        metric_event_map = {
-                            "CTR (클릭률)": "click_banner",
-                            "CVR (전환율)": "purchase",
-                            "AOV (평균 주문액)": "purchase",
-                            "Bounce Rate (이탈률)": "bounce",
-                            "Purchase Time (결제 시간)": "purchase"
-                        }
-                        event_type = metric_event_map.get(primary_metric, "click_banner")
+                        # Simplified injection for demo speed
+                        # Ideally, this calls agent_swarm/runner.py
+                        # Here we simulate the OUTPUT of that runner
                         
-                        # Guardrail settings
-                        guard_metric = st.session_state.get('guard_metric', 'Refund Rate')
-                        guard_threshold = st.session_state.get('guard_threshold', 5.0)
+                        # Generate dummy traffic around the target sample size
+                        needed = st.session_state['n'] * 2
                         
-                        current_count = run_query("SELECT COUNT(*) FROM assignments", con).iloc[0,0]
-                        new_users = []
-                        new_events = []
+                        # Use SQL to check if we already ran needed amount
+                        curr_cnt = al.run_query("SELECT COUNT(*) FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'", con).iloc[0,0]
                         
-                        for i in range(remaining):
-                            uid = f"sim_{current_count + i}"
-                            is_test = get_bucket(uid) >= (100 * (1 - split))
-                            variant = 'B' if is_test else 'A'
-                            
-                            new_users.append((uid, 'exp_1', variant, datetime.now()))
-                            
-                            # Event generation based on primary metric
-                            rate = target if variant == 'B' else base
-                            if np.random.random() < rate:
-                                new_events.append((f"evt_{uid}", uid, event_type, datetime.now()))
-                                
-                                # Guardrail Logic (Refund simulation) - only for purchase events
-                                if event_type == 'purchase' and guard_metric:
-                                    refund_prob = 0.01 if variant == 'A' else (guard_threshold / 100) + 0.02
-                                    if np.random.random() < refund_prob:
-                                        # Refund happens 1-24 hours after purchase
-                                        ts = datetime.now() + timedelta(hours=np.random.randint(1, 24))
-                                        new_events.append((f"ref_{uid}", uid, 'refund', ts))
-                        
-                        if new_users:
-                            df_users = pd.DataFrame(new_users, columns=['uid','eid','var','ts'])
-                            # assignments: user_id, experiment_id, variant, assigned_at
-                            con.executemany("INSERT INTO assignments VALUES (?, ?, ?, ?)", df_users.values.tolist())
-                        
-                        if new_events:
-                            df_events = pd.DataFrame(new_events, columns=['eid','uid','name','ts'])
-                            # events: event_id, user_id, event_name, timestamp
-                            con.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", df_events.values.tolist())
-                        
-                        st.toast(f"✅ {remaining:,}명 데이터 생성 완료! ({primary_metric} 이벤트 포함)")
-                        st.rerun()
-                
-                st.write("")
-                
-                # Button 2: Agent Swarm
-                with st.expander("ℹ️ 🤖 에이전트 투입 (실전)", expanded=False):
-                    st.markdown(f"""
-                    **실제 HTTP 요청으로 웹 앱 방문 후 행동 판단**
-                    
-                    1. 남은 인원({remaining:,}명)을 5가지 행동 유형으로 분산
-                    2. `localhost:8000` 실제 접속하여 A/B 배너 확인
-                    3. 각 유형의 성향에 따라 클릭/구매 결정
-                    4. DB 자동 기록 (실제 사용자와 동일한 흐름)
-                    """)
-                    
-                    st.markdown("#### 🎭 에이전트 유형별 행동 패턴")
-                    
-                    col_a1, col_a2 = st.columns(2)
-                    with col_a1:
-                        st.markdown("""
-                        **💥 Impulsive (충동형)**
-                        - 빨간색, "긴급" 문구에 즉각 반응
-                        - 클릭률: 30% (B안 +25%)
-                        - 구매율: 25%
-                        
-                        **🧮 Calculator (계산형)**
-                        - 할인율을 꼼꼼히 계산
-                        - 클릭률: 20% (B안 +10%)
-                        - 구매율: 20%
-                        
-                        **🛍️ Browser (윈도우쇼핑)**
-                        - 클릭은 많이 하지만 구매는 드뭄
-                        - 클릭률: 50%
-                        - 구매율: 2%
-                        """)
-                    
-                    with col_a2:
-                        st.markdown("""
-                        **🎯 Mission (목적형)**
-                        - 원하는 게 명확, 빠르게 구매
-                        - 클릭률: 15%
-                        - 구매율: 40%
-                        
-                        **🤔 Cautious (신중형)**
-                        - 리뷰 읽고 고민, 낮은 전환율
-                        - 클릭률: 8%
-                        - 구매율: 10%
-                        """)
-                    
-                    st.divider()
-                    st.markdown("#### ⚙️ 에이전트 분포 조정")
-                    st.caption("각 유형의 비율을 조정하여 다양한 사용자 구성을 시뮬레이션하세요.")
-                    
-                    col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
-                    with col_s1:
-                        pct_impulsive = st.number_input("💥 충동형 (%)", 0, 100, 20, 5, key="pct_imp")
-                    with col_s2:
-                        pct_calculator = st.number_input("🧮 계산형 (%)", 0, 100, 25, 5, key="pct_calc")
-                    with col_s3:
-                        pct_browser = st.number_input("🛍️ 쇼핑형 (%)", 0, 100, 25, 5, key="pct_brow")
-                    with col_s4:
-                        pct_mission = st.number_input("🎯 목적형 (%)", 0, 100, 20, 5, key="pct_miss")
-                    with col_s5:
-                        pct_cautious = st.number_input("🤔 신중형 (%)", 0, 100, 10, 5, key="pct_caut")
-                    
-                    total_pct = pct_impulsive + pct_calculator + pct_browser + pct_mission + pct_cautious
-                    if total_pct != 100:
-                        st.warning(f"⚠️ 합계가 100%가 아닙니다. (현재: {total_pct}%)")
-                
-                if st.button(f"🤖 에이전트 투입 ({remaining:,}명)", type="secondary", use_container_width=True, disabled=(remaining==0 or total_pct != 100)):
-                    # Calculate agent distribution based on user input
-                    agent_config = {
-                        "impulsive": int(remaining * pct_impulsive / 100),
-                        "calculator": int(remaining * pct_calculator / 100),
-                        "browser": int(remaining * pct_browser / 100),
-                        "mission": int(remaining * pct_mission / 100),
-                        "cautious": int(remaining * pct_cautious / 100)
-                    }
-                    
-                    with st.spinner(f"🤖 에이전트 투입 중... ({remaining:,}명)"):
-                        try:
+                        if curr_cnt < needed:
+                            # Verify target App is running
+                            try:
+                                import requests
+                                r = requests.get("http://localhost:8000")
+                                if r.status_code != 200: raise Exception("Server/8000 down")
+                            except:
+                                st.error("Target App(Port 8000)에 연결할 수 없습니다. 터미널에서 `python target_app/main.py`를 실행해주세요.")
+                                st.stop()
+
+                            # Call runner (subprocess)
+                            import subprocess
                             import sys
-                            import os
-                            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                            if project_root not in sys.path:
-                                sys.path.insert(0, project_root)
+                            try:
+                                # Construct weights string
+                                weights = f"{p_impulsive},{p_rational},{p_window},{p_mission},{p_cautious}"
+                                cmd = [sys.executable, "agent_swarm/runner.py", "--count", str(needed), "--weights", weights]
+                                subprocess.run(cmd, check=True)
+                            except Exception as e:
+                                st.error(f"Simulation Failed: {e}")
                             
-                            from agent_swarm.runner import run_agent_swarm
-                            
-                            progress_placeholder = st.empty()
-                            def update_progress(current, total, msg):
-                                progress_placeholder.progress(current / total, text=f"{msg} ({current}/{total})")
-                            
-                            results = run_agent_swarm(agent_config, update_progress)
-                            
-                            # Post-process for Guardrail (Refunds)
-                            # Find agents who purchased recently
-                            start_time = st.session_state.get('step3_start_time')
-                            # Assuming agents start with 'agent_'
-                            recent_buyers = run_query(f"""
-                                SELECT DISTINCT e.user_id, a.variant 
-                                FROM events e
-                                JOIN assignments a ON e.user_id = a.user_id
-                                WHERE e.event_name = 'purchase' 
-                                AND e.user_id LIKE 'agent_%'
-                                AND e.assigned_at >= TIMESTAMP '{start_time.strftime('%Y-%m-%d %H:%M:%S')}'
-                            """, con)
-                            
-                            new_refunds = []
-                            # Determine threshold (from session or default)
-                            guard_threshold = st.session_state.get('guard_threshold', 5.0)
-                            
-                            # Handle case where run_query returns string error
-                            if isinstance(recent_buyers, str):
-                                st.error("환불 데이터 생성 중 DB 조회 오류")
-                            elif not recent_buyers.empty:
-                                for _, row in recent_buyers.iterrows():
-                                    uid = row['user_id']
-                                    variant = row['variant']
-                                    
-                                    # Higher refund rate for B
-                                    refund_prob = 0.01 if variant == 'A' else (guard_threshold / 100) + 0.02
-                                    if np.random.random() < refund_prob:
-                                        ts = datetime.now() + timedelta(hours=np.random.randint(1, 24))
-                                        new_refunds.append((f"ref_{uid}", uid, 'refund', ts))
-                            
-                            if new_refunds:
-                                df_refunds = pd.DataFrame(new_refunds, columns=['eid','uid','name','ts'])
-                                # events: event_id, user_id, event_name, timestamp
-                                con.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", df_refunds.values.tolist())
-                            
-                            
-                            cnt_refunds = len(new_refunds)
-                            
-                            # Verify DB data
-                            agent_count = run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'agent_%'", con)
-                            agent_events = run_query("SELECT COUNT(*) as cnt FROM events WHERE user_id LIKE 'agent_%'", con)
-                            
-                            actual_agents = agent_count.iloc[0, 0] if not agent_count.empty else 0
-                            actual_events = agent_events.iloc[0, 0] if not agent_events.empty else 0
-                            
-                            st.success(f"✅ 에이전트 {results['total']}명 투입 완료!")
-                            st.info(f"""
-                            📊 **실행 결과:**
-                            - 성공: {results['success']}명
-                            - 클릭: {results['clicked']}명
-                            - 구매: {results['purchased']}명
-                            - 환불: {cnt_refunds}건
-                            
-                            💾 **DB 기록:**
-                            - Assignments: {actual_agents:,}명
-                            - Events: {actual_events:,}건
-                            """)
-                            
-                            if actual_agents == 0:
-                                st.error("⚠️ DB에 데이터가 기록되지 않았습니다! Target App (localhost:8000)이 실행 중인지 확인하세요.")
-                            else:
-                                st.rerun()
-                        
-                        except Exception as e:
-                            st.error(f"❌ 에이전트 실행 실패: {str(e)}")
-                            st.info("💡 Tip: Target App (localhost:8000)이 실행 중인지 확인하세요.")
-                
-                st.write("")
-                st.divider()
-                
-                # Next button
-                if current_n >= target_total:
-                    st.success(f"✅ 목표 달성! ({current_n:,}/{target_total:,}명)")
-                    if st.button("다음: 결과 분석 ➡️", type="primary", use_container_width=True):
-                        st.session_state['step'] = 4
-                        st.rerun()
-                else:
-                    st.info(f"💡 위 버튼 중 하나를 선택하여 데이터를 생성하세요. (남은 인원: {remaining:,}명)")
-    
+                            st.toast("시뮬레이션 완료! 데이터가 수집되었습니다.")
+                            st.rerun()
 
+        with col_chart:
+            # Live counts
+            df_live = al.run_query("""
+                SELECT 
+                    variant, 
+                    COUNT(DISTINCT user_id) as visitors 
+                FROM assignments 
+                WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'
+                GROUP BY 1
+            """, con)
+            
+            if not df_live.empty:
+                st.bar_chart(df_live, x="variant", y="visitors", color="variant", horizontal=True)
+            else:
+                st.info("데이터 대기 중...")
+        
+        st.write("")
+        if st.button("다음: 결과 분석 (Analysis) ➡️", type="primary", use_container_width=True):
+             st.session_state['step'] = 4
+             st.rerun()
 
-    # --- STEP 4: ANALYSIS (formerly Step 5) ---
+    # --- STEP 4: ANALYSIS ---
     elif curr == 4:
-        st.markdown(f"<h2>Step 4. 최종 분석 (Final Analysis)</h2>", unsafe_allow_html=True)
-        edu_guide("P-value (유의 확률)", "결과가 우연히 나왔을 확률입니다. 보통 <strong>0.05 (5%)</strong>보다 낮으면 '통계적으로 유의미하다'고 판단하여 Test 안을 채택합니다.")
-
-        # Get selected primary metric from Step 1
+        st.markdown(f"<h2>Step 4. 결론 내리기 (Analysis)</h2>", unsafe_allow_html=True)
+        ui.edu_guide("P-value 검정", "우연히 이런 결과가 나올 확률을 계산합니다. 0.05(5%) 미만이어야 '통계적으로 유의미'하다고 봅니다.")
+        
         primary_metric = st.session_state.get('metric', 'CTR (클릭률)')
         
-        # Map metric to event_name
+        # Determine event name for query
         metric_event_map = {
             "CTR (클릭률)": "click_banner",
             "CVR (전환율)": "purchase",
-            "AOV (평균 주문액)": "purchase",
-            "Bounce Rate (이탈률)": None,
-            "Purchase Time (결제 시간)": "purchase"
+            "AOV (평균 주문액)": "purchase"
         }
-        
         event_name = metric_event_map.get(primary_metric, "click_banner")
         
-        # SQL - Only count experiment users (sim_* and agent_*)
-        # Dynamic based on selected metric
-        if event_name:
-            sql = f"""
-            SELECT 
-                a.variant as 'Variant',
-                COUNT(DISTINCT a.user_id) as 'Users',
-                COUNT(DISTINCT e.user_id) as 'Conversions'
-            FROM assignments a
-            LEFT JOIN events e ON a.user_id = e.user_id AND e.event_name = '{event_name}'
-            WHERE a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%'
-            GROUP BY 1 ORDER BY 1
-            """
-        else:
-            # Fallback for metrics without event
-            sql = """
-            SELECT 
-                a.variant as 'Variant',
-                COUNT(DISTINCT a.user_id) as 'Users',
-                0 as 'Conversions'
-            FROM assignments a
-            WHERE a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%'
-            GROUP BY 1 ORDER BY 1
-            """
+        # Get Stats
+        sql = f"""
+        SELECT 
+            a.variant,
+            COUNT(DISTINCT a.user_id) as users,
+            COUNT(DISTINCT e.user_id) as conversions
+        FROM assignments a
+        LEFT JOIN events e ON a.user_id = e.user_id AND e.event_name = '{event_name}'
+        WHERE a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%'
+        GROUP BY 1 ORDER BY 1
+        """
         
-        df = run_query(sql, con)
+        df = al.run_query(sql, con)
         
-        # Calc Stats
-        p_val = 1.0
-        decision = "Inconclusive"
-        lift = 0
-        c_rate = 0
-        t_rate = 0
-        
+        # Calculate P-value and Stats using analytics module
         if len(df) == 2:
-            c_users, c_conv = df.iloc[0,1], df.iloc[0,2]
-            t_users, t_conv = df.iloc[1,1], df.iloc[1,2]
-            
-            c_rate = c_conv/c_users if c_users > 0 else 0
-            t_rate = t_conv/t_users if t_users > 0 else 0
-            lift = (t_rate - c_rate) / c_rate if c_rate > 0 else 0
-            
-            pooled_p = (c_conv + t_conv) / (c_users + t_users) if (c_users + t_users) > 0 else 0
-            se = np.sqrt(pooled_p * (1 - pooled_p) * (1/c_users + 1/t_users)) if c_users > 0 and t_users > 0 else 0
-            if se > 0:
-                z = (t_rate - c_rate) / se
-                p_val = stats.norm.sf(abs(z))*2
-                if p_val < 0.05: decision = "Significant"
+            res = al.calculate_statistics(
+                df.iloc[0]['users'], df.iloc[0]['conversions'],
+                df.iloc[1]['users'], df.iloc[1]['conversions']
+            )
+        else:
+            res = {"lift": 0, "p_value": 1.0}
 
         c1, c2 = st.columns([1.5, 1], gap="large")
         with c1:
             with st.container(border=True):
                 st.markdown("#### 📊 데이터 집계 (Data)")
-                st.code(sql, language="sql")
                 st.dataframe(df, use_container_width=True, hide_index=True)
         
         with c2:
@@ -1267,162 +492,54 @@ elif st.session_state['page'] == 'study':
                 st.markdown("#### 🏁 최종 성적표")
                 
                 if len(df) == 2:
-                    # Use +/- instead of arrow for P-value delta
-                    pval_display = f"+{p_val:.4f}" if p_val >= 0 else f"{p_val:.4f}"
-                    st.metric("Lift (개선율)", f"{lift*100:.2f}%", delta=None)
-                    st.caption(f"📊 P-value: **{p_val:.4f}**")
+                    st.metric("Lift (개선율)", al.format_delta(res['lift']), delta=None)
+                    st.caption(f"📊 P-value: **{res['p_value']:.4f}**")
                     
-                    if decision == "Significant":
+                    if res['p_value'] < 0.05:
                         st.success(f"**WINNER** (실험 성공!)")
+                        decision = "Significant"
                     else:
                         st.warning(f"**TIE** (차이 없음)")
-                
-                st.divider()
-                
-                # --- Guardrail Analysis ---
-                st.markdown("#### 🛡️ 가드레일 지표 분석")
-                guard_metric = st.session_state.get('guard_metric', 'Refund Rate')
-                guard_threshold = st.session_state.get('guard_threshold', 5.0)
-                
-                # Calculate Refund Rate per variant (or other guardrail metrics)
-                # For now, we support Refund Rate, Bounce Rate, etc.
-                # Check if any refund-related metric is selected
-                if len(df) == 2 and guard_metric:
-                    # Query refund events (filter to experiment users only)
-                    sql_refund = """
-                    SELECT 
-                        a.variant,
-                        COUNT(DISTINCT e.user_id) as refunds
-                    FROM assignments a
-                    JOIN events e ON a.user_id = e.user_id
-                    WHERE e.event_name = 'refund'
-                    AND (a.user_id LIKE 'sim_%' OR a.user_id LIKE 'agent_%')
-                    GROUP BY 1 ORDER BY 1
-                    """
-                    df_ref = run_query(sql_refund, con)
-                    
-                    # Simple lookup
-                    ref_a = 0
-                    ref_b = 0
-                    
-                    if not isinstance(df_ref, str) and not df_ref.empty:
-                        for _, row in df_ref.iterrows():
-                            if row['variant'] == 'A': ref_a = row['refunds']
-                            elif row['variant'] == 'B': ref_b = row['refunds']
-                        
-                    rr_a = (ref_a / c_conv * 100) if c_conv > 0 else 0.0
-                    rr_b = (ref_b / t_conv * 100) if t_conv > 0 else 0.0
-                    
-                    st.write(f"**{guard_metric}**")
-                    col_r1, col_r2 = st.columns(2)
-                    col_r1.metric("A (Control)", f"{rr_a:.2f}%")
-                    # Use +/- format instead of arrow
-                    delta_val = rr_b - rr_a
-                    delta_str = f"+{delta_val:.2f}%" if delta_val >= 0 else f"{delta_val:.2f}%"
-                    col_r2.metric("B (Test)", f"{rr_b:.2f}%", delta=None)
-                    col_r2.caption(f"차이: **{delta_str}**")
-                    
-                    if rr_b > guard_threshold:
-                        st.error(f"⚠️ **경고: {guard_metric} 급증!**")
-                        st.markdown(f"""
-                        <div style='background:rgba(255,0,0,0.1); padding:10px; border-radius:5px; border-left:3px solid red;'>
-                            <strong>🚨 조기 종료 권장 (Early Stopping Recommended)</strong><br>
-                            B안의 {guard_metric}({rr_b:.2f}%)이 허용 임계치({guard_threshold}%)를 초과했습니다.
-                            부정적인 사용자 경험이 우려되므로 실험을 중단하는 것이 좋습니다.
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.success("✅ 가드레일 지표 안전함")
+                        decision = "Inconclusive"
                 else:
-                    st.info("💡 가드레일 지표가 설정되지 않았거나 데이터가 부족합니다.")
+                    st.info("데이터 부족")
+                    decision = "No Data"
                 
+                # Report Saving
                 st.divider()
-                note = st.text_area("배운 점 (Learning Note)", placeholder="이번 실험을 통해 무엇을 알게 되었나요?")
-                
-                if st.button("💾 실험 회고록에 저장 (Save Report)", type="primary", use_container_width=True):
-                    # Prepare Data
-                    h = st.session_state.get('hypothesis', '-')
-                    t = st.session_state.get('target', '-')
-                    pm = st.session_state.get('metric', '-')
-                    gr = str(st.session_state.get('guardrails', []))
-                    n = st.session_state.get('n', 0)
-                    split = st.session_state.get('split', 50)
-                    
-                    # Safe Insert
+                note = st.text_area("배운 점 (Learning Note)")
+                if st.button("💾 실험 회고록에 저장", type="primary"):
                     con.execute(f"""
                         INSERT INTO experiments (
-                            target, hypothesis, primary_metric, guardrails, sample_size, 
-                            traffic_split, p_value, decision, learning_note, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    """, [t, h, pm, gr, n, split, p_val, decision, note])
-                    
-                    
-                    # Cleanup - Only delete experiment data, preserve history
+                            target, hypothesis, primary_metric, created_at, p_value, decision, learning_note
+                        ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+                    """, [
+                        st.session_state.get('target', '-'), 
+                        st.session_state.get('hypothesis', '-'),
+                        st.session_state.get('metric', '-'),
+                        res['p_value'], decision, note
+                    ])
+                    # Cleanup Sim Data
                     con.execute("DELETE FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
                     con.execute("DELETE FROM events WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
                     
-                    st.toast("회고록에 저장되었습니다! 📝")
+                    st.toast("저장 완료!")
                     st.session_state['page'] = 'portfolio'
                     st.session_state['step'] = 1
                     st.rerun()
 
 # =========================================================
-# PAGE: EXPERIMENT RETROSPECTIVE (PORTFOLIO)
+# PAGE: PORTFOLIO
 # =========================================================
 elif st.session_state['page'] == 'portfolio':
     st.title("📚 실험 회고록 (Experiment Retrospective)")
-    st.markdown("### 내가 진행한 실험들의 성장 기록")
     
-    df_history = run_query("SELECT * FROM experiments ORDER BY created_at DESC", con)
+    df_history = al.run_query("SELECT * FROM experiments ORDER BY created_at DESC", con)
     
     if df_history.empty:
-        st.info("아직 진행된 실험이 없습니다. 마스터 클래스에서 첫 실험을 시작해보세요!")
+        st.info("실험 기록이 없습니다.")
     else:
-        # 1. Filter Context
-        all_targets = ["All"] + list(df_history['target'].unique()) if 'target' in df_history.columns else ["All"]
-        all_targets = [t for t in all_targets if t is not None]
-        
-        selected_target = st.selectbox("📂 카테고리 필터 (Category)", all_targets, index=0)
-        
-        if selected_target != "All":
-            df_history = df_history[df_history['target'] == selected_target]
-            
-        st.divider()
-
-        # 2. Experiment Cards
         for _, row in df_history.iterrows():
             with st.container(border=True):
-                # Summary Row
-                c1, c2, c3 = st.columns([0.5, 3, 1.5])
-                with c1:
-                    st.markdown("🧪")
-                with c2:
-                    st.markdown(f"**{row['hypothesis']}**")
-                    tgt_badge = f"<span style='background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; font-size:0.8rem;'>{row.get('target', 'General')}</span>"
-                    st.markdown(f"{tgt_badge} | {row['created_at'].strftime('%Y-%m-%d %H:%M')}", unsafe_allow_html=True)
-                with c3:
-                    decision = row['decision']
-                    color = "#4ade80" if decision == 'Significant' else "#94a3b8"
-                    st.markdown(f"<div style='text-align:right; color:{color}; font-weight:bold;'>{decision}</div>", unsafe_allow_html=True)
-
-                # Detail Report (Expander)
-                with st.expander("📄 상세 보고서 보기 (View Report)"):
-                    st.markdown("#### 1. 실험 설계 (Design)")
-                    d1, d2, d3 = st.columns(3)
-                    d1.metric("Target", row.get('target', '-'))
-                    d2.metric("Primary Metric", row['primary_metric'])
-                    d3.metric("Guardrails", row.get('guardrails', 'None'))
-                    
-                    st.markdown("#### 2. 실험 결과 (Results)")
-                    r1, r2, r3 = st.columns(3)
-                    r1.metric("Sample Size", f"{row.get('sample_size', 0):,}명")
-                    r2.metric("P-value", f"{row['p_value']:.4f}")
-                    r3.metric("Traffic Split", f"{row.get('traffic_split', 0)}%")
-                    
-                    if row['learning_note']:
-                        st.markdown(f"""
-                        <div style="background:rgba(139, 92, 246, 0.1); padding:15px; border-radius:8px; margin-top:10px;">
-                            <strong>💡 Learning Note:</strong><br>
-                            {row['learning_note']}
-                        </div>
-                        """, unsafe_allow_html=True)
+                st.markdown(f"**{row['hypothesis']}**")
+                st.caption(f"{row['created_at']} | Result: {row['decision']}")

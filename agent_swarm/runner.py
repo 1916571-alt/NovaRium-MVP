@@ -5,6 +5,7 @@ Orchestrates multiple agents to simulate realistic user traffic.
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from agent_swarm.agent import HeuristicAgent
+from agent_swarm.behaviors import get_behavior_by_name
 
 def run_agent_swarm(config, progress_callback=None):
     """
@@ -24,7 +25,9 @@ def run_agent_swarm(config, progress_callback=None):
     for trait, count in config.items():
         for i in range(count):
             agent_id = f"agent_{trait}_{agent_id_counter + i}"
-            agents.append(HeuristicAgent(agent_id, trait))
+            # Use Factory to get Behavior Object
+            behavior = get_behavior_by_name(trait)
+            agents.append(HeuristicAgent(agent_id, behavior))
     
     total = len(agents)
     results = {

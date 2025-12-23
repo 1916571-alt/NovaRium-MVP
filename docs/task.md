@@ -62,3 +62,8 @@
     - [x] **지표 가이드 툴팁**: 각 지표의 의미와 사용 사례를 설명하는 툴팁 추가
     - [x] **Step 3 에이전트 튜닝**: 에이전트 유형별(충동/신중 등) 비율 조정 UI 구현
     - [x] **Step 4 분석 고도화**: Primary Metric 동적 반영 및 가드레일 분석 로직 추가
+
+## 9단계: 리팩토링 및 테스트 (Refactoring & Testing) [NEW]
+- [x] **모듈 분리**: `dashboard.py`의 로직을 `analytics.py`와 `components.py`로 분리 <!-- id: refactor-1 -->
+- [x] **단위 테스트**: `analytics.py`에 대한 Unit Test 작성 (`tests/test_analytics.py`) <!-- id: refactor-2 -->
+- [x] **CI/CD 파이프라인**: GitHub Actions를 통한 자동 테스트 설정 (`.github/workflows/ci.yml`) <!-- id: refactor-3 -->
