@@ -346,7 +346,7 @@ elif st.session_state['page'] == 'study':
                 total_needed = n * 2
                 st.markdown(f"<div class='big-stat'>{total_needed:,}</div>", unsafe_allow_html=True)
                 st.markdown("**명 (총 필요 유저 수)**")
-                st.progress(min(1.0, 0.3 + (mde * 2)))
+                st.progress(float(min(1.0, 0.3 + (mde * 2))))
 
         st.write("")
         if st.button("다음: 데이터 수집 시작 (Simulation) ➡️", type="primary", use_container_width=True):
