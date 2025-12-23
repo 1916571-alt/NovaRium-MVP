@@ -34,3 +34,9 @@ NovaRium Edu is an interactive, **educational A/B testing simulator** designed t
 -   **`assignments`**: Experiment group allocation logs.
 -   **`events`**: User behavior logs (clicks, purchases).
 -   **`experiments`**: Comprehensive archive with `target`, `guardrails`, `learning_note`, etc.
+
+## 5. Development Guidelines
+-   **Testing Strategy**:
+    -   **Core Logic**: TDD is mandatory. All business logic must be unit tested.
+    -   **UI**: No automated testing. UI correctness is verified via manual review.
+-   **Code Quality**: All implementations must strictly adhere to **SOLID** principles.

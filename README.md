@@ -1,87 +1,111 @@
-# NovaRium-MVP
+# NovaRium Edu: A/B Testing Master Class
 
-**A/B Testing Master Class Simulator** - 누구나 쉽게 배우는 데이터 분석 시뮬레이터
+<div align="center">
+  <h3>🎓 Interactive A/B Testing Simulator for Future Data Analysts</h3>
+  <p>Learn the complete experimentation workflow through hands-on simulation.</p>
+</div>
 
-> 이론으로만 배우는 A/B 테스트는 그만. 직접 경험하며 데이터 분석가로 다시 태어나세요.
+---
 
-## 🌟 Features
+## 📖 Introduction
 
-- **5단계 마스터 클래스**: 가설 설정부터 통계 분석까지 전 과정 실습
-- **Agent Swarm 시뮬레이션**: 5가지 성향의 AI 에이전트가 실제 앱을 방문
-- **실험 회고록**: 모든 실험을 상세한 성적표로 기록
-- **위기 감지 시스템**: 지표 급락 시 자동 경고 및 해결 가이드
+**NovaRium Edu** is an educational platform designed to bridge the gap between theoretical A/B testing knowledge and practical application. While many courses focus on statistical formulas, they often lack the context of the full experimentation lifecycle.
 
-## 📚 Documentation
+This project offers a **"Wizard Mode"** that guides users through the entire process—from hypothesis generation to rigorous statistical analysis—simulating real-world traffic and user behaviors using advanced **Agent Swarm** technology.
 
-모든 프로젝트 문서는 [`/docs`](./docs) 폴더에서 확인하실 수 있습니다:
+## 🌟 Key Features
 
-- [📖 README](./docs/README.md) - 상세 프로젝트 소개
-- [📋 PRD](./docs/PRD.md) - 제품 요구사항 문서
-- [📊 Presentation](./docs/presentation.md) - 발표 자료 (Marp)
-- [📝 Tutorial](./docs/Tutorial.md) - AI Agent 협업 튜토리얼
-- [✅ Task List](./docs/task.md) - 구현 작업 목록
-- [💡 Ideation](./docs/Ideation.md) - 프로젝트 아이디어 스케치
+### 1. 5-Step Master Class (Wizard Mode)
+Experience the end-to-end workflow of a data analyst:
+- **Hypothesis & Metrics**: Define OEC (Overall Evaluation Criterion) and Guardrail metrics.
+- **Power Analysis**: Calculate sample size using `scipy` based on Alpha, Power, and MDE.
+- **Sampling**: Visualize deterministic traffic allocation using Hash algorithms.
+- **Simulation**: Run realistic experiments with AI personas.
+- **Analysis**: Perform SQL-based aggregation and statistical validation.
 
-## 🚀 Quick Start
+### 2. Agent Swarm Simulation
+Instead of random data generation, NovaRium uses **5 distinct AI Agent Personas** to simulate realistic user behavior patterns, creating authentic messy data for analysis.
 
-### 1. 환경 설정
+### 3. Experiment Retrospective
+A professional portfolio builder that archives every experiment, allowing users to build a "case study" log of their learning journey, complete with lift metrics and statistical significance reports.
 
-```bash
-# 가상환경 생성 및 활성화
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-# source venv/bin/activate  # macOS/Linux
+## 🏗️ System Architecture
 
-# 의존성 설치
-pip install -r requirements.txt
+This project follows a strict **Clean Architecture** approach to separate concerns and ensure maintainability.
+
+```mermaid
+graph TD
+    User([User])
+    subgraph "Presentation Layer"
+        Streamlit["🖥️ Streamlit Dashboard<br>(Wizard & Analytics)"]
+        TargetApp["🛒 Mock Target App<br>(FastAPI)"]
+    end
+    
+    subgraph "Core Logic Layer (TDD & SOLID)"
+        Simulator["🤖 Simulation Engine<br>(Agent Swarm)"]
+        Stats["📈 Statistical Service<br>(Scipy)"]
+        ExpManager["🧪 Experiment Manager"]
+    end
+    
+    subgraph "Data Layer"
+        DuckDB[("🦆 DuckDB<br>(Local OLAP Warehouse)")]
+    end
+    
+    User --> Streamlit
+    User --> TargetApp
+    Streamlit --> ExpManager
+    Streamlit --> Stats
+    ExpManager --> Simulator
+    TargetApp --> ExpManager
+    Simulator --> DuckDB
+    ExpManager --> DuckDB
+    Stats --> DuckDB
 ```
 
-### 2. 서버 실행
+## 💻 Technical Excellence
 
-```bash
-# Target App (포트 8000)
-python target_app/main.py
+This project was built with a strong focus on software engineering best practices:
 
-# Dashboard (포트 8501)
-streamlit run scripts/dashboard.py
-```
-
-### 3. 접속
-
-- **🛒 쇼핑몰 앱**: http://localhost:8000
-- **📊 분석 대시보드**: http://localhost:8501
-
-## 🌐 Live Demo
-
-- **Presentation**: https://1916571-alt.github.io/NovaRium-MVP/
-- **Repository**: https://github.com/1916571-alt/NovaRium-MVP
+- **TDD (Test Driven Development)**: All core logic (simulation, statistics, hashing) is implemented using TDD to ensure reliability.
+- **SOLID Principles**: The codebase adheres to strict object-oriented design principles for scalability.
+- **Local OLAP**: Utilizes **DuckDB** for high-performance analytical queries on simulated large-scale datasets.
+- **No UI Automation**: Conscious decision to rely on manual verification for UI to focus automation efforts on critical business logic.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Streamlit (Dashboard), FastAPI (Target App)
-- **Database**: DuckDB (Local OLAP)
-- **Analysis**: Scipy (Statistical Testing), Plotly (Visualization)
-- **Simulation**: Custom Agent Swarm (5 Personas)
+- **Frontend**: Streamlit, Plotly
+- **Backend/Core**: Python 3.9+, FastAPI
+- **Database**: DuckDB
+- **Testing**: Pytest (Core Logic)
 
-## 📁 Project Structure
+## 🚀 Quick Start
 
+### 1. Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/1916571-alt/NovaRium-MVP.git
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: .\venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
-NovaRium-MVP/
-├── docs/                  # 📚 모든 문서
-├── scripts/               # 🔧 유틸리티 스크립트
-│   ├── dashboard.py       # Streamlit 대시보드
-│   ├── create_gh_issues.py # GitHub 이슈 생성
-│   └── ...
-├── agent_swarm/           # 🤖 AI 에이전트 시뮬레이터
-├── target_app/            # 🛒 타겟 앱 (FastAPI)
-├── raw_data/              # 📊 원본 데이터
-└── requirements.txt       # 의존성 목록
+
+### 2. Run Application
+
+```bash
+# Launch the Dashboard
+streamlit run scripts/dashboard.py
 ```
 
-## 📝 License
+## 📄 License
 
 MIT License
 
 ---
-
-**Made with ❤️ by AI Agent Collaboration**
+<div align="center">
+  <p>Developed by <b>Geonyul Shin</b></p>
+</div>
