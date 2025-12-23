@@ -4,3 +4,6 @@ duckdb
 scipy
 streamlit
 plotly
+fastapi
+uvicorn
+python-multipart
