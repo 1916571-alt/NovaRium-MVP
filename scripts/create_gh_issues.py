@@ -12,7 +12,7 @@ def run_command(cmd):
         print(f"Error running command {' '.join(cmd)}: {e.stderr}")
         return None
 
-def get_tasks_from_md(filename="task.md"):
+def get_tasks_from_md(filename="../docs/task.md"):
     tasks = []
     current_phase = ""
     
