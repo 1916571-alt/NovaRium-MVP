@@ -51,22 +51,22 @@
 ```mermaid
 graph TD
     subgraph "Phase 1: Experiment Design"
-        Analyst[👩‍💻 Analyts] -->|Step 1| ExpBuilder[🧪 Experiment Builder UI]
-        ExpBuilder -->|Define Variant/Metrics| ConfigDB[(⚙️ Config)]
+        Analyst["👩‍💻 Analyst"] -->|Step 1| ExpBuilder["🧪 Experiment Builder UI"]
+        ExpBuilder -->|Define Variant/Metrics| ConfigDB[("⚙️ Config")]
     end
 
     subgraph "Phase 2: Execution (Target App)"
-        ConfigDB -->|Apply Variant| TargetApp[📱 NovaEats App (FastAPI)]
-        Simulator[🤖 Agent Swarm] -->|Visit & Action| TargetApp
+        ConfigDB -->|Apply Variant| TargetApp["📱 NovaEats App (FastAPI)"]
+        Simulator["🤖 Agent Swarm"] -->|Visit & Action| TargetApp
     end
 
     subgraph "Phase 3: Data Pipeline"
-        TargetApp -->|Generate Logs| RawLogs[📄 Raw Access Logs]
+        TargetApp -->|Generate Logs| RawLogs["📄 Raw Access Logs"]
         RawLogs -->|ETL Process| DuckDB[("🦆 DuckDB (Warehouse)")]
     end
 
     subgraph "Phase 4: Analysis"
-        DuckDB -->|Query| Dashboard[📊 Analytics Dashboard]
+        DuckDB -->|Query| Dashboard["📊 Analytics Dashboard"]
         Dashboard -->|P-value & Decisions| Analyst
     end
 ```
