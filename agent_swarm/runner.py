@@ -40,7 +40,7 @@ def run_agent_swarm(config, progress_callback=None):
     }
     
     # Run agents concurrently
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=50) as executor:
         futures = {executor.submit(agent.run_session): agent for agent in agents}
         
         completed = 0

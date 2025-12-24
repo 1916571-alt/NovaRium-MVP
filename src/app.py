@@ -117,15 +117,33 @@ elif st.session_state['page'] == 'data_lab':
                         sql = mb.generate_mart_sql(clean_metrics)
                         
                         # 2. Execute
-                        import duckdb
-                        with duckdb.connect(DB_PATH) as txn_con:
-                            txn_con.execute("BEGIN TRANSACTION")
-                            txn_con.execute(sql)
-                            txn_con.execute("COMMIT")
+                        # 2. Execute via Server API (Avoids Locking)
+                        import requests
+                        try:
+                            resp = requests.post(
+                                "http://localhost:8000/admin/execute_sql", 
+                                json={"sql": sql}, 
+                                timeout=30
+                            )
+                            if resp.status_code != 200:
+                                raise Exception(f"Server API Error: {resp.text}")
                             
-                            # 3. Validation
-                            row_count = txn_con.execute("SELECT COUNT(*) FROM dm_daily_kpi").fetchone()[0]
+                            r_json = resp.json()
+                            if r_json.get("status") != "success":
+                                raise Exception(f"SQL Error: {r_json.get('message')}")
+                                
+                            # 3. Validation (Use Read-Only via stats.py)
+                            check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
+                            df_res = al.run_query(check_sql)
+                            row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
+                            
                             st.success(f"구축 완료! 총 {row_count:,}개의 일별 데이터가 적재되었습니다.")
+                            
+                        except requests.exceptions.ConnectionError:
+                             st.error("서버 연결 실패: Target App(Localhost:8000)이 실행 중인지 확인하세요.")
+                             raise
+                        except Exception as e:
+                             raise e
                         
                         # Move to dashboard
                         import time
@@ -867,7 +885,12 @@ elif st.session_state['page'] == 'study':
                 st.markdown("#### 🚀 시뮬레이션 제어")
                 # Use total_needed from Step 2, fallback to n*2 for backwards compatibility
                 total_target = st.session_state.get('total_needed', st.session_state.get('n', 100) * 2)
-                st.info(f"Target: {total_target:,}명 방문 예정")
+                
+                # Simulation Scale Slider (New Feature)
+                scale_pct = st.slider("테스트 규모 (Simulation Scale)", 1, 100, 100, format="%d%%", help="전체 표본 중 실제로 시뮬레이션할 비율입니다. 테스트용으로 작게 설정하세요.")
+                effective_target = int(total_target * (scale_pct / 100.0))
+                
+                st.info(f"Target: {total_target:,}명 방문 예정 (실제 실행: {effective_target:,}명 - {scale_pct}%)")
                 turbo = st.checkbox("Turbo Mode (무시 지연 제거)", value=True)
                 
                 col_start, col_stop = st.columns(2)
@@ -877,7 +900,7 @@ elif st.session_state['page'] == 'study':
                         # Traits order must match runner.py and UI: Window, Mission, Rational, Impulsive, Cautious
                         traits = ["Window", "Mission", "Rational", "Impulsive", "Cautious"]
                         weights = ",".join([str(st.session_state['p_dist'].get(t, 20)) for t in traits])
-                        needed = st.session_state.get('total_needed', st.session_state.get('n', 100) * 2)
+                        needed = effective_target # Use scaled target
                         
                         cmd = [sys.executable, "agent_swarm/runner.py", "--count", str(needed), "--weights", weights]
                         if turbo: cmd.append("--turbo")
@@ -940,6 +963,8 @@ elif st.session_state['page'] == 'study':
                                 """, con=None)
                                 
                                 if not df_logs.empty:
+                                    # Fix: Convert string timestamp (from JSON API) to datetime object
+                                    df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
                                     log_text = "  \n".join([f"🕒 {row['timestamp'].strftime('%H:%M:%S')} | 👤 {row['user_id']} | 📢 {row['event_name']}" for _, row in df_logs.iterrows()])
                                     log_area.markdown(f"**최근 활동:**  \n{log_text}")
                                 else:

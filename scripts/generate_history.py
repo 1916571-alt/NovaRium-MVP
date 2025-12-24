@@ -78,7 +78,8 @@ def generate_history():
     
     # Fix column names for insert
     # assignments
-    con.execute("INSERT INTO assignments SELECT uid, eid, var, ts FROM df_u")
+    # assignments (3 columns: user_id, variant, assigned_at)
+    con.execute("INSERT INTO assignments SELECT uid, var, ts FROM df_u")
     
     # events (event_id is first arg in tuple)
     con.execute("INSERT INTO events SELECT eid, uid, name, ts, val FROM df_e")

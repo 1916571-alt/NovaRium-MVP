@@ -8,6 +8,12 @@ import os
 from datetime import datetime
 import hashlib
 import uuid
+import threading
+import logging
+
+# Setup Logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("TargetApp")
 
 app = FastAPI()
 
@@ -19,27 +25,50 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 DB_PATH = os.path.join(os.path.dirname(BASE_DIR), 'novarium_local.db')
 
-# Ensure DB Connected
-def get_db_connection():
-    return duckdb.connect(DB_PATH)
+# Singleton DB Connection
+db_con = None
+db_lock = threading.Lock()
+
+@app.on_event("startup")
+async def startup_event():
+    global db_con
+    try:
+        logger.info(f"Connecting to DB at {DB_PATH}")
+        db_con = duckdb.connect(DB_PATH)
+        
+        # Ensure tables exist
+        with db_lock:
+            db_con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE)")
+            db_con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
+            
+        logger.info("DB Connected and Tables Checked")
+    except Exception as e:
+        logger.error(f"DB Startup Error: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global db_con
+    if db_con:
+        db_con.close()
+        logger.info("DB Connection Closed")
 
 def log_event(uid, variant, event_name, value=0.0):
+    global db_con
+    if not db_con:
+        logger.error("DB Not Connected")
+        return
+
     try:
-        con = get_db_connection()
-        # Ensure tables exist
-        con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE)")
-        con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
-        
-        # Log
         eid = str(uuid.uuid4())
-        con.execute(f"INSERT INTO events VALUES ('{eid}', '{uid}', '{event_name}', CURRENT_TIMESTAMP, {value})")
-        con.close()
+        # Use simple print for user feedback as requested
+        print(f"[App] Logging Event: {event_name} by {uid} (Value: {value})")
+        
+        with db_lock:
+            # Use parametrized query for safety even if internal
+            db_con.execute("INSERT INTO events VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)", 
+                         [eid, uid, event_name, value])
     except Exception as e:
-        print(f"Log Error: {e}")
-        try:
-            con.close()
-        except:
-            pass
+        print(f"[App] Log Error: {e}")
 
 def get_assignment(uid: str):
     # Deterministic Split - Standardized to MD5 to match stats.py
@@ -65,47 +94,22 @@ async def read_root(request: Request, uid: str = None):
     })
     
     if is_new or uid:  # Log assignment if new OR if explicitly passed (Agent run)
-        max_retries = 3
-        retry_delay = 0.1
-        
-        for attempt in range(max_retries):
+        global db_con
+        if db_con:
             try:
-                con = get_db_connection()
-                # Ensure table exists
-                con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
-                # Check if exists using prepared statement
-                exists = con.execute("SELECT 1 FROM assignments WHERE user_id = ?", [user_id]).fetchone()
-                if not exists:
-                    con.execute("INSERT INTO assignments VALUES (?, ?, CURRENT_TIMESTAMP)", [user_id, variant])
-                    print(f"[INFO] Logged assignment: {user_id} → {variant}")
-                else:
-                    print(f"[DEBUG] Assignment already exists for {user_id}")
-                con.close()
-                break  # Success, exit retry loop
+                with db_lock:
+                    # Check if exists
+                    exists = db_con.execute("SELECT 1 FROM assignments WHERE user_id = ?", [user_id]).fetchone()
+                    if not exists:
+                        db_con.execute("INSERT INTO assignments VALUES (?, ?, CURRENT_TIMESTAMP)", [user_id, variant])
+                        print(f"[App] Logged assignment: {user_id} -> {variant}")
+                    else:
+                        # Debug usually off, but user asked for visibility
+                        # print(f"[App] Assignment already exists for {user_id}")
+                        pass
             except Exception as e:
-                error_msg = str(e).lower()
-                # Check if it's a lock error
-                if ('lock' in error_msg or 'cannot open' in error_msg or 'access' in error_msg) and attempt < max_retries - 1:
-                    wait_time = retry_delay * (2 ** attempt)
-                    print(f"[WARN] DB locked for {user_id}, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
-                    import time
-                    time.sleep(wait_time)
-                    try:
-                        con.close()
-                    except:
-                        pass
-                    continue
-                else:
-                    # Non-lock error or final retry failed
-                    print(f"[ERROR] Assignment Log Error for {user_id}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    try:
-                        con.close()
-                    except:
-                        pass
-                    break
-            
+                print(f"[App] Assignment Log Error: {e}")
+
     if is_new:
         response.set_cookie(key="user_id", value=user_id)
         
@@ -147,5 +151,62 @@ async def track_order(uid: str = Form(...), amount: float = Form(...)):
     log_event(uid, group, 'purchase', amount)
     return {"status": "success", "event": "order", "uid": uid}
 
+from pydantic import BaseModel
+
+class SqlRequest(BaseModel):
+    sql: str
+
+@app.post("/admin/execute_sql")
+async def execute_sql(body: SqlRequest):
+    global db_con
+    if not db_con:
+        return {"status": "error", "message": "DB not connected"}
+    
+    try:
+        logger.info("Executing Admin SQL")
+        with db_lock:
+            result = None
+            columns = []
+            try:
+                db_con.execute(body.sql)
+                try:
+                    result = db_con.fetchall()
+                    if db_con.description:
+                        columns = [desc[0] for desc in db_con.description]
+                except Exception:
+                    # Query probably didn't return rows (e.g. INSERT/UPDATE)
+                    pass
+                try:
+                    db_con.execute("COMMIT")
+                except Exception as e:
+                    # DDLs like CREATE TABLE might auto-commit, causing "no transaction active" error
+                    if "no transaction is active" in str(e).lower():
+                        pass
+                    else:
+                        raise e
+            except Exception as e:
+                try:
+                    db_con.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise e
+                
+        return {"status": "success", "data": result, "columns": columns}
+
+    except Exception as e:
+        logger.error(f"SQL Exec Error: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
+    # Ensure tables exist before server start if running directly
+    if not os.path.exists(DB_PATH):
+        print(f"Creating DB at {DB_PATH}")
+        try:
+            con = duckdb.connect(DB_PATH)
+            con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE)")
+            con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
+            con.close()
+        except:
+            pass
+            
     uvicorn.run(app, host="0.0.0.0", port=8000)

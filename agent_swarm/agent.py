@@ -43,6 +43,8 @@ class HeuristicAgent:
             
             if not is_turbo:
                 time.sleep(random.uniform(0.3, 1.5))
+            else:
+                time.sleep(0.02) # Minimum delay
             
             # 2. Get Variant
             variant = self._get_variant()
@@ -56,8 +58,15 @@ class HeuristicAgent:
                     data={"uid": self.agent_id, "element": f"banner_{variant}"},
                     timeout=5
                 )
+                self.session.post(
+                    f"{self.base_url}/click",
+                    data={"uid": self.agent_id, "element": f"banner_{variant}"},
+                    timeout=5
+                )
                 if not is_turbo:
                     time.sleep(random.uniform(0.5, 2.0))
+                else:
+                    time.sleep(0.02) # Minimum delay to prevent starvation
             
             # 4. Purchase Decision (Delegated to Strategy)
             purchased = False

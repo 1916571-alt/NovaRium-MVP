@@ -15,42 +15,61 @@ def get_connection():
     """
     return duckdb.connect(DB_PATH)
 
-def run_query(query, con=None, max_retries=3, retry_delay=0.5):
+def run_query(query, con=None, max_retries=5, retry_delay=0.5):
     """
     Execute a SQL query and return the result as a DataFrame.
-    Handles connection lifecycle if con is None (Transient Read-Only).
-    Implements retry logic for database lock errors.
-    Gracefully handles errors by returning empty DF.
+    Prioritizes Server API to avoid file locking, then falls back to direct access.
     """
     import time
+    import requests
     
     if con:
         # If connection is provided, use it directly (no retry needed)
         try:
             return con.execute(query).df()
         except Exception as e:
-            # Safe error printing (avoid OSError on Windows)
             try:
-                print(f"Query Error: {repr(e)}")
+                print(f"Query Error (Existing Conn): {repr(e)}")
             except:
-                print("Query Error: [Unable to print error details]")
+                pass
             return pd.DataFrame()
-    
-    # Retry logic for transient connections (handles file locks)
+
+    # 1. Try via Server API (Preferred)
+    try:
+        response = requests.post("http://localhost:8000/admin/execute_sql", json={"sql": query}, timeout=2)
+        if response.status_code == 200:
+            res_json = response.json()
+            if res_json.get("status") == "success":
+                data = res_json.get("data")
+                cols = res_json.get("columns", [])
+                
+                if data is not None:
+                    if not data and not cols:
+                         return pd.DataFrame()
+                    if cols:
+                        return pd.DataFrame(data, columns=cols)
+                    return pd.DataFrame(data)
+                else:
+                    return pd.DataFrame()
+    except:
+        pass # API failed, fallback to direct DB
+
+    # 2. Retry logic for transient connections (handles file locks)
     for attempt in range(max_retries):
         try:
+            # Explicitly set read_only=True to allow concurrent reads even if locked by writer
             with duckdb.connect(DB_PATH, read_only=True) as conn:
                 return conn.execute(query).df()
         except Exception as e:
             error_msg = str(e).lower()
             
             # Check if it's a lock error
-            if 'cannot open file' in error_msg or 'lock' in error_msg or 'access' in error_msg:
+            if 'cannot open file' in error_msg or 'lock' in error_msg or 'access' in error_msg or 'process' in error_msg:
                 if attempt < max_retries - 1:
                     # Exponential backoff
                     wait_time = retry_delay * (2 ** attempt)
                     try:
-                        print(f"DB locked, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
+                        print(f"[Stats] DB locked, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
                     except:
                         pass
                     time.sleep(wait_time)
@@ -58,14 +77,10 @@ def run_query(query, con=None, max_retries=3, retry_delay=0.5):
             
             # Non-lock error or final retry failed
             try:
-                print(f"Query Error: {repr(e)}")
+                print(f"[Stats] Query failed: {repr(e)}")
             except:
-                print("Query Error: [Unable to print error details]")
+                pass
             return pd.DataFrame()
-    
-    # All retries exhausted
-    print(f"Query failed after {max_retries} attempts")
-    return pd.DataFrame() # Return empty DF to prevent dashboard crash
 
 
 def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
