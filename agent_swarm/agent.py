@@ -2,6 +2,7 @@ import requests
 import time
 import hashlib
 import random
+import os
 from agent_swarm.behaviors import BehaviorStrategy, get_behavior_by_name
 
 class HeuristicAgent:
@@ -33,12 +34,15 @@ class HeuristicAgent:
         Simulates a complete user session.
         """
         try:
+            is_turbo = os.getenv("AGENT_TURBO") == "1"
+            
             # 1. Visit Home
             res = self.session.get(f"{self.base_url}/?uid={self.agent_id}", timeout=5)
             if res.status_code != 200:
                 return {"success": False, "error": "Server error"}
             
-            time.sleep(random.uniform(0.3, 1.5))
+            if not is_turbo:
+                time.sleep(random.uniform(0.3, 1.5))
             
             # 2. Get Variant
             variant = self._get_variant()
@@ -52,7 +56,8 @@ class HeuristicAgent:
                     data={"uid": self.agent_id, "element": f"banner_{variant}"},
                     timeout=5
                 )
-                time.sleep(random.uniform(0.5, 2.0))
+                if not is_turbo:
+                    time.sleep(random.uniform(0.5, 2.0))
             
             # 4. Purchase Decision (Delegated to Strategy)
             purchased = False

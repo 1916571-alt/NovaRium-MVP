@@ -697,12 +697,9 @@ elif st.session_state['page'] == 'study':
         
         st.markdown("#### 2️⃣ 필요 표본 수 계산 (Sample Size)")
         
-        # Connect to DB for Baseline
-        con = duckdb.connect(al.DB_PATH, read_only=True)
-        
         selected_metric = st.session_state.get('metric', 'CTR (클릭률)')
         
-        # Fetch baseline
+        # Fetch baseline using al.run_query (handles connection properly)
         sql_baseline = """
         SELECT 
             (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / 
@@ -715,20 +712,32 @@ elif st.session_state['page'] == 'study':
              sql_baseline = sql_baseline.replace("'click_banner'", "'purchase'")
 
         try:
-            df_baseline = al.run_query(sql_baseline, con)
+            df_baseline = al.run_query(sql_baseline, con=None)  # con=None: auto manages connection
             auto_baseline = df_baseline.iloc[0, 0] if not df_baseline.empty and df_baseline.iloc[0, 0] else 0.10
-        except Exception:
-            auto_baseline = 0.10 # Fallback
-            
-        con.close()
+        except Exception as e:
+            st.warning(f"Baseline 조회 실패 (기본값 10% 사용): {e}")
+            auto_baseline = 0.10  # Fallback
         
         # Get MDE from Step 1 (Strategy Tab)
         mde_percent = st.session_state.get('min_effect', 5) # returns int like 5
         mde = mde_percent / 100.0
         
         # Calculate Sample Size
-        n = al.calculate_sample_size(auto_baseline, mde)
-        total_needed = n * 2
+        n_per_group = al.calculate_sample_size(auto_baseline, mde)
+        
+        # Account for traffic split
+        control_pct = split / 100.0
+        test_pct = 1.0 - control_pct
+        
+        # For 50:50 split, total = n * 2
+        # For unequal splits, we need more total traffic to get 'n' samples in each group
+        if split == 50:
+            total_needed = n_per_group * 2
+        else:
+            # Calculate based on which group needs more traffic
+            total_for_control = int(n_per_group / control_pct) if control_pct > 0 else n_per_group * 2
+            total_for_test = int(n_per_group / test_pct) if test_pct > 0 else n_per_group * 2
+            total_needed = max(total_for_control, total_for_test)
         
         # Display Metrics in 3 Columns
         c1, c2, c3 = st.columns(3, gap="large")
@@ -740,7 +749,41 @@ elif st.session_state['page'] == 'study':
             st.metric(f"목표 상승폭 (MDE)", f"+{mde_percent}%", help="앞 단계(전략)에서 설정한 최소 목표치입니다.")
             
         with c3:
-            st.metric(f"필요 표본 수 (그룹당)", f"{n:,}명", delta=f"총 {total_needed:,}명 필요", delta_color="off")
+            st.metric(f"총 필요 표본 수", f"{total_needed:,}명", 
+                     delta=f"Control {int(total_needed * control_pct):,} | Test {int(total_needed * test_pct):,}", 
+                     delta_color="off",
+                     help=f"각 그룹당 최소 {n_per_group:,}명의 샘플이 필요합니다.")
+        
+        # Formula Explanation Expander
+        with st.expander("📐 표본 수 계산 공식 (Sample Size Formula)"):
+            st.markdown("""
+            #### Two-Sample Z-Test for Proportions
+            
+            ```
+            n = (2 × p̄ × (1-p̄) × (Zα + Zβ)²) / (p₁ - p₂)²
+            ```
+            
+            **파라미터:**
+            - **p₁ (baseline)**: {:.2%} ← 현재 전환율
+            - **p₂ (target)**: {:.2%} ← 목표 전환율 (baseline × (1 + MDE))
+            - **p̄ (pooled)**: {:.2%} ← (p₁ + p₂) / 2
+            - **Zα**: 1.96 ← 95% 신뢰수준 (α=0.05)
+            - **Zβ**: 0.84 ← 80% 검정력 (β=0.20)
+            
+            **계산 결과:**
+            - **그룹당 필요 샘플**: {:,}명
+            - **트래픽 분배**: Control {}% / Test {}%
+            - **총 방문자 필요**: {:,}명
+            
+            > ℹ️ 불균등 분배 시, 소수 그룹이 충분한 샘플을 얻기 위해 더 많은 총 방문자가 필요합니다.
+            """.format(
+                auto_baseline, 
+                auto_baseline * (1 + mde),
+                (auto_baseline + auto_baseline * (1 + mde)) / 2,
+                n_per_group,
+                split, 100-split,
+                total_needed
+            ))
             
         # Estimation Info
         visit_est = 500 # Assumption
@@ -749,7 +792,8 @@ elif st.session_state['page'] == 'study':
 
         st.write("")
         if st.button("다음: 데이터 수집 시작 (Simulation) ➡️", type="primary", use_container_width=True):
-            st.session_state['n'] = n
+            st.session_state['n'] = n_per_group
+            st.session_state['total_needed'] = total_needed
             st.session_state['split'] = split
             st.session_state['step'] = 3
             st.rerun()
@@ -760,82 +804,198 @@ elif st.session_state['page'] == 'study':
         ui.edu_guide("실시간 시뮬레이션", "Agent System이 가상의 유저가 되어 앱을 방문합니다.")
         
         # Agent Persona Settings
-        with st.expander("🤖 에이전트 성향 설정 (Advanced)", expanded=False):
-            st.caption("다양한 성향의 유저 비율을 조정해보세요.")
-            c_p1, c_p2, c_p3, c_p4, c_p5 = st.columns(5)
-            # Default distribution
-            p_impulsive = c_p1.slider("충동형", 0, 100, 20)
-            p_rational = c_p2.slider("계산형", 0, 100, 20)
-            p_window = c_p3.slider("아이쇼핑", 0, 100, 40)
-            p_mission = c_p4.slider("목적형", 0, 100, 10)
-            p_cautious = c_p5.slider("신중형", 0, 100, 10)
+        with st.expander("🤖 에이전트 성향 설정 (Agent Persona)", expanded=True):
+            if 'p_dist' not in st.session_state:
+                st.session_state['p_dist'] = {'Window': 40, 'Mission': 10, 'Rational': 20, 'Impulsive': 20, 'Cautious': 10}
             
-            total_p = p_impulsive + p_rational + p_window + p_mission + p_cautious
+            # Caption and Button in one row
+            col_caption, col_analyze = st.columns([3, 1])
+            col_caption.caption("기존 고객 데이터를 분석하여 에이전트 성향을 자동으로 설정합니다.")
+            
+            if col_analyze.button("🔄 기존 고객 분석 및 적용", help="DB의 유저/주문 패턴을 분석하여 실제 고객 분포를 반영합니다.", key="analyze_btn"):
+                with st.spinner("DuckDB 분석 중: 고객 세그먼트 추출..."):
+                    dist = al.get_user_segments()
+                    st.session_state['p_dist'] = dist
+                    st.toast("분석 완료! 고객 분포가 적용되었습니다.", icon="✅")
+                    st.rerun()
+                    
+            p_dist = st.session_state['p_dist']
+            
+            # Persona inputs (aligned with stats.py segmentation logic)
+            c_p1, c_p2, c_p3, c_p4, c_p5 = st.columns(5)
+            
+            p_window = c_p1.number_input("🛍️ 아이쇼핑 (Window)", 0, 100, p_dist.get('Window', 0), step=5, 
+                                         help="주문 이력 없음 (탐색만 하는 유저)", key="p_window")
+            p_mission = c_p2.number_input("🎯 목적형 (Mission)", 0, 100, p_dist.get('Mission', 0), step=5, 
+                                          help="3회 이상 구매 (충성 고객)", key="p_mission")
+            p_rational = c_p3.number_input("💡 계산형 (Rational)", 0, 100, p_dist.get('Rational', 0), step=5, 
+                                           help="평균 이상 지출 (고액 구매자)", key="p_rational")
+            p_impulsive = c_p4.number_input("⚡ 충동형 (Impulsive)", 0, 100, p_dist.get('Impulsive', 0), step=5, 
+                                             help="가입 30일 이내 신규 유저", key="p_impulsive")
+            p_cautious = c_p5.number_input("🧐 신중형 (Cautious)", 0, 100, p_dist.get('Cautious', 0), step=5, 
+                                            help="장기 가입 + 간헐적 구매", key="p_cautious")
+            
+            # Sync Session State
+            st.session_state['p_dist'] = {
+                'Window': p_window, 'Mission': p_mission, 'Rational': p_rational,
+                'Impulsive': p_impulsive, 'Cautious': p_cautious
+            }
+            
+            total_p = sum(st.session_state['p_dist'].values())
+            
+            # Visual Distribution Bar
+            st.progress(min(total_p/100, 1.0))
+            
             if total_p != 100:
-                st.warning(f"합계가 100%가 되어야 합니다. (현재: {total_p}%)")
+                st.warning(f"⚠️ 합계가 100%가 되어야 합니다. (현재: {total_p}%)")
+            else:
+                st.caption(f"✅ 설정 완료: Window {p_window}% | Mission {p_mission}% | Rational {p_rational}% | Impulsive {p_impulsive}% | Cautious {p_cautious}%")
 
         col_sim, col_chart = st.columns([1, 1], gap="large")
+        
+        # Create chart placeholder BEFORE simulation starts
+        with col_chart:
+            with st.container(border=True):
+                st.markdown("#### 📊 실시간 그룹 분포")
+                chart_placeholder = st.empty()
+                # Initial state
+                with chart_placeholder.container():
+                    st.info("데이터 대기 중...")
         
         with col_sim:
             with st.container(border=True):
                 st.markdown("#### 🚀 시뮬레이션 제어")
-                st.info(f"Target: {st.session_state['n'] * 2:,}명 방문 예정")
+                # Use total_needed from Step 2, fallback to n*2 for backwards compatibility
+                total_target = st.session_state.get('total_needed', st.session_state.get('n', 100) * 2)
+                st.info(f"Target: {total_target:,}명 방문 예정")
+                turbo = st.checkbox("Turbo Mode (무시 지연 제거)", value=True)
                 
-                if st.button("▶️ Agent Swarm 투입 (Start)", type="primary", use_container_width=True):
-                    with st.spinner("에이전트들이 쇼핑몰을 방문 중입니다..."):
-                        # In a real scenario, this would trigger external scripts
-                        # For now, we use synthetic data injection (same logic as before)
-                        from src.core import simulation as gen # Re-use generation logic
+                col_start, col_stop = st.columns(2)
+                
+                with col_start:
+                    if st.button("▶️ Agent Swarm 투입 (Start)", type="primary", use_container_width=True, key="start_sim_btn"):
+                        # Traits order must match runner.py and UI: Window, Mission, Rational, Impulsive, Cautious
+                        traits = ["Window", "Mission", "Rational", "Impulsive", "Cautious"]
+                        weights = ",".join([str(st.session_state['p_dist'].get(t, 20)) for t in traits])
+                        needed = st.session_state.get('total_needed', st.session_state.get('n', 100) * 2)
                         
-                        # Simplified injection for demo speed
-                        # Ideally, this calls agent_swarm/runner.py
-                        # Here we simulate the OUTPUT of that runner
+                        cmd = [sys.executable, "agent_swarm/runner.py", "--count", str(needed), "--weights", weights]
+                        if turbo: cmd.append("--turbo")
+                    
+                        import subprocess
+                        import time
+                        import sys
                         
-                        # Generate dummy traffic around the target sample size
-                        needed = st.session_state['n'] * 2
+                        # Prepare command with PYTHONPATH
+                        import os
+                        env = os.environ.copy()
+                        env['PYTHONPATH'] = os.path.abspath('.')
                         
-                        # Use SQL to check if we already ran needed amount
-                        curr_cnt = al.run_query("SELECT COUNT(*) FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'").iloc[0,0]
+                        # UI Placeholders
+                        progress_bar = st.progress(0, text="준비 중...")
+                        status_container = st.status("🚀 시뮬레이션 엔진 가동 중...", expanded=True)
+                        log_area = st.empty()
                         
-                        if curr_cnt < needed:
-                            # Verify target App is running
-                            try:
-                                import requests
-                                r = requests.get("http://localhost:8000")
-                                if r.status_code != 200: raise Exception("Server/8000 down")
-                            except:
-                                st.error("Target App(Port 8000)에 연결할 수 없습니다. 터미널에서 `python target_app/main.py`를 실행해주세요.")
-                                st.stop()
-
-                            # Call runner (subprocess)
-                            import subprocess
-                            import sys
-                            try:
-                                # Construct weights string
-                                weights = f"{p_impulsive},{p_rational},{p_window},{p_mission},{p_cautious}"
-                                cmd = [sys.executable, "agent_swarm/runner.py", "--count", str(needed), "--weights", weights]
-                                subprocess.run(cmd, check=True)
-                            except Exception as e:
-                                st.error(f"Simulation Failed: {e}")
+                        try:
+                            # Launch non-blocking with PYTHONPATH
+                            proc = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                             
-                            st.toast("시뮬레이션 완료! 데이터가 수집되었습니다.")
-                            st.rerun()
-
-        with col_chart:
-            # Live counts
-            df_live = al.run_query("""
-                SELECT 
-                    variant, 
-                    COUNT(DISTINCT user_id) as visitors 
-                FROM assignments 
-                WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'
-                GROUP BY 1
-            """, con=None)
-            
-            if not df_live.empty:
-                st.bar_chart(df_live, x="variant", y="visitors", color="variant", horizontal=True)
-            else:
-                st.info("데이터 대기 중...")
+                            # Store process in session state for Stop button
+                            st.session_state['sim_process'] = proc
+                            
+                            # CRITICAL: Wait for process to actually start before polling
+                            time.sleep(0.5)
+                            
+                            start_time = time.time()
+                            last_count = 0
+                            loop_count = 0
+                            
+                            # Force initial UI update
+                            status_container.update(label="⚙️ 에이전트 투입 중...", state="running")
+                            
+                            while proc.poll() is None:
+                                loop_count += 1
+                                
+                                # Check if user requested stop
+                                if st.session_state.get('sim_stop_requested', False):
+                                    proc.terminate()
+                                    status_container.update(label="⏹️ 사용자가 중지했습니다", state="error")
+                                    st.session_state['sim_stop_requested'] = False
+                                    st.session_state.pop('sim_process', None)
+                                    break
+                                
+                                # 1. Update Progress
+                                df_count = al.run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'agent_%'", con=None)
+                                curr_count = df_count.iloc[0]['cnt'] if not df_count.empty else 0
+                                
+                                progress = min(curr_count / needed, 1.0) if needed > 0 else 0
+                                progress_bar.progress(progress, text=f"데이터 수집 중... ({curr_count}/{needed}) [Loop: {loop_count}]")
+                                
+                                # 2. Show Live Logs (Ticker)
+                                df_logs = al.run_query("""
+                                    SELECT timestamp, user_id, event_name 
+                                    FROM events 
+                                    WHERE user_id LIKE 'agent_%' 
+                                    ORDER BY timestamp DESC LIMIT 5
+                                """, con=None)
+                                
+                                if not df_logs.empty:
+                                    log_text = "  \n".join([f"🕒 {row['timestamp'].strftime('%H:%M:%S')} | 👤 {row['user_id']} | 📢 {row['event_name']}" for _, row in df_logs.iterrows()])
+                                    log_area.markdown(f"**최근 활동:**  \n{log_text}")
+                                else:
+                                    log_area.caption("에이전트 활동 대기 중...")
+                                
+                                # 3. Update Chart (RIGHT SIDE) - NEW!
+                                df_live = al.run_query("""
+                                    SELECT 
+                                        variant, 
+                                        COUNT(DISTINCT user_id) as visitors 
+                                    FROM assignments 
+                                    WHERE user_id LIKE 'agent_%'
+                                    GROUP BY 1
+                                """, con=None)
+                                
+                                with chart_placeholder.container():
+                                    if not df_live.empty:
+                                        st.bar_chart(df_live, x="variant", y="visitors", color="variant", horizontal=True)
+                                        st.caption(f"🔄 실시간 업데이트 중... (Loop: {loop_count})")
+                                    else:
+                                        st.info("데이터 수집 대기 중...")
+                                
+                                # 4. Handle timeout or stuck
+                                elapsed = time.time() - start_time
+                                if elapsed > 120 and curr_count == last_count:
+                                    status_container.update(label="⚠️ 시뮬레이션 지연 발생", state="error")
+                                    st.warning(f"2분 경과, 데이터 증가 없음. 프로세스 상태: {proc.poll()}")
+                                    break
+                                
+                                last_count = curr_count
+                                time.sleep(1)
+                            
+                            # Final Check
+                            exit_code = proc.wait()
+                            st.session_state.pop('sim_process', None)
+                            
+                            if not st.session_state.get('sim_stop_requested', False):
+                                status_container.update(label=f"✅ 시뮬레이션 완료! (Exit Code: {exit_code})", state="complete", expanded=False)
+                                st.success(f"Loop 실행 횟수: {loop_count}회, 최종 데이터: {last_count}건")
+                                st.toast("시뮬레이션 완료! 데이터가 수집되었습니다.")
+                                time.sleep(1)  # Give UI a moment to render
+                                st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"시뮬레이션 중 오류 발생: {e}")
+                            import traceback
+                            st.code(traceback.format_exc())
+                            st.session_state.pop('sim_process', None)
+                
+                with col_stop:
+                    if st.button("⏹️ 중지 (Stop)", type="secondary", use_container_width=True, key="stop_sim_btn"):
+                        if 'sim_process' in st.session_state:
+                            st.session_state['sim_stop_requested'] = True
+                            st.warning("중지 요청됨... 프로세스 종료 중")
+                        else:
+                            st.info("실행 중인 시뮬레이션이 없습니다")
         
         st.write("")
         if st.button("다음: 결과 분석 (Analysis) ➡️", type="primary", use_container_width=True):
@@ -871,63 +1031,117 @@ elif st.session_state['page'] == 'study':
         
         df = al.run_query(sql)
         
-        # Calculate P-value and Stats using analytics module
-        if len(df) == 2:
-            res = al.calculate_statistics(
-                df.iloc[0]['users'], df.iloc[0]['conversions'],
-                df.iloc[1]['users'], df.iloc[1]['conversions']
-            )
-        else:
-            res = {"lift": 0, "p_value": 1.0}
-
-        c1, c2 = st.columns([1.5, 1], gap="large")
-        with c1:
-            with st.container(border=True):
-                st.markdown("#### 📊 데이터 집계 (Data)")
-                st.dataframe(df, use_container_width=True, hide_index=True)
+        if len(df) < 2:
+            st.warning("📊 분석을 위한 충분한 데이터가 수집되지 않았습니다. (최소 2개의 그룹 필요)")
+            st.stop()
+            
+        # Calculate Stats
+        res = al.calculate_statistics(
+            df.iloc[0]['users'], df.iloc[0]['conversions'],
+            df.iloc[1]['users'], df.iloc[1]['conversions']
+        )
         
-        with c2:
+        # Plotly CVR Comparison with CIs
+        import plotly.graph_objects as go
+        
+        rows = []
+        for i, row in df.iterrows():
+            rate = row['conversions'] / row['users'] if row['users'] > 0 else 0
+            # 95% CI
+            error = 1.96 * np.sqrt(rate * (1-rate) / row['users']) if row['users'] > 0 else 0
+            rows.append({
+                'variant': row['variant'],
+                'rate': rate * 100,
+                'error': error * 100,
+                'users': row['users'],
+                'conversions': row['conversions']
+            })
+        plot_df = pd.DataFrame(rows)
+        
+        fig = go.Figure()
+        colors = {'A': '#135bec', 'B': '#ef4444'}
+        
+        for v in ['A', 'B']:
+            v_data = plot_df[plot_df['variant'] == v]
+            if v_data.empty: continue
+            
+            fig.add_trace(go.Bar(
+                x=[v], 
+                y=v_data['rate'],
+                name=f"Group {v}",
+                marker_color=colors.get(v, '#cccccc'),
+                error_y=dict(type='data', array=v_data['error'], visible=True),
+                text=[f"{r:.2f}%" for r in v_data['rate']],
+                textposition='auto',
+            ))
+            
+        fig.update_layout(
+            title=f"{primary_metric} 비교 (95% 신뢰구간 포함)",
+            yaxis_title=f"{primary_metric} (%)",
+            template="plotly_dark",
+            height=400,
+            showlegend=False
+        )
+        
+        c_stats, c_plot = st.columns([1, 1.5], gap="medium")
+        
+        with c_stats:
+            st.markdown("#### 🏁 최종 결과 요약")
             with st.container(border=True):
-                st.markdown("#### 🏁 최종 성적표")
+                st.metric("Lift (개선율)", al.format_delta(res['lift']), 
+                         delta=f"{al.format_delta(res['lift'])} {'🔥' if res['lift'] > 0 else '❄️'}")
                 
-                if len(df) == 2:
-                    st.metric("Lift (개선율)", al.format_delta(res['lift']), delta=None)
-                    st.caption(f"📊 P-value: **{res['p_value']:.4f}**")
-                    
-                    if res['p_value'] < 0.05:
-                        st.success(f"**WINNER** (실험 성공!)")
-                        decision = "Significant"
-                    else:
-                        st.warning(f"**TIE** (차이 없음)")
-                        decision = "Inconclusive"
+                p_val_str = f"{res['p_value']:.4f}"
+                st.write(f"📊 **P-value:** {p_val_str}")
+                
+                if res['p_value'] < 0.05:
+                    st.success(f"🎊 **통계적으로 유의미함** (p < 0.05)")
+                    decision = "Significant Winner" if res['lift'] > 0 else "Significant Loser"
                 else:
-                    st.info("데이터 부족")
-                    decision = "No Data"
-                
-                # Report Saving
-                st.divider()
-                note = st.text_area("배운 점 (Learning Note)")
-                if st.button("💾 실험 회고록에 저장", type="primary"):
-                    import duckdb
-                    with duckdb.connect(DB_PATH) as txn_con:
-                        txn_con.execute(f"""
-                            INSERT INTO experiments (
-                                target, hypothesis, primary_metric, created_at, p_value, decision, learning_note
-                            ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
-                        """, [
-                            st.session_state.get('target', '-'), 
-                            st.session_state.get('hypothesis', '-'),
-                            st.session_state.get('metric', '-'),
-                            res['p_value'], decision, note
-                        ])
-                        # Cleanup Sim Data
-                        txn_con.execute("DELETE FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
-                        txn_con.execute("DELETE FROM events WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
-                    
-                    st.toast("저장 완료!")
-                    st.session_state['page'] = 'portfolio'
-                    st.session_state['step'] = 1
-                    st.rerun()
+                    st.warning(f"⚖️ **유의미한 차이 없음** (p >= 0.05)")
+                    decision = "Inconclusive"
+            
+            # Guardrail Check
+            st.markdown("#### 🛡️ 가드레일 (Safety)")
+            guard_threshold = st.session_state.get('guard_threshold', -5.0)
+            # Check AOV or similar if available, or just use Lift for now
+            if res['lift'] < (guard_threshold / 100):
+                 st.error(f"❌ 가드레일 위반! (하락폭 {res['lift']*100:.1f}% > 임계치 {guard_threshold}%)")
+            else:
+                 st.info(f"✅ 가드레일 통과 (지표 안정적)")
+                 
+        with c_plot:
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Data Table
+        st.markdown("#### 📊 데이터 집계 (Raw Data)")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # Report Saving
+        st.divider()
+        st.markdown("#### 📝 실험 회고록 작성")
+        note = st.text_area("배운 점 (Learning Note)", help="이번 실험에서 얻은 인사이트를 기록하세요.")
+        if st.button("💾 실험 회고록에 저장", type="primary"):
+            import duckdb
+            with duckdb.connect(DB_PATH) as txn_con:
+                txn_con.execute(f"""
+                    INSERT INTO experiments (
+                        target, hypothesis, primary_metric, created_at, p_value, decision, learning_note
+                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+                """, [
+                    st.session_state.get('target', '-'), 
+                    st.session_state.get('hypothesis', '-'),
+                    st.session_state.get('metric', '-'),
+                    res['p_value'], decision, note
+                ])
+                # Cleanup Sim Data
+                txn_con.execute("DELETE FROM assignments WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
+                txn_con.execute("DELETE FROM events WHERE user_id LIKE 'sim_%' OR user_id LIKE 'agent_%'")
+            
+            st.toast("저장 완료!")
+            st.session_state['page'] = 'portfolio'
+            st.session_state['step'] = 1
+            st.rerun()
 
 # =========================================================
 # PAGE: PORTFOLIO

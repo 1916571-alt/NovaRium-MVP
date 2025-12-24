@@ -15,21 +15,58 @@ def get_connection():
     """
     return duckdb.connect(DB_PATH)
 
-def run_query(query, con=None):
+def run_query(query, con=None, max_retries=3, retry_delay=0.5):
     """
     Execute a SQL query and return the result as a DataFrame.
     Handles connection lifecycle if con is None (Transient Read-Only).
+    Implements retry logic for database lock errors.
     Gracefully handles errors by returning empty DF.
     """
-    try:
-        if con:
+    import time
+    
+    if con:
+        # If connection is provided, use it directly (no retry needed)
+        try:
             return con.execute(query).df()
-        else:
+        except Exception as e:
+            # Safe error printing (avoid OSError on Windows)
+            try:
+                print(f"Query Error: {repr(e)}")
+            except:
+                print("Query Error: [Unable to print error details]")
+            return pd.DataFrame()
+    
+    # Retry logic for transient connections (handles file locks)
+    for attempt in range(max_retries):
+        try:
             with duckdb.connect(DB_PATH, read_only=True) as conn:
                 return conn.execute(query).df()
-    except Exception as e:
-        print(f"Query Error: {e}")
-        return pd.DataFrame() # Return empty DF to prevent dashboard crash
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            # Check if it's a lock error
+            if 'cannot open file' in error_msg or 'lock' in error_msg or 'access' in error_msg:
+                if attempt < max_retries - 1:
+                    # Exponential backoff
+                    wait_time = retry_delay * (2 ** attempt)
+                    try:
+                        print(f"DB locked, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
+                    except:
+                        pass
+                    time.sleep(wait_time)
+                    continue
+            
+            # Non-lock error or final retry failed
+            try:
+                print(f"Query Error: {repr(e)}")
+            except:
+                print("Query Error: [Unable to print error details]")
+            return pd.DataFrame()
+    
+    # All retries exhausted
+    print(f"Query failed after {max_retries} attempts")
+    return pd.DataFrame() # Return empty DF to prevent dashboard crash
+
 
 def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     """
@@ -111,3 +148,62 @@ def calculate_retention_rate(cohort_size, retained_count):
     if cohort_size <= 0:
         return 0.0
     return retained_count / cohort_size
+
+def get_user_segments(con=None):
+    """
+    Analyze existing user behavior in DB to define Persona Distribution.
+    Returns a dictionary with percentage values (0-100) for each segment.
+    """
+    sql = """
+    WITH user_metrics AS (
+        SELECT 
+            u.user_id,
+            COUNT(o.order_id) as order_count,
+            COALESCE(SUM(o.amount), 0) as total_spent,
+            DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
+        FROM users u
+        LEFT JOIN orders o ON u.user_id = o.user_id
+        GROUP BY 1
+    ),
+    averages AS (
+        SELECT AVG(total_spent) as avg_spent FROM user_metrics WHERE order_count > 0
+    )
+    SELECT
+        CASE
+            WHEN order_count = 0 THEN 'Window'
+            WHEN order_count >= 3 THEN 'Mission'
+            WHEN total_spent > (SELECT avg_spent FROM averages) THEN 'Rational'
+            WHEN tenure_days < 30 THEN 'Impulsive'
+            ELSE 'Cautious'
+        END as segment,
+        COUNT(*) as cnt
+    FROM user_metrics
+    GROUP BY 1
+    """
+    df = run_query(sql, con)
+    
+    if df.empty:
+        # Fallback default
+        return {'Impulsive': 20, 'Rational': 20, 'Window': 40, 'Mission': 10, 'Cautious': 10}
+        
+    total = df['cnt'].sum()
+    if total == 0: return {}
+    
+    seg_map = df.set_index('segment')['cnt'].to_dict()
+    
+    # Normalize to 100% total (integer)
+    raw_dist = {k: (v/total)*100 for k, v in seg_map.items()}
+    
+    # Fill missing keys
+    keys = ['Impulsive', 'Rational', 'Window', 'Mission', 'Cautious']
+    final_dist = {k: int(raw_dist.get(k, 0)) for k in keys}
+    
+    # Adjust rounding error to ensure 100
+    current_sum = sum(final_dist.values())
+    diff = 100 - current_sum
+    if diff != 0:
+        # Add diff to the largest segment
+        max_key = max(final_dist, key=final_dist.get)
+        final_dist[max_key] += diff
+        
+    return final_dist

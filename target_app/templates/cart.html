@@ -69,6 +69,10 @@
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
             <h1 class="text-lg font-bold leading-tight tracking-tight">장바구니</h1>
+            <!-- Experiment Debug Info -->
+            <div class="text-xs text-gray-500 bg-neutral-200 dark:bg-neutral-800 px-2 py-1 rounded">
+                {{ uid }} <span class="font-bold text-primary">{{ variant }}</span>
+            </div>
             <button
                 class="flex h-10 items-center justify-center px-2 text-sm font-bold text-primary transition-opacity hover:opacity-80">
                 삭제
@@ -81,16 +85,19 @@
                 class="group flex gap-4 rounded-xl bg-white dark:bg-[#1a202c] p-3 shadow-sm transition-all hover:shadow-md border border-transparent dark:border-white/5">
                 <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg size-[80px] shrink-0"
                     data-alt="Juicy double cheeseburger with melted cheese and fresh lettuce"
-                    style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBmUaC_8d6ix84m9dBo3ro2IkTJ_hRYdOqjFYvom6NoaTV2Y1XtsEHsel5gpQwU1LzrNIwBnm7FNwbOgL9VDHzflj0M8ik7AwostKYOpKQ774DuRGVTbT2TvCxBR4IgaLnrWL0zxPRIfj4w6wCnCZ7R4P_WMg-X_X_KVL4bzhHy2EPFKIGdeeVxWKd-EdY5RQgi42JBPGYsoK6oFSM-R5Gfx3avaFATdyiVGe7iMgNw6FZbRlniGwSYYB9cXB3POi9Ku9USeGeC6yGW");'>
+                    style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBmUaC_8d6ix84m9dBo3ro2IkTJ_hRYdOqjFYvom6NoaTV2Y1XtsEHsel5gpQwU1LzrNIwBnm7FNwbOgL9VDHzflj0M8ik7AwostKYOpKQ774DuRGVTbT2TvCxBR4IgaLnrWL0zxPRIfj4w6wCnCZ7R4P_WMg-X_X_KVL4bzhHy2EPFKIGdeeVWk-EdY5RQgi42JBPGYsoK6oFSM-R5Gfx3avaFATdyiVGe7iMgNw6FZbRlniGwSYYB9cXB3POi9Ku9USeGeC6yGW");'>
                 </div>
                 <div class="flex flex-1 flex-col justify-between py-1">
                     <div>
-                        <div class="flex justify-between items-start">
-                            <h3 class="text-base font-bold leading-tight">더블 치즈버거</h3>
-                            <span class="text-base font-bold text-primary">12,500원</span>
+                        <div>
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-base font-bold leading-tight">더블 치즈버거</h3>
+                                <span class="text-base font-bold text-primary">12,500원</span>
+                            </div>
+                            <p class="text-neutral-500 dark:text-[#9da6b9] text-xs font-normal leading-normal mt-1">
+                                감자튀김(M),
+                                제로 콜라</p>
                         </div>
-                        <p class="text-neutral-500 dark:text-[#9da6b9] text-xs font-normal leading-normal mt-1">감자튀김(M),
-                            제로 콜라</p>
                     </div>
                     <div class="flex items-center justify-between mt-2">
                         <button

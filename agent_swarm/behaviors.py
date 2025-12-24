@@ -87,8 +87,10 @@ def get_behavior_by_name(name: str) -> BehaviorStrategy:
     strategies = {
         "impulsive": ImpulsiveBehavior(),
         "calculator": CalculatorBehavior(),
+        "rational": CalculatorBehavior(),  # Alias for UI consistency
         "browser": BrowserBehavior(),
+        "window": BrowserBehavior(),  # Alias for UI consistency
         "mission": MissionBehavior(),
         "cautious": CautiousBehavior()
     }
-    return strategies.get(name.lower(), BrowserBehavior()) # Default
+    return strategies.get(name.lower(), BrowserBehavior())  # Default

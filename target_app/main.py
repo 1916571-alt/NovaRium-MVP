@@ -23,16 +23,15 @@ DB_PATH = os.path.join(os.path.dirname(BASE_DIR), 'novarium_local.db')
 def get_db_connection():
     return duckdb.connect(DB_PATH)
 
-def log_event(uid, group, event_name, value=0.0):
+def log_event(uid, variant, event_name, value=0.0):
     try:
         con = get_db_connection()
-        # Ensure tables exist (Just in case, though they should exist from setup)
+        # Ensure tables exist
         con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE)")
-        con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, group_id VARCHAR, assigned_at TIMESTAMP)")
+        con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
         
         # Log
         eid = str(uuid.uuid4())
-        # Use simple f-string query for MVP performance/simplicity or parameterized if wrapper allows
         con.execute(f"INSERT INTO events VALUES ('{eid}', '{uid}', '{event_name}', CURRENT_TIMESTAMP, {value})")
         con.close()
     except Exception as e:
@@ -43,45 +42,72 @@ def log_event(uid, group, event_name, value=0.0):
             pass
 
 def get_assignment(uid: str):
-    # Deterministic Split
-    hash_val = int(hashlib.sha256(uid.encode()).hexdigest(), 16)
+    # Deterministic Split - Standardized to MD5 to match stats.py
+    hash_val = int(hashlib.md5(uid.encode()).hexdigest(), 16)
     return 'B' if (hash_val % 100) >= 50 else 'A' # 50:50 Split
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    # Simple Cookie-based ID
-    uid = request.cookies.get("user_id")
+async def read_root(request: Request, uid: str = None):
+    # 1. Check Query Param (Agent priority) -> 2. Cookie -> 3. New
+    user_id = uid or request.cookies.get("user_id")
     is_new = False
-    if not uid:
-        uid = f"user_{uuid.uuid4().hex[:8]}"
+    if not user_id:
+        user_id = f"user_{uuid.uuid4().hex[:8]}"
         is_new = True
     
-    group = get_assignment(uid)
+    variant = get_assignment(user_id)
     
     # Render
     response = templates.TemplateResponse("index.html", {
         "request": request,
-        "uid": uid,
-        "group": group
+        "uid": user_id,
+        "variant": variant
     })
     
-    if is_new:
-        response.set_cookie(key="user_id", value=uid)
+    if is_new or uid:  # Log assignment if new OR if explicitly passed (Agent run)
+        max_retries = 3
+        retry_delay = 0.1
         
-        # Log Assignment if new
-        try:
-            con = get_db_connection()
-            # Check if exists (Double check)
-            exists = con.execute(f"SELECT 1 FROM assignments WHERE user_id = '{uid}'").fetchone()
-            if not exists:
-                con.execute(f"INSERT INTO assignments VALUES ('{uid}', '{group}', CURRENT_TIMESTAMP)")
-            con.close()
-        except Exception as e:
-            print(f"Assignment Log Error: {e}")
+        for attempt in range(max_retries):
             try:
+                con = get_db_connection()
+                # Ensure table exists
+                con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
+                # Check if exists using prepared statement
+                exists = con.execute("SELECT 1 FROM assignments WHERE user_id = ?", [user_id]).fetchone()
+                if not exists:
+                    con.execute("INSERT INTO assignments VALUES (?, ?, CURRENT_TIMESTAMP)", [user_id, variant])
+                    print(f"[INFO] Logged assignment: {user_id} → {variant}")
+                else:
+                    print(f"[DEBUG] Assignment already exists for {user_id}")
                 con.close()
-            except:
-                pass
+                break  # Success, exit retry loop
+            except Exception as e:
+                error_msg = str(e).lower()
+                # Check if it's a lock error
+                if ('lock' in error_msg or 'cannot open' in error_msg or 'access' in error_msg) and attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)
+                    print(f"[WARN] DB locked for {user_id}, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
+                    import time
+                    time.sleep(wait_time)
+                    try:
+                        con.close()
+                    except:
+                        pass
+                    continue
+                else:
+                    # Non-lock error or final retry failed
+                    print(f"[ERROR] Assignment Log Error for {user_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    try:
+                        con.close()
+                    except:
+                        pass
+                    break
+            
+    if is_new:
+        response.set_cookie(key="user_id", value=user_id)
         
     return response
 

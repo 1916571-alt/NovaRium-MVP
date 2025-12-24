@@ -72,7 +72,7 @@ def run_agent_swarm(config, progress_callback=None):
             
             # Progress callback
             if progress_callback:
-                progress_callback(completed, total, f"{agent.trait} 에이전트 완료")
+                progress_callback(completed, total, f"{agent.behavior.name} 에이전트 완료")
     
     return results
 
@@ -89,20 +89,50 @@ def get_default_config():
 
 
 if __name__ == "__main__":
-    # Test run
-    config = get_default_config()
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Run Agent Swarm Simulation")
+    parser.add_argument("--count", type=int, default=100, help="Total number of agents")
+    parser.add_argument("--weights", type=str, default="40,10,20,20,10", help="Weights (Window, Mission, Rational, Impulsive, Cautious)")
+    parser.add_argument("--turbo", action="store_true", help="Run without delays")
     
+    args = parser.parse_args()
+    
+    if args.turbo:
+        import os
+        os.environ["AGENT_TURBO"] = "1"
+    
+    # Map weights to trait names (matching app.py UI order)
+    traits = ["window", "mission", "rational", "impulsive", "cautious"]
+    weight_vals = [int(w) for w in args.weights.split(",")]
+    
+    if len(weight_vals) != 5:
+        raise ValueError("Expected 5 comma-separated weights")
+    
+    # Calculate counts per trait
+    total_weight = sum(weight_vals)
+    config = {}
+    for trait, weight in zip(traits, weight_vals):
+        config[trait] = int((weight / total_weight) * args.count)
+
+    # Adjust rounding discrepancy
+    current_total = sum(config.values())
+    if current_total < args.count:
+        config["window"] += (args.count - current_total)
+
     def progress(current, total, msg):
         print(f"[{current}/{total}] {msg}")
+        sys.stdout.flush()
     
+    print(f"Starting Swarm: Total={args.count}, Traits={config}")
     results = run_agent_swarm(config, progress)
+    
     print("\n=== Results ===")
     print(f"Total: {results['total']}")
     print(f"Success: {results['success']}")
     print(f"Clicked: {results['clicked']} ({results['clicked']/results['total']*100:.1f}%)")
     print(f"Purchased: {results['purchased']} ({results['purchased']/results['total']*100:.1f}%)")
-    print("\nBy Trait:")
-    for trait, stats in results['by_trait'].items():
+    for trait, stats in results.get('by_trait', {}).items():
         ctr = stats['clicked'] / stats['total'] * 100 if stats['total'] > 0 else 0
-        cvr = stats['purchased'] / stats['clicked'] * 100 if stats['clicked'] > 0 else 0
-        print(f"  {trait}: CTR={ctr:.1f}% CVR={cvr:.1f}%")
+        print(f"  {trait}: CTR={ctr:.1f}%")

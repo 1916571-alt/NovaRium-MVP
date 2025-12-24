@@ -28,9 +28,9 @@
 - [ ] **A/B 테스트 마법사**:
     - [x] Step 1: 가설 설정 UI (전략 탭 및 시각적 변인 설정) <!-- id: feat-wizard-1 -->
     - [x] Step 2: 파워 분석(Sample Size) 및 트래픽 분배 <!-- id: feat-wizard-2 -->
-    - [x] Step 3: 데이터 수집 시뮬레이션 준비 <!-- id: feat-wizard-3 -->
-    - [ ] Step 4: 시뮬레이션 실행 및 진행률 표시 <!-- id: feat-wizard-4 -->
-    - [ ] Step 5: 결과 분석 및 승/패 판정 <!-- id: feat-wizard-5 -->
+    - [x] Step 3: 데이터 수집 준비 및 고객 세그먼테이션 연동 <!-- id: feat-wizard-3 -->
+    - [/] Step 4: 시뮬레이션 실행 및 실시간 진행률 표시 <!-- id: feat-wizard-4 -->
+    - [ ] Step 5: 고도화된 결과 분석 및 시각화 리포트 <!-- id: feat-wizard-5 -->
 
 ## 3단계: 테스트 및 품질 향상 (Testing & Quality)
 > **목표**: 자동화된 테스트 환경을 구축하고 코드 신뢰성을 높입니다.
