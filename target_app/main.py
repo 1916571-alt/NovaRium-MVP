@@ -34,14 +34,10 @@ async def startup_event():
     global db_con
     try:
         logger.info(f"Connecting to DB at {DB_PATH}")
-        db_con = duckdb.connect(DB_PATH)
-        
-        # Ensure tables exist
-        with db_lock:
-            db_con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE, run_id VARCHAR)")
-            db_con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, experiment_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP, run_id VARCHAR, weight FLOAT DEFAULT 1.0)")
-            
-        logger.info("DB Connected and Tables Checked")
+        # Use READ ONLY mode to avoid locking issues with Streamlit
+        db_con = duckdb.connect(DB_PATH, read_only=True)
+
+        logger.info("DB Connected in READ ONLY mode")
     except Exception as e:
         logger.error(f"DB Startup Error: {e}")
 
@@ -53,19 +49,14 @@ async def shutdown_event():
         logger.info("DB Connection Closed")
 
 def log_event(uid, variant, event_name, value=0.0, run_id=None):
-    global db_con
-    if not db_con:
-        logger.error("DB Not Connected")
-        return
-
     try:
         eid = str(uuid.uuid4())
         # Use simple print for user feedback as requested
         print(f"[App] Logging Event: {event_name} by {uid} (Value: {value})")
 
-        with db_lock:
-            # Use parametrized query for safety even if internal
-            db_con.execute("INSERT INTO events VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)",
+        # Use temporary connection for writing to avoid locking with Streamlit
+        with duckdb.connect(DB_PATH) as write_con:
+            write_con.execute("INSERT INTO events VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)",
                          [eid, uid, event_name, value, run_id])
     except Exception as e:
         print(f"[App] Log Error: {e}")
@@ -129,25 +120,20 @@ async def read_root(request: Request, uid: str = None, run_id: str = None, weigh
     })
 
     if is_new or uid:  # Log assignment if new OR if explicitly passed (Agent run)
-        global db_con
-        if db_con:
-            try:
-                with db_lock:
-                    # Check if exists for this run (if run_id provided)
-                    if run_id:
-                        exists = db_con.execute("SELECT 1 FROM assignments WHERE user_id = ? AND run_id = ?", [user_id, run_id]).fetchone()
-                    else:
-                        exists = db_con.execute("SELECT 1 FROM assignments WHERE user_id = ? AND run_id IS NULL", [user_id]).fetchone()
+        try:
+            # Use temporary connection for writing
+            with duckdb.connect(DB_PATH) as write_con:
+                # Check if exists for this run (if run_id provided)
+                if run_id:
+                    exists = write_con.execute("SELECT 1 FROM assignments WHERE user_id = ? AND run_id = ?", [user_id, run_id]).fetchone()
+                else:
+                    exists = write_con.execute("SELECT 1 FROM assignments WHERE user_id = ? AND run_id IS NULL", [user_id]).fetchone()
 
-                    if not exists:
-                        db_con.execute("INSERT INTO assignments VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)", [user_id, 'exp_default', variant, run_id, weight])
-                        print(f"[App] Logged assignment: {user_id} -> {variant} (run_id: {run_id}, weight: {weight})")
-                    else:
-                        # Debug usually off, but user asked for visibility
-                        # print(f"[App] Assignment already exists for {user_id}")
-                        pass
-            except Exception as e:
-                print(f"[App] Assignment Log Error: {e}")
+                if not exists:
+                    write_con.execute("INSERT INTO assignments VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)", [user_id, 'exp_default', variant, run_id, weight])
+                    print(f"[App] Logged assignment: {user_id} -> {variant} (run_id: {run_id}, weight: {weight})")
+        except Exception as e:
+            print(f"[App] Assignment Log Error: {e}")
 
     if is_new:
         response.set_cookie(key="user_id", value=user_id)

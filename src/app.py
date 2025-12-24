@@ -1216,15 +1216,32 @@ GROUP BY 1
 
         st.caption(f"🔍 현재 분석 중인 실험: `{current_run_id}`")
 
+        # Use weighted aggregation to match real-world scale
+        # For CTR, count banner_A and banner_B clicks; for CVR/AOV, count purchases
+        if 'CTR' in primary_metric:
+            event_condition = "(e.event_name = 'banner_A' OR e.event_name = 'banner_B')"
+        else:
+            event_condition = "e.event_name = 'purchase'"
+
         sql = f"""
+        WITH user_events AS (
+            SELECT
+                a.variant,
+                e.user_id,
+                a.weight,
+                MAX(CASE WHEN {event_condition} THEN 1 ELSE 0 END) as converted
+            FROM assignments a
+            LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
+            WHERE a.run_id = '{current_run_id}'
+            GROUP BY a.variant, e.user_id, a.weight
+        )
         SELECT
-            a.variant,
-            COUNT(DISTINCT a.user_id) as users,
-            COUNT(DISTINCT CASE WHEN e.event_name = '{event_name}' THEN e.user_id END) as conversions
-        FROM assignments a
-        LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
-        WHERE a.run_id = '{current_run_id}'
-        GROUP BY 1 ORDER BY 1
+            variant,
+            CAST(ROUND(SUM(weight), 0) AS INTEGER) as users,
+            CAST(ROUND(SUM(CASE WHEN converted = 1 THEN weight ELSE 0 END), 0) AS INTEGER) as conversions
+        FROM user_events
+        GROUP BY variant
+        ORDER BY variant
         """
 
         df = al.run_query(sql)
@@ -1270,17 +1287,20 @@ GROUP BY 1
         for v in ['A', 'B']:
             v_data = plot_df[plot_df['variant'] == v]
             if v_data.empty: continue
-            
+
+            # Label A as Control, B as Test
+            group_label = f"{v} (Control)" if v == 'A' else f"{v} (Test)"
+
             fig.add_trace(go.Bar(
-                x=[v], 
+                x=[group_label],
                 y=v_data['rate'],
-                name=f"Group {v}",
+                name=group_label,
                 marker_color=colors.get(v, '#cccccc'),
                 error_y=dict(type='data', array=v_data['error'], visible=True),
                 text=[f"{r:.2f}%" for r in v_data['rate']],
                 textposition='auto',
             ))
-            
+
         fig.update_layout(
             title=f"{primary_metric} 비교 (95% 신뢰구간 포함)",
             yaxis_title=f"{primary_metric} (%)",
@@ -1306,6 +1326,10 @@ GROUP BY 1
                 else:
                     st.warning(f"⚖️ **유의미한 차이 없음** (p >= 0.05)")
                     decision = "Inconclusive"
+
+                # Save res and decision to session state for retrospective save
+                st.session_state['last_res'] = res
+                st.session_state['last_decision'] = decision
 
                 # Decision Action Buttons - Always show both Adopt and Re-experiment
                 st.divider()
@@ -1350,7 +1374,8 @@ GROUP BY 1
 
                 # Show guidance based on statistical and practical significance
                 if st.session_state.get('show_adoption_success'):
-                    st.success("✨ 채택 완료! 다음 실험을 설계하여 플랫폼을 더욱 개선하세요.")
+                    st.success("✨ 채택 표시 완료!")
+                    st.info("⬇️ **중요**: 아래로 스크롤하여 '실험 회고록'을 작성하고 저장 버튼을 눌러야 Target App에 실제로 반영됩니다.")
                 else:
                     if res['p_value'] < 0.05 and res['lift'] > 0:
                         st.info("💡 **권장**: 통계적으로 유의미한 개선입니다. 채택을 고려하세요.")
@@ -1359,8 +1384,11 @@ GROUP BY 1
                     else:
                         st.info("💡 **참고**: 유의미한 차이가 없습니다. 실무적 판단 또는 재실험을 고려하세요.")
 
-            # Secondary Metrics Check - Calculate secondary metrics
-            st.markdown("#### 📊 보조 지표 분석 (Secondary Metrics)")
+        with c_plot:
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Secondary Metrics Check - Calculate secondary metrics (moved below chart)
+            st.markdown("#### 📊 가드레일 지표 (Guardrail Metrics)")
             guardrails = st.session_state.get('guardrails', [])
             guard_results = []
 
@@ -1374,17 +1402,28 @@ GROUP BY 1
                     else:
                         guard_event = "click_banner"
 
-                    # Query guardrail metric
+                    # Query guardrail metric with weighted aggregation
                     guard_sql = f"""
+                    WITH user_metrics AS (
+                        SELECT
+                            a.variant,
+                            e.user_id,
+                            a.weight,
+                            MAX(CASE WHEN e.event_name = 'purchase' THEN 1 ELSE 0 END) as purchased,
+                            SUM(CASE WHEN e.event_name = 'purchase' THEN e.value ELSE 0 END) as revenue
+                        FROM assignments a
+                        LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
+                        WHERE a.run_id = '{current_run_id}'
+                        GROUP BY a.variant, e.user_id, a.weight
+                    )
                     SELECT
-                        a.variant,
-                        COUNT(DISTINCT a.user_id) as users,
-                        COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as conversions,
-                        COALESCE(SUM(CASE WHEN e.event_name = 'purchase' THEN e.value ELSE 0 END), 0) as revenue
-                    FROM assignments a
-                    LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
-                    WHERE a.run_id = '{current_run_id}'
-                    GROUP BY 1 ORDER BY 1
+                        variant,
+                        CAST(ROUND(SUM(weight), 0) AS INTEGER) as users,
+                        CAST(ROUND(SUM(CASE WHEN purchased = 1 THEN weight ELSE 0 END), 0) AS INTEGER) as conversions,
+                        CAST(ROUND(SUM(revenue * weight), 0) AS BIGINT) as revenue
+                    FROM user_metrics
+                    GROUP BY variant
+                    ORDER BY variant
                     """
                     df_guard = al.run_query(guard_sql)
 
@@ -1399,6 +1438,9 @@ GROUP BY 1
                             test_aov = df_guard.iloc[1]['revenue'] / df_guard.iloc[1]['conversions'] if df_guard.iloc[1]['conversions'] > 0 else 0
                             guard_lift = (test_aov - control_aov) / control_aov if control_aov > 0 else 0
                             guard_results.append({"metric": "AOV (평균주문액)", "control": control_aov, "test": test_aov, "lift": guard_lift})
+
+                # Save guard_results to session state for later use in retrospective save
+                st.session_state['last_guard_results'] = guard_results
 
                 # Display secondary metrics results
                 guard_threshold = st.session_state.get('session_guard_threshold', -5.0) / 100
@@ -1416,11 +1458,9 @@ GROUP BY 1
                 else:
                     st.caption("보조 지표 분석 결과가 없습니다.")
             else:
+                st.session_state['last_guard_results'] = []
                 st.info(f"설정된 보조 지표가 없습니다.")
-                 
-        with c_plot:
-            st.plotly_chart(fig, width="stretch")
-        
+
         # Comprehensive Metrics Comparison Table
         st.divider()
         col_title, col_spacer, col_help = st.columns([2.5, 0.5, 1])
@@ -1598,8 +1638,19 @@ GROUP BY 1
             import duckdb
             import json
 
+            # Get saved results from session state
+            saved_res = st.session_state.get('last_res')
+            saved_decision = st.session_state.get('last_decision')
+            saved_guard_results = st.session_state.get('last_guard_results', [])
+
+            if not saved_res:
+                st.error("⚠️ 분석 결과를 찾을 수 없습니다.")
+                st.info("💡 Step 4 (결론 내리기)로 이동하여 분석을 먼저 실행해주세요. 그 후 다시 이 페이지로 돌아와서 회고록을 저장할 수 있습니다.")
+                st.caption(f"🔍 디버그 정보: current_run_id = {current_run_id}, last_res in session = {bool(st.session_state.get('last_res'))}")
+                st.stop()
+
             # Prepare guardrail results for storage
-            guardrail_results_json = json.dumps(guard_results) if 'guard_results' in locals() else None
+            guardrail_results_json = json.dumps(saved_guard_results) if saved_guard_results else None
 
             with duckdb.connect(DB_PATH) as txn_con:
                 # Save experiment record
@@ -1615,8 +1666,8 @@ GROUP BY 1
                     st.session_state.get('hypothesis', '-'),
                     st.session_state.get('metric', '-'),
                     ','.join(st.session_state.get('guardrails', [])),
-                    res['p_value'], decision, note, current_run_id,
-                    res['control_rate'], res['test_rate'], res['lift'],
+                    saved_res['p_value'], saved_decision, note, current_run_id,
+                    saved_res['control_rate'], saved_res['test_rate'], saved_res['lift'],
                     guardrail_results_json
                 ])
 
@@ -1645,9 +1696,12 @@ GROUP BY 1
                 txn_con.execute(f"DELETE FROM assignments WHERE run_id = '{current_run_id}'")
                 txn_con.execute(f"DELETE FROM events WHERE run_id = '{current_run_id}'")
 
-            st.toast("저장 완료!")
-            # Clear current run_id
+            st.toast("💾 회고록 저장 완료!")
+            # Clear current run_id and saved results
             st.session_state.pop('current_run_id', None)
+            st.session_state.pop('last_res', None)
+            st.session_state.pop('last_decision', None)
+            st.session_state.pop('last_guard_results', None)
             st.session_state['page'] = 'portfolio'
             st.session_state['step'] = 1
             st.rerun()
