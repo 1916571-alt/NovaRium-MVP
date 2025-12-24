@@ -52,37 +52,37 @@ def generate_history():
             
             # 1. Assignment (Just logging visit)
             # Use 'history_load' as experiment_id to distinguish
+            # Use NULL for run_id for historical baseline data, weight=1.0 for historical data
             visit_time = current_date + timedelta(seconds=random.randint(0, 86400))
-            users.append((uid, 'history_load', 'A', visit_time))
-            
+            users.append((uid, 'history_load', 'A', visit_time, None, 1.0))
+
             # 2. Click Event
             if random.random() < ctr:
                 click_time = visit_time + timedelta(seconds=random.randint(2, 60))
-                events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time, 0.0))
-                
+                events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time, 0.0, None))
+
                 # 3. Order Event
                 if random.random() < cvr:
                     order_time = click_time + timedelta(seconds=random.randint(30, 300))
                     # Random Amount between 15000 and 50000 KRW
                     amount = float(random.randint(15000, 50000))
-                    events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time, amount))
+                    events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time, amount, None))
 
     # Bulk Insert
     print("[+] Saving to DuckDB...")
-    df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts'])
-    df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts', 'val'])
-    
+    df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts', 'run_id', 'weight'])
+    df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts', 'val', 'run_id'])
+
     # We need to match schema:
-    # assignments: user_id, experiment_id, variant, assigned_at
-    # events: event_id, user_id, event_name, timestamp, value
-    
+    # assignments: user_id, experiment_id, variant, assigned_at, run_id, weight
+    # events: event_id, user_id, event_name, timestamp, value, run_id
+
     # Fix column names for insert
     # assignments
-    # assignments (3 columns: user_id, variant, assigned_at)
-    con.execute("INSERT INTO assignments SELECT uid, var, ts FROM df_u")
-    
+    con.execute("INSERT INTO assignments SELECT uid, eid, var, ts, run_id, weight FROM df_u")
+
     # events (event_id is first arg in tuple)
-    con.execute("INSERT INTO events SELECT eid, uid, name, ts, val FROM df_e")
+    con.execute("INSERT INTO events SELECT eid, uid, name, ts, val, run_id FROM df_e")
     
     con.close()
     print("[*] History Generation Complete!")

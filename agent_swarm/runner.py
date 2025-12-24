@@ -7,27 +7,33 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from agent_swarm.agent import HeuristicAgent
 from agent_swarm.behaviors import get_behavior_by_name
 
-def run_agent_swarm(config, progress_callback=None):
+def run_agent_swarm(config, progress_callback=None, run_id=None, weight=1.0):
     """
     Runs a swarm of agents with specified distribution.
-    
+
     Args:
         config: Dict with trait counts, e.g. {"impulsive": 20, "calculator": 25, ...}
         progress_callback: Optional function to report progress (current, total, message)
-    
+        run_id: Optional unique identifier for this experiment run
+        weight: Statistical weight for hybrid simulation (default 1.0)
+
     Returns:
         Dict with results summary
     """
+    # Generate unique run_id if not provided
+    if not run_id:
+        run_id = f"run_{int(time.time() * 1000)}"
+
     # Generate agent list
     agents = []
     agent_id_counter = int(time.time() * 1000)  # Unique ID base
-    
+
     for trait, count in config.items():
         for i in range(count):
             agent_id = f"agent_{trait}_{agent_id_counter + i}"
             # Use Factory to get Behavior Object
             behavior = get_behavior_by_name(trait)
-            agents.append(HeuristicAgent(agent_id, behavior))
+            agents.append(HeuristicAgent(agent_id, behavior, run_id, weight))
     
     total = len(agents)
     results = {
@@ -73,7 +79,10 @@ def run_agent_swarm(config, progress_callback=None):
             # Progress callback
             if progress_callback:
                 progress_callback(completed, total, f"{agent.behavior.name} 에이전트 완료")
-    
+
+    results["run_id"] = run_id
+    results["weight"] = weight
+    results["effective_total"] = int(total * weight)
     return results
 
 
@@ -96,7 +105,9 @@ if __name__ == "__main__":
     parser.add_argument("--count", type=int, default=100, help="Total number of agents")
     parser.add_argument("--weights", type=str, default="40,10,20,20,10", help="Weights (Window, Mission, Rational, Impulsive, Cautious)")
     parser.add_argument("--turbo", action="store_true", help="Run without delays")
-    
+    parser.add_argument("--run-id", type=str, default=None, help="Unique run identifier for experiment isolation")
+    parser.add_argument("--weight", type=float, default=1.0, help="Statistical weight for hybrid simulation")
+
     args = parser.parse_args()
     
     if args.turbo:
@@ -124,9 +135,10 @@ if __name__ == "__main__":
     def progress(current, total, msg):
         print(f"[{current}/{total}] {msg}")
         sys.stdout.flush()
-    
-    print(f"Starting Swarm: Total={args.count}, Traits={config}")
-    results = run_agent_swarm(config, progress)
+
+    effective = int(args.count * args.weight)
+    print(f"Starting Swarm: Total={args.count}, Effective={effective} (x{args.weight}), Traits={config}, Run ID={args.run_id or 'auto-generated'}")
+    results = run_agent_swarm(config, progress, args.run_id, args.weight)
     
     print("\n=== Results ===")
     print(f"Total: {results['total']}")

@@ -38,8 +38,8 @@ async def startup_event():
         
         # Ensure tables exist
         with db_lock:
-            db_con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE)")
-            db_con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
+            db_con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE, run_id VARCHAR)")
+            db_con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, experiment_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP, run_id VARCHAR, weight FLOAT DEFAULT 1.0)")
             
         logger.info("DB Connected and Tables Checked")
     except Exception as e:
@@ -52,7 +52,7 @@ async def shutdown_event():
         db_con.close()
         logger.info("DB Connection Closed")
 
-def log_event(uid, variant, event_name, value=0.0):
+def log_event(uid, variant, event_name, value=0.0, run_id=None):
     global db_con
     if not db_con:
         logger.error("DB Not Connected")
@@ -62,47 +62,86 @@ def log_event(uid, variant, event_name, value=0.0):
         eid = str(uuid.uuid4())
         # Use simple print for user feedback as requested
         print(f"[App] Logging Event: {event_name} by {uid} (Value: {value})")
-        
+
         with db_lock:
             # Use parametrized query for safety even if internal
-            db_con.execute("INSERT INTO events VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)", 
-                         [eid, uid, event_name, value])
+            db_con.execute("INSERT INTO events VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)",
+                         [eid, uid, event_name, value, run_id])
     except Exception as e:
         print(f"[App] Log Error: {e}")
 
+def get_adopted_variant():
+    """Check if there's an adopted experiment and return the winning variant."""
+    global db_con
+    if not db_con:
+        return None
+
+    try:
+        with db_lock:
+            # Get the most recent adoption
+            result = db_con.execute("""
+                SELECT variant_config
+                FROM adoptions
+                ORDER BY adopted_at DESC
+                LIMIT 1
+            """).fetchone()
+
+            if result:
+                import json
+                variant_config = json.loads(result[0])
+                logger.info(f"Adopted variant detected: {variant_config}")
+                return variant_config
+    except Exception as e:
+        logger.warning(f"No adoptions table or error: {e}")
+
+    return None
+
 def get_assignment(uid: str):
-    # Deterministic Split - Standardized to MD5 to match stats.py
+    # Check if there's an adopted variant first
+    adopted = get_adopted_variant()
+    if adopted:
+        # If experiment was adopted, show winning variant to everyone
+        logger.info("Using adopted variant for all users")
+        return 'B'  # Adopted variant is always the test variant
+
+    # Otherwise, use deterministic split for A/B testing
     hash_val = int(hashlib.md5(uid.encode()).hexdigest(), 16)
     return 'B' if (hash_val % 100) >= 50 else 'A' # 50:50 Split
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request, uid: str = None):
+async def read_root(request: Request, uid: str = None, run_id: str = None, weight: float = 1.0):
     # 1. Check Query Param (Agent priority) -> 2. Cookie -> 3. New
     user_id = uid or request.cookies.get("user_id")
     is_new = False
     if not user_id:
         user_id = f"user_{uuid.uuid4().hex[:8]}"
         is_new = True
-    
+
     variant = get_assignment(user_id)
-    
+    adopted = get_adopted_variant()
+
     # Render
     response = templates.TemplateResponse("index.html", {
         "request": request,
         "uid": user_id,
-        "variant": variant
+        "variant": variant,
+        "is_adopted": adopted is not None  # Flag to show adoption badge
     })
-    
+
     if is_new or uid:  # Log assignment if new OR if explicitly passed (Agent run)
         global db_con
         if db_con:
             try:
                 with db_lock:
-                    # Check if exists
-                    exists = db_con.execute("SELECT 1 FROM assignments WHERE user_id = ?", [user_id]).fetchone()
+                    # Check if exists for this run (if run_id provided)
+                    if run_id:
+                        exists = db_con.execute("SELECT 1 FROM assignments WHERE user_id = ? AND run_id = ?", [user_id, run_id]).fetchone()
+                    else:
+                        exists = db_con.execute("SELECT 1 FROM assignments WHERE user_id = ? AND run_id IS NULL", [user_id]).fetchone()
+
                     if not exists:
-                        db_con.execute("INSERT INTO assignments VALUES (?, ?, CURRENT_TIMESTAMP)", [user_id, variant])
-                        print(f"[App] Logged assignment: {user_id} -> {variant}")
+                        db_con.execute("INSERT INTO assignments VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)", [user_id, 'exp_default', variant, run_id, weight])
+                        print(f"[App] Logged assignment: {user_id} -> {variant} (run_id: {run_id}, weight: {weight})")
                     else:
                         # Debug usually off, but user asked for visibility
                         # print(f"[App] Assignment already exists for {user_id}")
@@ -112,7 +151,7 @@ async def read_root(request: Request, uid: str = None):
 
     if is_new:
         response.set_cookie(key="user_id", value=user_id)
-        
+
     return response
 
 @app.get("/cart", response_class=HTMLResponse)
@@ -140,15 +179,15 @@ async def view_tracking(request: Request):
     return templates.TemplateResponse("tracking.html", {"request": request, "uid": uid, "group": group})
 
 @app.post("/click")
-async def track_click(uid: str = Form(...), element: str = Form(...)):
+async def track_click(uid: str = Form(...), element: str = Form(...), run_id: str = Form(None)):
     group = get_assignment(uid)
-    log_event(uid, group, element, 0.0)
+    log_event(uid, group, element, 0.0, run_id)
     return {"status": "success", "event": "click", "uid": uid}
 
 @app.post("/order")
-async def track_order(uid: str = Form(...), amount: float = Form(...)):
+async def track_order(uid: str = Form(...), amount: float = Form(...), run_id: str = Form(None)):
     group = get_assignment(uid)
-    log_event(uid, group, 'purchase', amount)
+    log_event(uid, group, 'purchase', amount, run_id)
     return {"status": "success", "event": "order", "uid": uid}
 
 from pydantic import BaseModel
@@ -203,8 +242,8 @@ if __name__ == "__main__":
         print(f"Creating DB at {DB_PATH}")
         try:
             con = duckdb.connect(DB_PATH)
-            con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE)")
-            con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP)")
+            con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE, run_id VARCHAR)")
+            con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, experiment_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP, run_id VARCHAR, weight FLOAT DEFAULT 1.0)")
             con.close()
         except:
             pass

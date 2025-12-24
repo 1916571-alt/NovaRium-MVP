@@ -31,7 +31,9 @@ def load_data(con):
             user_id VARCHAR,
             experiment_id VARCHAR,
             variant VARCHAR,
-            assigned_at TIMESTAMP
+            assigned_at TIMESTAMP,
+            run_id VARCHAR,
+            weight FLOAT DEFAULT 1.0
         )
     """)
 
@@ -42,7 +44,9 @@ def load_data(con):
             event_id VARCHAR,
             user_id VARCHAR,
             event_name VARCHAR,
-            timestamp TIMESTAMP
+            timestamp TIMESTAMP,
+            value DOUBLE,
+            run_id VARCHAR
         )
     """)
     
@@ -64,6 +68,11 @@ def load_data(con):
             p_value FLOAT,
             decision VARCHAR,
             learning_note VARCHAR,
+            run_id VARCHAR,
+            control_rate FLOAT,
+            test_rate FLOAT,
+            lift FLOAT,
+            guardrail_results VARCHAR,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)

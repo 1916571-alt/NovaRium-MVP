@@ -4,6 +4,7 @@ import hashlib
 import numpy as np
 import pandas as pd
 from scipy import stats
+import streamlit as st
 
 # Constants (DB Path)
 # Assuming this script is in src/core/ folder, so db is two levels up
@@ -83,6 +84,7 @@ def run_query(query, con=None, max_retries=5, retry_delay=0.5):
             return pd.DataFrame()
 
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     """
     Calculate required sample size per variation for A/B testing.
@@ -91,15 +93,15 @@ def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     standard_norm = stats.norm()
     Z_alpha = standard_norm.ppf(1 - alpha/2)
     Z_beta = standard_norm.ppf(power)
-    
+
     p1 = baseline_cvr
     p2 = baseline_cvr * (1 + mde)
-    
+
     pooled_prob = (p1 + p2) / 2
-    
-    if p1 == p2: 
+
+    if p1 == p2:
         return 0
-        
+
     n = (2 * pooled_prob * (1 - pooled_prob) * (Z_alpha + Z_beta)**2) / (p1 - p2)**2
     return int(n)
 
@@ -111,6 +113,7 @@ def get_bucket(user_id, num_buckets=100):
     hash_obj = hashlib.md5(str(user_id).encode())
     return int(hash_obj.hexdigest(), 16) % num_buckets
 
+@st.cache_data(ttl=60)  # Cache for 1 minute (short TTL for live data)
 def calculate_statistics(c_users, c_conv, t_users, t_conv):
     """
     Calculate A/B test statistics: CVRs, Lift, and P-value.

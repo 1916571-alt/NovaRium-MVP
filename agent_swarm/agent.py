@@ -13,14 +13,16 @@ class HeuristicAgent:
     - DIP: Depends on BehaviorStrategy abstraction.
     """
     
-    def __init__(self, agent_id: str, behavior: BehaviorStrategy):
+    def __init__(self, agent_id: str, behavior: BehaviorStrategy, run_id: str = None, weight: float = 1.0):
         self.agent_id = agent_id
         if isinstance(behavior, str):
             # Backward compatibility / Factory usage
             self.behavior = get_behavior_by_name(behavior)
         else:
             self.behavior = behavior # Dependency Injection
-            
+
+        self.run_id = run_id
+        self.weight = weight  # For hybrid simulation
         self.base_url = "http://localhost:8000"
         self.session = requests.Session()
     
@@ -37,7 +39,10 @@ class HeuristicAgent:
             is_turbo = os.getenv("AGENT_TURBO") == "1"
             
             # 1. Visit Home
-            res = self.session.get(f"{self.base_url}/?uid={self.agent_id}", timeout=5)
+            params = {"uid": self.agent_id, "weight": self.weight}
+            if self.run_id:
+                params["run_id"] = self.run_id
+            res = self.session.get(f"{self.base_url}/", params=params, timeout=5)
             if res.status_code != 200:
                 return {"success": False, "error": "Server error"}
             
@@ -53,14 +58,17 @@ class HeuristicAgent:
             clicked = False
             if self.behavior.should_click(variant):
                 clicked = True
+                click_data = {"uid": self.agent_id, "element": f"banner_{variant}"}
+                if self.run_id:
+                    click_data["run_id"] = self.run_id
                 self.session.post(
                     f"{self.base_url}/click",
-                    data={"uid": self.agent_id, "element": f"banner_{variant}"},
+                    data=click_data,
                     timeout=5
                 )
                 self.session.post(
                     f"{self.base_url}/click",
-                    data={"uid": self.agent_id, "element": f"banner_{variant}"},
+                    data=click_data,
                     timeout=5
                 )
                 if not is_turbo:
@@ -72,9 +80,12 @@ class HeuristicAgent:
             purchased = False
             if clicked and self.behavior.should_purchase():
                 purchased = True
+                order_data = {"uid": self.agent_id, "amount": random.randint(15000, 50000)}
+                if self.run_id:
+                    order_data["run_id"] = self.run_id
                 self.session.post(
                     f"{self.base_url}/order",
-                    data={"uid": self.agent_id, "amount": random.randint(15000, 50000)},
+                    data=order_data,
                     timeout=5
                 )
             

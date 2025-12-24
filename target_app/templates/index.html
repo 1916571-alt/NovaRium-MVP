@@ -76,6 +76,9 @@
             <!-- Experiment Debug Info -->
             <div class="text-xs text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">
                 {{ uid }} <span class="font-bold text-primary">{{ variant }}</span>
+                {% if is_adopted %}
+                <span class="ml-1 text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded font-bold">ADOPTED ✓</span>
+                {% endif %}
             </div>
 
             <button
