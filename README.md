@@ -1,106 +1,131 @@
-# NovaRium Edu: 실전 A/B 테스팅 마스터 클래스
+# NovaRium Edu: End-to-End A/B Testing Simulator for Data Analysts
 
 <div align="center">
-  <h3>🎓 미래의 데이터 분석가를 위한 인터랙티브 A/B 테스트 시뮬레이터</h3>
-  <p>이론이 아닌 <b>실전 시뮬레이션</b>을 통해 실험의 전체 과정을 마스터하세요.</p>
+  <h3>🎓 데이터 분석가를 위한 실전 A/B 테스트 & 데이터 마트 구축 프로젝트</h3>
+  <p>이론을 넘어 <b>실험 설계부터 데이터 파이프라인(ETL), 분석, 의사결정</b>까지<br>전 과정을 직접 시뮬레이션하며 구축한 개인 포트폴리오 프로젝트입니다.</p>
 </div>
 
 ---
 
-## 📖 소개 (Introduction)
+## 🧐 프로젝트 배경 (Why Project?)
 
-**NovaRium Edu**는 이론적인 A/B 테스트 지식과 실무 적용 사이의 간극을 메우기 위해 설계된 교육용 플랫폼입니다.
-단순히 통계 공식을 외우는 것을 넘어, **가설 설정(Plan)부터 실험 설계(Design), 데이터 수집(Collect), 분석(Analyze)**에 이르는 전체 사이클을 직접 경험할 수 있습니다.
+### "실무 경험의 닭과 달걀 문제를 해결하다"
+데이터 분석가를 준비하며 가장 큰 어려움은 **'실제 트래픽 기반의 A/B 테스트 경험'**을 쌓기 어렵다는 점이었습니다. 
+이론만으로는 **실험 설계의 난관(Traffic Split, Sample Size)**, **데이터 정합성 문제**, **지표 설정의 모호함**을 체감하기 어렵다고 판단했습니다.
 
-본 프로젝트는 **'모던 소프트웨어 엔지니어링'** 원칙을 준수하여 개발되었으며, 사용자에게는 분석적 사고를, 개발자에게는 공학적 설계의 모범 사례를 제공하는 것을 목표로 합니다.
+따라서 직접 **가상 쇼핑몰(Target App)**과 **유저 시뮬레이터(Agent Swarm)**를 구축하고, 그 위에서 분석가가 수행해야 할 전체 라이프사이클을 경험할 수 있는 **통합 시뮬레이션 환경**을 개발했습니다.
 
-## 🌟 핵심 기능 (Key Features)
+## 🎯 핵심 역량 및 기능 (Key Capabilities)
 
-### 1. 5단계 마스터 클래스 (Wizard Mode)
-분석가의 실제 업무 흐름을 그대로 따라가는 마법사 모드를 제공합니다:
-- **1단계: 가설 및 지표**: OEC(주요 지표)와 가드레일 지표를 정의하고 가설을 수립합니다.
-- **2단계: 파워 분석**: `scipy`를 활용해 검정력(Power)과 유의수준(Alpha)에 기반한 필요 표본 크기를 계산합니다.
-- **3단계: 샘플링**: 해시(Hash) 알고리즘을 이용한 결정론적 트래픽 분배 과정을 시각화합니다.
-- **4단계: 시뮬레이션**: AI 페르소나(Agent Swarm)를 투입하여 실제와 유사한 유저 행동 데이터를 생성합니다.
-- **5단계: 분석**: DuckDB SQL을 실행하여 결과를 집계하고 P-value를 통해 승패를 판정합니다.
+이 프로젝트를 통해 다음과 같은 **데이터 분석가 핵심 역량**을 실제 코드로 구현했습니다.
 
-### 2. 에이전트 스웜 (Agent Swarm)
-난수로 생성된 단순 더미 데이터가 아닙니다. '충동형', '신중형', '목적형' 등 5가지 성향을 가진 **AI 에이전트**들이 가상 쇼핑몰을 이용하며 남긴 행동 데이터를 분석합니다.
+### 1. 실험 설계 및 관리 (Experiment Design & Management)
+> *Demonstrated Skill: Experimental Design, Hypothesis Testing, Power Analysis*
 
-### 3. 실험 회고록 (Retrospective)
-모든 실험 결과는 자동으로 아카이빙됩니다. 성공한 실험과 실패한 실험을 기록하고 복기하며 자신만의 **데이터 분석 포트폴리오**를 완성할 수 있습니다.
+- **Visual Experiment Builder**: 코딩 없이 직관적으로 대조군(Control)과 실험군(Test)을 설정하고 미리보기(Preview)를 제공합니다.
+- **Robust Metrics Framework**:
+    - **OEC (Overall Evaluation Criterion)**: 핵심 지표(Primary)와 목표 상승폭(MDE) 설정.
+    - **Guardrails**: 매출 하락 등 부작용을 방지하기 위한 안전 장치(Safety Margin) 설정.
+- **Statistical Power Analysis**: `scipy`를 활용해 Alpha(유의수준), Power(검정력), Baseline CTR에 따른 **필요 표본 수(Sample Size)**를 자동 계산합니다.
 
-## 🏗️ 시스템 아키텍처 (System Architecture)
+### 2. 데이터 엔지니어링 및 파이프라인 (Data Engineering)
+> *Demonstrated Skill: ETL, SQL, Data Warehouse Modeling*
 
-이 프로젝트는 **클린 아키텍처(Clean Architecture)** 및 계층형 구조를 따릅니다:
+- **DuckDB 기반 DW 구축**: 로컬 OLAP 데이터베이스인 DuckDB를 활용해 Serverless 데이터 웨어하우스를 구축했습니다.
+- **Log to Mart 파이프라인**:
+    - **Raw Data**: 유저 로그(Events), 주문 정보(Orders) 적재.
+    - **Data Mart**: 분석하기 쉬운 형태(`daily_metrics`, `user_stats`)로 가공하는 배치(Batch) 작업 자동화.
+
+### 3. 유저 행동 시뮬레이션 (User Simulation)
+> *Demonstrated Skill: Data Generation, Behavioral Analysis*
+
+- **Agent Swarm**: 단순 난수 생성이 아닌, **5가지 페르소나(충동형, 신중형, 체리피커 등)**를 가진 AI 에이전트가 확률 모델에 따라 행동합니다.
+- **Dynamic Interaction**: 실험 변인(예: 배너 색상 변경, 할인율 증가)에 따라 에이전트의 클릭률(CTR)과 구매율(CVR)이 동적으로 변화하도록 모델링했습니다.
+
+---
+
+## 🏗️ 시스템 아키텍처 (Architecture)
+
+**User Flow**부터 **Data Flow**까지의 전체 흐름입니다.
 
 ```mermaid
 graph TD
-    User([User])
-    subgraph "Presentation Layer (src/ui)"
-        Streamlit["🖥️ Streamlit App<br>(App/Dashboard)"]
+    subgraph "Phase 1: Experiment Design"
+        Analyst[👩‍💻 Analyts] -->|Step 1| ExpBuilder[🧪 Experiment Builder UI]
+        ExpBuilder -->|Define Variant/Metrics| ConfigDB[(⚙️ Config)]
     end
-    
-    subgraph "Core Domain Layer (src/core)"
-        Simulator["🤖 Simulation Engine<br>(User/Order/Agent Logic)"]
-        Stats["📈 Statistical Service<br>(Scipy/Power Analysis)"]
+
+    subgraph "Phase 2: Execution (Target App)"
+        ConfigDB -->|Apply Variant| TargetApp[📱 NovaEats App (FastAPI)]
+        Simulator[🤖 Agent Swarm] -->|Visit & Action| TargetApp
     end
-    
-    subgraph "Data Persistence Layer (src/data)"
-        DuckDB[("🦆 DuckDB<br>(Local OLAP Warehouse)")]
+
+    subgraph "Phase 3: Data Pipeline"
+        TargetApp -->|Generate Logs| RawLogs[📄 Raw Access Logs]
+        RawLogs -->|ETL Process| DuckDB[("🦆 DuckDB (Warehouse)")]
     end
-    
-    User --> Streamlit
-    Streamlit --> Stats
-    Streamlit --> Simulator
-    Stats --> DuckDB
-    Simulator --> DuckDB
+
+    subgraph "Phase 4: Analysis"
+        DuckDB -->|Query| Dashboard[📊 Analytics Dashboard]
+        Dashboard -->|P-value & Decisions| Analyst
+    end
 ```
-
-## 💻 기술적 우수성 (Engineering Excellence)
-
-- **TDD (테스트 주도 개발)**: 핵심 비즈니스 로직(통계, 데이터 생성)은 `pytest` 기반의 단위 테스트로 검증되었습니다.
-- **모듈화 설꼐 (Modularity)**: 관심사 분리(SoC) 원칙에 따라 UI, Core, Data 계층이 명확히 분리된 `src` 패키지 구조를 갖습니다.
-- **로컬 데이터 웨어하우스**: **DuckDB**를 도입하여 별도의 서버 구축 없이도 대용량 데이터에 대한 고성능 분석이 가능합니다.
 
 ## 🛠️ 기술 스택 (Tech Stack)
 
-- **Frontend**: Streamlit, Plotly
-- **Core Logic**: Python 3.9+, Scipy, NumPy, Faker
-- **Database**: DuckDB
-- **Testing**: Pytest
+분석 환경과 동일한 **Python 생태계**를 기반으로 구축했습니다.
 
-## 🚀 시작하기 (Quick Start)
+| Category | Tech Stack | Usage |
+|----------|------------|-------|
+| **Analysis** | **DuckDB** | 고성능 로컬 OLAP 분석 및 데이터 저장소 |
+| **Logic** | **Statsmodels / Scipy** | T-test, Power Analysis 등 통계 검정 엔진 |
+| **Visual** | **Streamlit** | 인터랙티브 대시보드 및 실험 설계 도구 |
+| **App** | **FastAPI** | 실험 대상 서비스(Target App) 백엔드 구현 |
+| **Viz** | **Plotly** | 시계열 데이터 및 분포 시각화 |
+
+## 🚀 실행 방법 (How to Run)
+
+누구나 로컬 환경에서 이 분석 시뮬레이터를 실행해볼 수 있습니다.
 
 ### 1. 설치 (Installation)
 
 ```bash
-# 저장소 복제
+# Clone Repository
 git clone https://github.com/1916571-alt/NovaRium-MVP.git
 
-# 가상환경 생성 (권장)
-python -m venv venv
-# Windows
-.\venv\Scripts\activate
-# Mac/Linux
-source venv/bin/activate
-
-# 의존성 패키지 설치
+# Install Dependencies
 pip install -r requirements.txt
 ```
 
-### 2. 앱 실행 (Run Application)
+### 2. 실행 (Run Simulator)
 
 ```bash
-# 대시보드 실행 (새로운 진입점)
+# Streamlit 대시보드 실행 (Main Entrypoint)
 streamlit run src/app.py
 ```
 
-## 📄 라이선스 (License)
+브라우저에서 `localhost:8501`이 열리면 **"실험 설계 (Experiment Builder)"** 탭으로 이동하여 나만의 A/B 테스트를 시작해보세요.
 
-MIT License
+---
+
+## 📂 프로젝트 구조 (Structure)
+
+```
+NovaRium-MVP/
+├── src/
+│   ├── app.py             # 메인 애플리케이션 (Entrypoint)
+│   ├── core/              # 핵심 비즈니스 로직
+│   │   ├── stats.py       # 통계 검정 및 표본 계산 엔진
+│   │   └── simulation.py  # 유저 행동 시뮬레이터
+│   ├── data/              # 데이터베이스 및 쿼리 관리
+│   └── ui/                # Streamlit UI 컴포넌트
+├── target_app/            # 실험 대상 웹 애플리케이션 (FastAPI)
+├── docs/                  # PRD 및 기획 문서
+└── README.md              # 프로젝트 문서
+```
 
 ---
 <div align="center">
-  <p>Developed by <b>Geonyul Shin</b></p>
+  <p>Developed with ❤️ by <b>Geonyul Shin</b></p>
+  <p><i>Building Bridges Between Theory and Practice.</i></p>
 </div>
