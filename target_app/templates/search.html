@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>검색</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                        "surface-dark": "#1c2333", // Slightly lighter for cards/inputs
+                        "surface-lighter": "#282e39"
+                    },
+                    fontFamily: {
+                        "display": ["Pretendard", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <script src="/static/js/highlight.js"></script>
+    <style>
+        body {
+            font-family: "Pretendard", sans-serif;
+        }
+
+        /* Hide scrollbar for horizontal scrolling areas */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(700px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark min-h-screen text-slate-900 dark:text-white overflow-x-hidden flex justify-center">
+    <div
+        class="relative flex h-full min-h-screen w-full max-w-md flex-col overflow-hidden bg-background-light dark:bg-background-dark shadow-xl">
+        <!-- Sticky Header with Search -->
+        <div
+            class="sticky top-0 z-20 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md pt-4 pb-2 px-4 border-b border-gray-200 dark:border-gray-800">
+            <!-- Search Input -->
+            <div class="flex items-center gap-3 mb-3">
+                <button class="text-slate-500 dark:text-slate-400 hover:text-primary transition-colors"
+                    onclick="window.history.back()">
+                    <span class="material-symbols-outlined text-[28px]">arrow_back</span>
+                </button>
+                <!-- Experiment Debug Info -->
+                <div class="text-xs text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">
+                    {{ uid }} <span class="font-bold text-primary">{{ variant }}</span>
+                </div>
+                <div class="flex-1 relative group">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span class="material-symbols-outlined text-slate-400">search</span>
+                    </div>
+                    <input
+                        class="block w-full rounded-xl border-none bg-white dark:bg-surface-lighter py-3 pl-10 pr-10 text-sm leading-6 text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-primary shadow-sm"
+                        placeholder="타코, 버거, 초밥 검색..." type="text" value="" />
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer">
+                        <!-- Clear icon hidden by default, visible if needed -->
+                    </div>
+                </div>
+            </div>
+            <!-- Horizontal Filters -->
+            <div class="flex gap-2 overflow-x-auto no-scrollbar py-1 pb-2">
+                <button
+                    class="flex shrink-0 items-center justify-center gap-x-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark px-3 py-1.5 transition-colors active:bg-primary/20">
+                    <span class="material-symbols-outlined text-primary text-[18px]">tune</span>
+                    <span class="text-xs font-medium">필터</span>
+                </button>
+                <button
+                    class="flex shrink-0 items-center justify-center gap-x-1 rounded-full bg-primary text-white px-3 py-1.5">
+                    <span class="text-xs font-medium">정렬</span>
+                    <span class="material-symbols-outlined text-[16px]">expand_more</span>
+                </button>
+                <button
+                    class="flex shrink-0 items-center justify-center gap-x-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                    <span class="text-xs font-medium">가격대</span>
+                    <span class="material-symbols-outlined text-[16px]">expand_more</span>
+                </button>
+                <button
+                    class="flex shrink-0 items-center justify-center gap-x-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                    <span class="material-symbols-outlined text-green-500 text-[16px]">eco</span>
+                    <span class="text-xs font-medium">채식</span>
+                </button>
+                <button
+                    class="flex shrink-0 items-center justify-center gap-x-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                    <span class="material-symbols-outlined text-amber-400 text-[16px] fill-current">star</span>
+                    <span class="text-xs font-medium">4.5+</span>
+                </button>
+            </div>
+        </div>
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto overflow-x-hidden pb-20">
+            <!-- Recent Searches Section -->
+            <div class="pt-4">
+                <div class="flex items-center justify-between px-4 pb-2">
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">최근 검색어</h2>
+                    <button class="text-xs font-medium text-primary hover:text-primary/80">전체 삭제</button>
+                </div>
+                <div class="flex flex-col">
+                    <!-- List Item 1 -->
+                    <div id="search-result-item"
+                        class="group flex items-center gap-4 px-4 py-3 hover:bg-surface-dark/50 transition-colors cursor-pointer"
+                        onclick="window.location.href='/detail'">
+                        <div
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-lighter text-slate-400">
+                            <span class="material-symbols-outlined">history</span>
+                        </div>
+                        <div class="flex flex-1 flex-col">
+                            <p class="text-sm font-medium text-slate-900 dark:text-white">버거킹</p>
+                        </div>
+                        <button class="text-slate-500 hover:text-red-500">
+                            <span class="material-symbols-outlined text-[20px]">close</span>
+                        </button>
+                    </div>
+                    <!-- List Item 2 -->
+                    <div
+                        class="group flex items-center gap-4 px-4 py-3 hover:bg-surface-dark/50 transition-colors cursor-pointer">
+                        <div
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-lighter text-slate-400">
+                            <span class="material-symbols-outlined">history</span>
+                        </div>
+                        <div class="flex flex-1 flex-col">
+                            <p class="text-sm font-medium text-slate-900 dark:text-white">야채 초밥</p>
+                        </div>
+                        <button class="text-slate-500 hover:text-red-500">
+                            <span class="material-symbols-outlined text-[20px]">close</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="h-2 bg-transparent"></div>
+            <!-- Popular / Trending Section -->
+            <div class="px-4 pt-4">
+                <h2 class="mb-4 text-lg font-bold text-slate-900 dark:text-white">인기 카테고리</h2>
+                <div class="flex flex-wrap gap-3">
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-surface-lighter px-4 py-3 transition-transform hover:scale-105 active:scale-95">
+                        <span class="text-xl">🍕</span>
+                        <span class="text-sm font-medium text-white">피자</span>
+                    </button>
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-surface-lighter px-4 py-3 transition-transform hover:scale-105 active:scale-95">
+                        <span class="text-xl">🍣</span>
+                        <span class="text-sm font-medium text-white">초밥</span>
+                    </button>
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-surface-lighter px-4 py-3 transition-transform hover:scale-105 active:scale-95">
+                        <span class="text-xl">🍔</span>
+                        <span class="text-sm font-medium text-white">버거</span>
+                    </button>
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-surface-lighter px-4 py-3 transition-transform hover:scale-105 active:scale-95">
+                        <span class="text-xl">🥗</span>
+                        <span class="text-sm font-medium text-white">건강식</span>
+                    </button>
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-surface-lighter px-4 py-3 transition-transform hover:scale-105 active:scale-95">
+                        <span class="text-xl">🌮</span>
+                        <span class="text-sm font-medium text-white">멕시칸</span>
+                    </button>
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-surface-lighter px-4 py-3 transition-transform hover:scale-105 active:scale-95">
+                        <span class="text-xl">🍦</span>
+                        <span class="text-sm font-medium text-white">디저트</span>
+                    </button>
+                    <button
+                        class="flex items-center gap-2 rounded-xl bg-primary/20 px-4 py-3 transition-transform hover:scale-105 active:scale-95 border border-primary/50">
+                        <span class="text-xl">🔥</span>
+                        <span class="text-sm font-medium text-primary">특가</span>
+                    </button>
+                </div>
+            </div>
+            <div class="h-6 bg-transparent"></div>
+            <!-- Top Results (Simulated Search Context) -->
+            <div class="px-4">
+                <h2 class="mb-4 text-lg font-bold text-slate-900 dark:text-white">평점 높은 맛집</h2>
+                <div class="flex flex-col gap-5">
+                    <!-- Restaurant Card 1 -->
+                    <div class="group flex w-full flex-col overflow-hidden rounded-2xl bg-white dark:bg-surface-dark shadow-sm hover:shadow-md transition-all"
+                        onclick="window.location.href='/detail'">
+                        <div class="relative h-40 w-full overflow-hidden">
+                            <img alt="Juicy gourmet burger with cheese and lettuce on a wooden board"
+                                class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                data-alt="Close up of a gourmet burger"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVbLnIW5ojQM1xw4xnGDWey2B5X3wlVPsjfd9LXZJEjH4ajriq5MgnYVe0h4RzMqn6B6S1kJw2m1DayKa5PU9vGguE4XaweT_uSef62rFs8413mmqxcUtq2jUDsBMZajvo40yahQaZGCOqJCr0V2lVPojF37gpSZDDmZrXna1d98oXsO0hru9UAKeOmQTyPwOEja9RjGVddW1thDufSBH42S287ntnIozlMRm4AwfWSkubNgf7gKpzgLBJBueZGKm8eQU5vBl6cBu6" />
+                            <div
+                                class="absolute top-3 right-3 rounded-full bg-white/90 px-2 py-1 text-xs font-bold text-slate-900 shadow-sm backdrop-blur-sm">
+                                20-30 분
+                            </div>
+                            <button
+                                class="absolute top-3 left-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-primary hover:text-white">
+                                <span class="material-symbols-outlined text-[20px] fill-current">favorite</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1 p-3">
+                            <div class="flex items-start justify-between">
+                                <h3 class="text-base font-bold text-slate-900 dark:text-white">더 버거 조인트</h3>
+                                <div
+                                    class="flex items-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-xs font-bold text-green-700 dark:text-green-400">
+                                    <span>4.8</span>
+                                    <span class="material-symbols-outlined text-[12px] fill-current">star</span>
+                                </div>
+                            </div>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">아메리칸 • 버거 • $$</p>
+                            <div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 mt-1">
+                                <span class="material-symbols-outlined text-[14px]">local_shipping</span>
+                                <span>1,000원 배달비</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Restaurant Card 2 -->
+                    <div
+                        class="group flex w-full flex-col overflow-hidden rounded-2xl bg-white dark:bg-surface-dark shadow-sm hover:shadow-md transition-all">
+                        <div class="relative h-40 w-full overflow-hidden">
+                            <img alt="Assortment of sushi rolls on a black plate"
+                                class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                data-alt="Sushi platter presentation"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvPiBGWX4fwo2fmOARsL_wK5Oyk-ld5WFb61MUzTh9eZFnC9EM37f6x3BNGAHunIJFnqtoZzn9l9ZV-VxfKOttqqgOi5T0O3Yh8kPn4xg7p52jAeUk1188qZKu_H1SevA-66o6QlL9ISHX2yJKtrT2CnGodX_foALv_w0bwXTzqJryHaDNGV3erzd84ovI_R5VzUCT0nABwKfvQ5pi_URmeqEIiTMyKyCSf3Aq_QHGk5G4w3tyYax4ahHMMLh7q1hXj368oX2qXdku" />
+                            <div
+                                class="absolute top-3 right-3 rounded-full bg-white/90 px-2 py-1 text-xs font-bold text-slate-900 shadow-sm backdrop-blur-sm">
+                                35-45 분
+                            </div>
+                            <button
+                                class="absolute top-3 left-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-primary hover:text-white">
+                                <span class="material-symbols-outlined text-[20px]">favorite</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1 p-3">
+                            <div class="flex items-start justify-between">
+                                <h3 class="text-base font-bold text-slate-900 dark:text-white">사쿠라 스시</h3>
+                                <div
+                                    class="flex items-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-xs font-bold text-green-700 dark:text-green-400">
+                                    <span>4.9</span>
+                                    <span class="material-symbols-outlined text-[12px] fill-current">star</span>
+                                </div>
+                            </div>
+                            <p class="text-sm text-slate-500 dark:text-slate-400">일식 • 초밥 • $$$</p>
+                            <div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 mt-1">
+                                <span class="material-symbols-outlined text-[14px]">local_shipping</span>
+                                <span>무료 배달</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Spacer for bottom safe area -->
+            <div class="h-8"></div>
+        </div>
+    </div>
+</body>
+
+</html>

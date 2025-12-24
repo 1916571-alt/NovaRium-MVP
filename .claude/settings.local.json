@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(xargs ls:*)",
+      "Bash(python:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(set PYTHONPATH=%CD%)",
+      "Bash(set AGENT_TURBO=1)",
+      "Bash(curl:*)",
+      "Bash(taskkill /F /PID 18508)",
+      "Bash(taskkill //F //PID 18508)",
+      "Bash(timeout /t 2)",
+      "Bash(streamlit run:*)",
+      "Bash(taskkill //F //PID 34936)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(del novarium_local.db)",
+      "Bash(git mv:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git stash:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaRium Edu - A/B Testing Master Class</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Plus Jakarta Sans', 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .presentation-container {
+            width: 90vw;
+            max-width: 1200px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slide {
+            width: 100%;
+            height: 100%;
+            padding: 60px 80px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        .slide.active {
+            display: flex;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .slide.lead {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .slide.lead h1 {
+            color: white;
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+        
+        .slide.lead h3 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        h1 {
+            color: #8B5CF6;
+            font-size: 3rem;
+            margin-bottom: 30px;
+            font-weight: 800;
+        }
+        
+        h2 {
+            color: #555;
+            font-size: 2rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        h3 {
+            color: #666;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+        
+        p {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        ul, ol {
+            margin-left: 40px;
+            margin-bottom: 20px;
+        }
+        
+        li {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        strong {
+            color: #8B5CF6;
+            font-weight: 700;
+        }
+        
+        .navigation {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+        
+        .nav-btn {
+            background: #8B5CF6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        
+        .nav-btn:hover {
+            background: #7C3AED;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.4);
+        }
+        
+        .nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .slide-counter {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            color: #8B5CF6;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .slide.lead .slide-counter {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <!-- Slide 1: Title -->
+        <div class="slide lead active">
+            <h1>🌌 NovaRium Edu</h1>
+            <h3>A/B Testing Master Class Simulator</h3>
+            <p><strong>누구나 쉽게 배우는 데이터 분석 시뮬레이터</strong></p>
+        </div>
+
+        <!-- Slide 2: Overview -->
+        <div class="slide">
+            <h2>1. 프로젝트 개요 (Overview)</h2>
+            <p><strong>"이론으로만 배우는 A/B 테스트는 그만. 직접 해보세요!"</strong></p>
+            <ul>
+                <li><strong>NovaRium Edu</strong>는 초보 분석가와 PM을 위한 <strong>실전 훈련 프로그램</strong>입니다.</li>
+                <li>복잡한 툴 사용법을 몰라도 괜찮습니다. <strong>친절한 5단계 가이드(Interactive Guide)</strong>를 따라가다 보면 어느새 실험 하나를 완수하게 됩니다.</li>
+            </ul>
+        </div>
+
+        <!-- Slide 3: Core Value -->
+        <div class="slide">
+            <h2>2. 핵심 가치 (Core Value)</h2>
+            <ol>
+                <li><strong>Learning by Doing (직접 해보기)</strong><br>
+                    가설부터 분석까지, A/B 테스트의 <strong>전 과정을 하나하나 직접 조작</strong>하며 배웁니다.</li>
+                <li><strong>Simulation & Interaction (시뮬레이션)</strong><br>
+                    단순히 보는 것이 아닙니다. MDE, 표본 수 등 <strong>주요 변수를 직접 설정</strong>해보고, 그에 따라 <strong>결과가 어떻게 달라지는지</strong> 즉시 확인합니다.</li>
+                <li><strong>Experiment Retrospective (나만의 성장 기록)</strong><br>
+                    단순한 실습으로 끝나지 않습니다. 내가 수행한 모든 실험을 <strong>상세한 성적표</strong>로 남겨 포트폴리오로 활용하세요.</li>
+            </ol>
+        </div>
+
+        <!-- Slide 4: Features 1-2 -->
+        <div class="slide">
+            <h2>3. 주요 기능: 5단계 마스터 클래스 (1~2)</h2>
+            <p><strong>1단계: 목표 정하기 (Hypothesis)</strong></p>
+            <ul>
+                <li>배달 앱(NovaEats)의 매출을 올리기 위해 <strong>"어떤 부분을 고치면 좋을지"</strong> 상상해보고 목표를 정합니다.</li>
+            </ul>
+            <p><strong>2단계: 실험 설계하기 (Design)</strong></p>
+            <ul>
+                <li>이 실험이 우연이 아니라고 확신하려면 <strong>"최소 몇 명의 사람에게 보여줘야 할까?"</strong>를 계산해봅니다. (Power Analysis)</li>
+                <li><strong>가드레일(Guardrail)</strong>: 실험이 성공하더라도 <strong>"환불률이 치솟으면 중단해야 한다"</strong>는 안전 장치를 설정합니다.</li>
+            </ul>
+        </div>
+
+        <!-- Slide 5: Features 3-4 -->
+        <div class="slide">
+            <h2>3. 주요 기능: 5단계 마스터 클래스 (3~4)</h2>
+            <p><strong>3단계: 팀 나누기 (Sampling)</strong></p>
+            <ul>
+                <li><strong>"사다리 타기(Hash)"</strong> 규칙을 이용해 방문자들을 A팀(기존 화면)과 B팀(새로운 화면)으로 공정하게 나누는 과정을 눈으로 확인합니다.</li>
+            </ul>
+            <p><strong>4단계: 데이터 모으기 (Collection)</strong></p>
+            <ul>
+                <li>가상의 고객 1,000명이 앱에 들어와서 버튼을 누르고 구매하는 모습을 지켜봅니다.</li>
+                <li><strong>실시간으로 데이터가 차곡차곡 쌓이는 과정</strong>을 생생하게 경험할 수 있습니다.</li>
+                <li><strong>Agent Swarm</strong>: 5가지 성향(충동형, 신중형 등)을 가진 AI 에이전트들이 실제 앱을 방문하여 구매하는 <strong>현실적인 시뮬레이션</strong>을 제공합니다.</li>
+            </ul>
+        </div>
+
+        <!-- Slide 6: Features 5 -->
+        <div class="slide">
+            <h2>3. 주요 기능: 5단계 마스터 클래스 (5)</h2>
+            <p><strong>5단계: 결론 내리기 (Analysis)</strong></p>
+            <ul>
+                <li>모인 데이터를 분석해서 최종 결정을 내립니다.</li>
+                <li><strong>"B화면이 A화면보다 정말 더 나은가?"</strong>를 통계적으로 판단합니다. (P-value 검정)</li>
+            </ul>
+        </div>
+
+        <!-- Slide 7: Retrospective -->
+        <div class="slide">
+            <h2>4. 주요 기능: 실험 회고록 (Retrospective)</h2>
+            <p><strong>나만의 데이터 분석 일기장</strong></p>
+            <ul>
+                <li><strong>상세 성적표</strong>: 내가 실험을 어떻게 설계했고, 결과는 어땠는지 꼼꼼하게 기록해줍니다.</li>
+                <li><strong>Drill-down View</strong>: 클릭 한 번으로 각 실험의 <strong>상세 지표(Target, Metric, Lift 등)</strong>를 다시 확인하여 복기할 수 있습니다.</li>
+                <li><strong>주제별 모아보기</strong>: '메인 배너 실험', '결제 화면 실험' 등 관심 있는 주제별로 나의 성장 과정을 모아봅니다.</li>
+            </ul>
+        </div>
+
+        <!-- Slide 8: Monitoring -->
+        <div class="slide">
+            <h2>5. 주요 기능: 종합 상황실 (Monitoring)</h2>
+            <p><strong>서비스의 건강 상태를 한눈에</strong></p>
+            <ul>
+                <li><strong>30일 트렌드</strong>: 지난 달의 방문자, 클릭률, 구매율 변화를 차트로 확인합니다.</li>
+                <li><strong>위기 감지(Crisis Alert)</strong>: 지표가 급락하면 <strong>"비상 경고"</strong>를 띄우고, 바로 해결 실험을 시작할 수 있도록 돕습니다.</li>
+            </ul>
+        </div>
+
+        <!-- Slide 9: Tech Stack -->
+        <div class="slide">
+            <h2>6. 기술 스택 (Tech Stack)</h2>
+            <ul>
+                <li><strong>Streamlit</strong>: Python만으로 빠르게 <strong>웹 애플리케이션 화면</strong>을 구현합니다.</li>
+                <li><strong>DuckDB</strong>: 별도 서버 설치 없이, 내 컴퓨터에서 <strong>대용량 데이터 분석(SQL)</strong>을 빠르게 처리합니다.</li>
+                <li><strong>Scipy</strong>: 신뢰할 수 있는 <strong>통계적 검정(P-value 계산)</strong> 기능을 수행합니다.</li>
+                <li><strong>Plotly</strong>: 사용자와 상호작용할 수 있는 <strong>반응형 차트</strong>를 그립니다.</li>
+            </ul>
+        </div>
+
+        <!-- Slide 10: Database -->
+        <div class="slide">
+            <h2>7. 데이터베이스 구조 (Data)</h2>
+            <ul>
+                <li><strong>users</strong>: 고객 정보 (누가?)</li>
+                <li><strong>orders</strong>: 구매 내역 (얼마나 샀나?)</li>
+                <li><strong>assignments</strong>: 실험 참가 기록 (어느 팀에 배정됐나?)</li>
+                <li><strong>events</strong>: 행동 기록 (무엇을 클릭했나?)</li>
+                <li><strong>experiments</strong>: 실험 결과 기록 (내 실험 일지)</li>
+            </ul>
+        </div>
+
+        <!-- Slide 11: Thank You -->
+        <div class="slide lead">
+            <h1>🚀 Thank You</h1>
+            <p><strong>NovaRium Edu: 가장 쉽고 확실한 A/B 테스트 입문서</strong></p>
+        </div>
+
+        <!-- Navigation -->
+        <div class="slide-counter">
+            <span id="current-slide">1</span> / <span id="total-slides">11</span>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" id="prev-btn" onclick="prevSlide()">◀ 이전</button>
+            <button class="nav-btn" id="next-btn" onclick="nextSlide()">다음 ▶</button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const currentSlideSpan = document.getElementById('current-slide');
+
+        document.getElementById('total-slides').textContent = totalSlides;
+
+        function showSlide(n) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[n].classList.add('active');
+            currentSlideSpan.textContent = n + 1;
+            
+            // Update button states
+            prevBtn.disabled = n === 0;
+            nextBtn.disabled = n === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+</html>

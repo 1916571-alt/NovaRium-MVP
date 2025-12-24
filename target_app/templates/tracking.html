@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>주문 추적</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Configuration -->
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                        "surface-dark": "#1c1f27",
+                    },
+                    fontFamily: {
+                        "display": ["Pretendard", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <script src="/static/js/highlight.js"></script>
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif !important;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(700px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-display h-screen w-full overflow-hidden text-gray-900 dark:text-white">
+    <div class="relative flex h-full w-full flex-col group/design-root">
+        <!-- Floating Top Bar -->
+        <div
+            class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 pt-12 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+            <button
+                class="pointer-events-auto flex size-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 transition-colors"
+                onclick="window.history.back()">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <h2 class="text-white text-lg font-bold tracking-tight">주문 확인</h2>
+            <!-- Experiment Debug Info -->
+            <div class="pointer-events-auto text-xs text-white/70 bg-white/10 backdrop-blur-md px-2 py-1 rounded">
+                {{ uid }} <span class="font-bold text-white">{{ variant }}</span>
+            </div>
+            <button
+                class="pointer-events-auto flex items-center justify-center rounded-full bg-white/10 px-4 py-2 backdrop-blur-md text-sm font-bold text-white hover:bg-white/20 transition-colors">
+                도움말
+            </button>
+        </div>
+        <!-- Map Area -->
+        <div class="absolute inset-0 z-0 h-[60%] w-full bg-gray-900">
+            <!-- Map Background Image -->
+            <div class="h-full w-full bg-cover bg-center opacity-80"
+                data-alt="Dark stylized map of city streets at night" data-location="New York City"
+                style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBolKBtV2Ugdql_2JPeSMJ8OWEJ4fyFlQeJFmGv6SstlJzaO4BiNAveHAVhupkt6nBWLXP6KQWifXD4-xApJOk-t5Rnrwh3Ix6m2Y95K2CEFWy9oLGDRX-DRcuq9HznFNGG_JDLebK4Q9oz9gAk2uaqGVJC0msu83GXXdh5fCkpE_Wj6jWAvwFVSolIUErrUAzJ3fEogV-X2R2fq0vnT4tmFO9mcjRJkX3P1dgk_gKlEL8UN98ZkBXTnysiof_kP4hIHKef3-hV7cMv');">
+            </div>
+            <!-- Map Overlay Gradient for smooth transition -->
+            <div class="absolute bottom-0 w-full h-32 bg-gradient-to-t from-background-dark/80 to-transparent"></div>
+            <!-- Route Line Simulation (SVG Overlay) -->
+            <svg class="absolute top-0 left-0 h-full w-full pointer-events-none"
+                style="filter: drop-shadow(0px 0px 4px #135bec);">
+                <path d="M 180 150 Q 250 250 220 350 T 180 500" fill="none" stroke="#135bec" stroke-dasharray="10 5"
+                    stroke-linecap="round" stroke-width="4"></path>
+            </svg>
+            <!-- Driver Marker -->
+            <div class="absolute top-[35%] left-[55%] flex flex-col items-center -translate-x-1/2 -translate-y-1/2">
+                <div id="driver-marker"
+                    class="relative flex h-12 w-12 items-center justify-center rounded-full bg-primary shadow-[0_0_20px_rgba(19,91,236,0.6)] border-4 border-white dark:border-background-dark">
+                    <span class="material-symbols-outlined text-white text-xl">two_wheeler</span>
+                </div>
+                <div class="mt-2 rounded-md bg-surface-dark px-3 py-1 text-xs font-bold text-white shadow-lg">
+                    5분 거리
+                </div>
+            </div>
+            <!-- Destination Marker -->
+            <div class="absolute top-[60%] left-[45%] flex flex-col items-center -translate-x-1/2 -translate-y-1/2">
+                <div
+                    class="flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.8)] animate-pulse">
+                    <div class="h-2 w-2 rounded-full bg-primary"></div>
+                </div>
+                <div class="mt-2 text-xs font-bold text-white drop-shadow-md">집</div>
+            </div>
+        </div>
+        <!-- Bottom Sheet -->
+        <div
+            class="absolute bottom-0 z-10 w-full flex-col rounded-t-3xl bg-white dark:bg-surface-dark shadow-[0_-8px_30px_rgba(0,0,0,0.5)] h-auto max-h-[85vh] overflow-hidden flex">
+            <!-- Drag Handle -->
+            <div class="flex w-full flex-col items-center pt-3 pb-1 shrink-0">
+                <div class="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+            </div>
+            <div class="flex-1 overflow-y-auto pb-8">
+                <!-- Headline Section -->
+                <div class="px-6 pt-4 pb-6">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h1 id="arrival-time"
+                                class="text-3xl font-bold leading-tight text-gray-900 dark:text-white">12분 후 도착 예정</h1>
+                            <p class="mt-1 text-base font-normal text-gray-500 dark:text-gray-400">음식이 오고 있어요!</p>
+                        </div>
+                        <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <span class="material-symbols-outlined text-3xl">schedule</span>
+                        </div>
+                    </div>
+                    <!-- Progress Stepper -->
+                    <div class="mt-8">
+                        <div class="relative flex items-center justify-between w-full">
+                            <!-- Line Background -->
+                            <div
+                                class="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                            </div>
+                            <!-- Active Line -->
+                            <div
+                                class="absolute left-0 top-1/2 h-1 w-3/4 -translate-y-1/2 bg-primary rounded-full shadow-[0_0_10px_rgba(19,91,236,0.5)]">
+                            </div>
+                            <!-- Steps -->
+                            <div class="relative z-10 flex flex-col items-center gap-2">
+                                <div
+                                    class="flex size-6 items-center justify-center rounded-full bg-primary text-white shadow-lg ring-4 ring-white dark:ring-surface-dark">
+                                    <span class="material-symbols-outlined text-[14px] font-bold">check</span>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-primary">주문접수</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center gap-2">
+                                <div
+                                    class="flex size-6 items-center justify-center rounded-full bg-primary text-white shadow-lg ring-4 ring-white dark:ring-surface-dark">
+                                    <span class="material-symbols-outlined text-[14px] font-bold">restaurant</span>
+                                </div>
+                                <span
+                                    class="text-[10px] font-bold uppercase tracking-wider text-primary hidden sm:block">조리중</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center gap-2">
+                                <div
+                                    class="flex size-8 items-center justify-center rounded-full bg-primary text-white shadow-[0_0_15px_rgba(19,91,236,0.6)] ring-4 ring-white dark:ring-surface-dark animate-pulse">
+                                    <span class="material-symbols-outlined text-sm font-bold">local_shipping</span>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-white">배달중</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center gap-2 opacity-50">
+                                <div
+                                    class="flex size-6 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-400 ring-4 ring-white dark:ring-surface-dark">
+                                    <div class="size-2 rounded-full bg-current"></div>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500">도착</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="h-px w-full bg-gray-100 dark:bg-gray-800"></div>
+                <!-- Driver Profile -->
+                <div class="px-6 py-6">
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <img alt="Driver"
+                                class="size-14 rounded-full object-cover border-2 border-white dark:border-gray-600"
+                                data-alt="Portrait of delivery driver Michael"
+                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcXoy_W-3pYH6kX0EK8JHttcYCKq-nyjFQ1Xsv7H2PcsxK2FmEzHCkQSss92k5Gh3mhepwJAUyTGx52izEEgWhsfHDzrwU8I6FfptN8SNo5xf8Tl3wBsnhdLrVoN7HvcZ3tUvtNCcMe7uO3l1ql9CrNBh86nhv9adRoDBlHSVL09_J358PbnuBrdZ0ovC6NxHNIc2l8BlyMv19VX39EWh6gG0jH9xCW9xE14S3VkuAZtni2yseKhgPbEeTwp9-uFTAyugqMcEIz7Fo" />
+                            <div
+                                class="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full bg-primary text-white border border-white dark:border-surface-dark">
+                                <span class="material-symbols-outlined text-[12px]">star</span>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">김철수 라이더</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Yamaha NMAX • 12가 3456</p>
+                            <div class="flex items-center gap-1 mt-0.5">
+                                <span class="text-xs font-bold text-primary">4.9</span>
+                                <span class="text-xs text-gray-400">(124건 배달)</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button
+                                class="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                                <span class="material-symbols-outlined text-xl">chat</span>
+                            </button>
+                            <button
+                                class="flex size-10 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary/90 transition-colors">
+                                <span class="material-symbols-outlined text-xl">call</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Order Summary Accordion -->
+                <div class="mx-6 rounded-xl bg-gray-50 dark:bg-[#15181f] p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">주문 요약
+                        </h4>
+                        <span class="text-sm font-bold text-gray-900 dark:text-white">#Order-2849</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded bg-white dark:bg-surface-dark text-xs font-bold shadow-sm">
+                                    x1</div>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">스파이시 참치 롤</span>
+                            </div>
+                            <span class="text-sm font-bold text-gray-900 dark:text-white">12,000원</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded bg-white dark:bg-surface-dark text-xs font-bold shadow-sm">
+                                    x2</div>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">미소 장국</span>
+                            </div>
+                            <span class="text-sm font-bold text-gray-900 dark:text-white">6,000원</span>
+                        </div>
+                    </div>
+                    <div
+                        class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">합계</span>
+                        <span class="text-lg font-bold text-primary">18,000원</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
