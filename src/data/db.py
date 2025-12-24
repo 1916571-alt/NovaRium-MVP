@@ -2,8 +2,9 @@ import duckdb
 import os
 
 # Constants
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'novarium_local.db')
-RAW_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'raw_data')
+# Constants
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'novarium_local.db')
+RAW_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'raw_data')
 
 def initialize_db():
     print(f"Connecting to DuckDB at {DB_PATH}...")

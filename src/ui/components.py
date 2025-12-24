@@ -147,16 +147,20 @@ def render_navbar():
             st.rerun()
 
     with c_nav:
-        c1, c2, c3 = st.columns([1, 1, 1])
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
         with c1:
+            if st.button("🛠️ 데이터 랩 (Data Eng)", type="primary" if st.session_state['page']=='data_lab' else "secondary", use_container_width=True):
+                st.session_state['page'] = 'data_lab'
+                st.rerun()
+        with c2:
             if st.button("🔍 모니터링 (Monitor)", type="primary" if st.session_state['page']=='monitor' else "secondary", use_container_width=True):
                 st.session_state['page'] = 'monitor'
                 st.rerun()
-        with c2:
+        with c3:
             if st.button("🚀 마스터 클래스 (Lab)", type="primary" if st.session_state['page']=='study' else "secondary", use_container_width=True):
                 st.session_state['page'] = 'study'
                 st.rerun()
-        with c3:
+        with c4:
             if st.button("📚 회고록 (Retro)", type="primary" if st.session_state['page']=='portfolio' else "secondary", use_container_width=True):
                 st.session_state['page'] = 'portfolio'
                 st.rerun()

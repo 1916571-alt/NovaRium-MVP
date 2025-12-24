@@ -12,7 +12,7 @@ fake = Faker('ko_KR')
 NUM_USERS = 1000
 START_DATE = datetime.now() - timedelta(days=90)  # 3 months ago
 END_DATE = datetime.now()
-RAW_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'raw_data')
+RAW_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'raw_data')
 
 def setup_directories():
     if not os.path.exists(RAW_DATA_DIR):

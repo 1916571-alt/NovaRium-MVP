@@ -1,77 +1,431 @@
 <!DOCTYPE html>
-<html lang="ko">
+
+<html class="dark" lang="ko">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NovaEats - Order Now</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>NovaEats - 주문하기</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Icons -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Configuration -->
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Pretendard", "-apple-system", "system-ui", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <script src="/static/js/highlight.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f4f6; }
-        .banner-a { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
-        .banner-b { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; } /* Red for urgency */
+        /* Custom scrollbar hiding for horizontal scrolling */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif !important;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(700px, 100dvh);
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
 
-    <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border border-gray-200">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-slate-800">🍔 NovaEats</h1>
-            <div class="text-sm text-gray-400">User: {{ uid }} <span class="bg-slate-200 px-2 py-1 rounded text-xs text-slate-600 ml-1">{{ variant }}</span></div>
-        </div>
-
-        <!-- EXPERIMENT ZONE: Main Banner -->
-        <!-- Variant A: Blue (Standard) -->
-        {% if variant == 'A' %}
-        <div id="hero-banner" class="banner-a p-6 rounded-xl mb-6 shadow-lg transform transition hover:scale-105 cursor-pointer text-center" onclick="trackClick('banner_A')">
-            <div class="text-sm font-medium opacity-80 mb-1">Welcome Back!</div>
-            <h2 class="text-2xl font-bold mb-2">맛있는 음식이<br>기다리고 있어요</h2>
-            <button class="mt-2 bg-white text-blue-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm hover:bg-gray-50">주문하기</button>
-        </div>
-        {% else %}
-        <!-- Variant B: Red (Urgency/Promotion) -->
-        <div id="hero-banner" class="banner-b p-6 rounded-xl mb-6 shadow-lg transform transition hover:scale-105 cursor-pointer text-center" onclick="trackClick('banner_B')">
-            <div class="text-sm font-medium opacity-80 mb-1">⏰ 마감 임박</div>
-            <h2 class="text-2xl font-bold mb-2">첫 주문 기회!<br>3,000원 쿠폰</h2>
-            <button class="mt-2 bg-white text-red-600 px-4 py-2 rounded-full font-bold text-sm shadow-sm hover:bg-gray-50">쿠폰 받고 주문하기</button>
-        </div>
-        {% endif %}
-
-        <!-- Food List -->
-        <div class="space-y-4">
-            <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition cursor-pointer" onclick="trackClick('item_1')">
-                <div class="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center text-2xl">🍕</div>
-                <div>
-                    <div class="font-bold text-slate-800">Chesse Pizza</div>
-                    <div class="text-sm text-gray-500">$12.00</div>
-                </div>
+<body class="bg-background-light dark:bg-background-dark font-display min-h-screen pb-24">
+    <!-- Top App Bar -->
+    <header
+        class="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm px-4 pt-6 pb-2 transition-colors duration-300">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-col flex-1">
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">배달 주소</span>
+                <button class="flex items-center gap-1 group text-left">
+                    <span class="text-gray-900 dark:text-white text-base font-bold truncate max-w-[200px]">서울시 강남구 테헤란로
+                        427</span>
+                    <span
+                        class="material-symbols-outlined text-primary text-xl group-hover:translate-y-0.5 transition-transform">keyboard_arrow_down</span>
+                </button>
             </div>
-            <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition cursor-pointer" onclick="trackClick('item_2')">
-                <div class="w-16 h-16 bg-yellow-100 rounded-lg flex items-center justify-center text-2xl">🍔</div>
-                <div>
-                    <div class="font-bold text-slate-800">Classic Burger</div>
-                    <div class="text-sm text-gray-500">$8.50</div>
-                </div>
+            <!-- Experiment Debug Info -->
+            <div class="text-xs text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">
+                {{ uid }} <span class="font-bold text-primary">{{ variant }}</span>
             </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="mt-8 pt-4 border-t border-gray-100 text-center text-xs text-gray-400">
-            NovaRium Edu Virtual Environment
+            <button
+                class="relative flex items-center justify-center size-10 rounded-full bg-white dark:bg-[#1C2333] shadow-sm border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#252b3b] transition-colors">
+                <span class="material-symbols-outlined text-gray-600 dark:text-gray-300">notifications</span>
+                <span class="absolute top-2 right-2 size-2 bg-red-500 rounded-full"></span>
+            </button>
+            <button class="size-10 rounded-full overflow-hidden border-2 border-white dark:border-[#252b3b] shadow-sm">
+                <div class="w-full h-full bg-cover bg-center" data-alt="User profile picture placeholder"
+                    style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD5xSZayJbfJqRlESf7x0y29PVOWSzmKYZ_ap3E9IyHqcD_rpRnlSiJgxb26hYQocLSTf9nnOymHpJ7xsHU7lR5vHnvp_MpJL2Rl2-DeQmXs1GU4QYOvbeLNrlTqXAXD_5vAdTOAMfXnSk_lTDDpf1rHhb4L6mYCJ4DKF_V0LwPyb1PuzTvqTYJNugf3_sKDa2k-8Uq2LUPBOBNwQZzsdX9a8jTspE7dboPBKWAmyG3HTiPKuYV4zQqal6LTYyh7Iepsa2PGPrjxKKC');">
+                </div>
+            </button>
+        </div>
+    </header>
+    <!-- Search Bar -->
+    <div
+        class="px-4 py-2 sticky top-[72px] z-40 bg-background-light dark:bg-background-dark transition-colors duration-300">
+        <div class="relative group" onclick="window.location.href='/search'">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <span
+                    class="material-symbols-outlined text-gray-400 dark:text-gray-500 group-focus-within:text-primary transition-colors">search</span>
+            </div>
+            <input
+                class="block w-full pl-12 pr-12 py-3.5 bg-white dark:bg-[#1C2333] border-none rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/50 shadow-sm transition-all text-base"
+                placeholder="무엇을 드시고 싶으세요?" type="text" />
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                    class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-400 dark:text-gray-500">
+                    <span class="material-symbols-outlined text-[20px]">tune</span>
+                </button>
+            </div>
         </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- EXPERIMENT SECTION: Main Banner (A/B Test)    -->
+    <!-- ============================================== -->
+    <section class="mt-4">
+        <div class="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory px-4 gap-4 pb-4">
+
+            <!-- VARIANT A (Control): Standard Blue -->
+            {% if variant == 'A' %}
+            <div id="hero-banner" onclick="trackClick('banner_A')"
+                class="snap-center shrink-0 w-[85%] sm:w-[320px] relative rounded-2xl overflow-hidden h-44 group shadow-lg cursor-pointer">
+                <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                    style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCkAr4gfIM1nDLjGkxCxRtP-QxjoNPvTWp6AZ1brVWYnrrfrMaq6fXvd3cN_yoJ0P2XNyqbeyTrwWdcpWZDWKBnkI2uLcD9fHPsc5SFIwqdg18nnyni-PUwx0GBh6CRDDRZ6JVSanrGchkkKTHZ5icVunV5Rm-Ezw4Mv0knvKIMERAWMpEfrMHYUUSB0dRl4Bfbe741DOFYZR2qlxYR2DPk1Jfcn11cvOTsQzi8fnOH01i7tTviBlNRLjy-_GkuYBHqaU-Lq-qhn0Bk');">
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-900/90 via-blue-800/50 to-transparent"></div>
+                <div class="absolute inset-0 p-5 flex flex-col justify-center items-start">
+                    <span class="bg-blue-500 text-white text-xs font-bold px-2.5 py-1 rounded-md mb-2">환영합니다!</span>
+                    <h3 class="text-white text-2xl font-bold leading-tight mb-1">맛있는 음식이<br />기다리고 있어요</h3>
+                    <p class="text-blue-100 text-sm mb-4">우리 동네 인기 맛집 큐레이션</p>
+                    <button
+                        class="bg-white text-blue-900 text-xs font-bold px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">지금
+                        주문하기</button>
+                </div>
+            </div>
+
+            <!-- VARIANT B (Test): Urgent Red -->
+            {% else %}
+            <div id="hero-banner" onclick="trackClick('banner_B')"
+                class="snap-center shrink-0 w-[85%] sm:w-[320px] relative rounded-2xl overflow-hidden h-44 group shadow-lg cursor-pointer border-2 border-red-500/50">
+                <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                    style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCkAr4gfIM1nDLjGkxCxRtP-QxjoNPvTWp6AZ1brVWYnrrfrMaq6fXvd3cN_yoJ0P2XNyqbeyTrwWdcpWZDWKBnkI2uLcD9fHPsc5SFIwqdg18nnyni-PUwx0GBh6CRDDRZ6JVSanrGchkkKTHZ5icVunV5Rm-Ezw4Mv0knvKIMERAWMpEfrMHYUUSB0dRl4Bfbe741DOFYZR2qlxYR2DPk1Jfcn11cvOTsQzi8fnOH01i7tTviBlNRLjy-_GkuYBHqaU-Lq-qhn0Bk');">
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-r from-red-900/90 via-red-800/50 to-transparent"></div>
+                <div class="absolute inset-0 p-5 flex flex-col justify-center items-start">
+                    <span class="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-md mb-2 animate-pulse">⏰
+                        선착순 마감</span>
+                    <h3 class="text-white text-2xl font-bold leading-tight mb-1">첫 주문 즉시<br />50% 할인</h3>
+                    <p class="text-red-100 text-sm mb-4">쿠폰코드: <span
+                            class="font-mono font-bold text-white">URGENT50</span></p>
+                    <button
+                        class="bg-white text-red-700 text-xs font-bold px-4 py-2 rounded-full hover:bg-gray-100 transition-colors shadow-lg shadow-red-900/20">쿠폰
+                        받고 주문하기</button>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Promo Card 2 (Static) -->
+            <div
+                class="snap-center shrink-0 w-[85%] sm:w-[320px] relative rounded-2xl overflow-hidden h-44 group shadow-lg">
+                <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                    data-alt="Assorted colorful sushi platter"
+                    style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAhhmaOEnJ4f86mFlmKn-hGvRyh-CNaayyxEQXdrlcR-kMJmgqNukJKOwgisSPnqYHlCgQA6oglbITdA12s-2fJSw4-92OV4OaAlEN7WaCju4dn8IqfGvtNd0oumNbE88YyDlmtP5Q-92SdDV82AQ89TB4NGzOJW00DU0FZw0W6sT7cENhZ4Vqf83m6eEQzP_SnFJ0YK-evTn_MKslPuWARUIslS4usGEppTfbd5GaAqqFEB4RPqDqAnyPu3ms_C2xiTCxNG3quWeK4');">
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-r from-purple-900/80 via-purple-900/40 to-transparent">
+                </div>
+                <div class="absolute inset-0 p-5 flex flex-col justify-center items-start">
+                    <span class="bg-purple-500 text-white text-xs font-bold px-2.5 py-1 rounded-md mb-2">무료 배달</span>
+                    <h3 class="text-white text-2xl font-bold leading-tight mb-1">스시 매니아<br />특별 할인</h3>
+                    <p class="text-purple-200 text-sm mb-4">30,000원 이상 주문 시</p>
+                    <button
+                        class="bg-white text-purple-900 text-xs font-bold px-4 py-2 rounded-full hover:bg-gray-100 transition-colors">메뉴
+                        보기</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories -->
+    <section class="mt-2">
+        <div class="px-4 pb-2 flex items-center justify-between">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">카테고리</h2>
+            <button class="text-primary text-sm font-medium hover:text-primary/80">전체보기</button>
+        </div>
+        <div id="category-nav" class="flex overflow-x-auto hide-scrollbar px-4 gap-4 py-2">
+            <!-- Category Item -->
+            <button class="flex flex-col items-center gap-2 group min-w-[72px]" onclick="trackClick('cat_burger')">
+                <div
+                    class="size-16 rounded-2xl bg-white dark:bg-[#1C2333] p-1 shadow-sm group-hover:shadow-md group-hover:ring-2 group-hover:ring-primary/20 transition-all flex items-center justify-center">
+                    <div class="w-full h-full rounded-xl bg-cover bg-center"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDMjZZYy4cqKDdon8xklBRPA6mPdWGIut7Ejj9ap0c-b9wNlC5QLuiPZcRCZ_D_CvU-NArqojUrikkYybbZrofFBZ83kjw_k9m0WyikuKCHaCREoGAn7FfkixcNg8cMeLxt30Q--BaSWK54ksSA0NsR1NWVQhO6wMWJbyCJpERJTv0AIub6WrHcxVXqFOw9pvfddPhXYswItUO5EwYGbIdjGQlTQfNverFG1QVYa9mV93fW_ixVW8YD8TTRr3svKLJADmKSuqkCPDuY');">
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition-colors">버거</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 group min-w-[72px]">
+                <div
+                    class="size-16 rounded-2xl bg-white dark:bg-[#1C2333] p-1 shadow-sm group-hover:shadow-md group-hover:ring-2 group-hover:ring-primary/20 transition-all flex items-center justify-center">
+                    <div class="w-full h-full rounded-xl bg-cover bg-center"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCWUH4a9eGE-X0kKrzWiDL5O8iq5SxT_6mrY-0HC-7DkFNWZFokxoX9JeSgK8v6xp8_RpiAr2Z7AJX-rhyFaT_Q2J2A1EvFI44bw-dAfoagaX32yV18jH1-G_rXm1UKAFV7KDSgaWv4yRk4WaEAQSewBXWxXkFotVmsQvqnstpBvBudd0gphNiiSSr-K_25G7iqCG_Tf9v6h4LrBf0nLBrd2QCqaTbxJqEnQrbqgYAG0mLYUmit1CUD40cbUd43HqS58IN9AP54F6hz');">
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition-colors">피자</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 group min-w-[72px]">
+                <div
+                    class="size-16 rounded-2xl bg-white dark:bg-[#1C2333] p-1 shadow-sm group-hover:shadow-md group-hover:ring-2 group-hover:ring-primary/20 transition-all flex items-center justify-center">
+                    <div class="w-full h-full rounded-xl bg-cover bg-center"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDvzYJj9xnuoxxTt-QfURHcXoHnzq_KKYceUIw9hKSPT9C9Heau83mqG8cqFlwG1fc1eE3trMkL-6687qFRVKgfoCFsRReexi59P01qf1TAmRyKMffZpc51w4GQA6AE2DPFyXheYTEU-yhcNBjpsKm8nDHyb_eE9OCP6FgqbTAcPpY0OtSDrbKkV_gRrObFmC3_BHrCjxPNwt4WR6Yn-Dw6-dczE9ynCakf-NLnE3m2Moi4zF-Y3zN7NoCOGgwO_NcpL5dwfGyJ0WzD');">
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition-colors">아시안</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 group min-w-[72px]">
+                <div
+                    class="size-16 rounded-2xl bg-white dark:bg-[#1C2333] p-1 shadow-sm group-hover:shadow-md group-hover:ring-2 group-hover:ring-primary/20 transition-all flex items-center justify-center">
+                    <div class="w-full h-full rounded-xl bg-cover bg-center"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC2JGQf8SGWSzZ6DHz9xXId-8AXTuADqDpxGCmy8DwbkjHzX8AzsYbtc-B6xq_og3yhcg7pnJdmk1d6IPkGk0Ws9ulspPyM0w_c6dM64tKCp40GH-FBe4UPFL7Ex6gK56cHY08ypM7qaokHsgZiP3Ux8cX-qjf9stNprRtJnhwNsaO17RG9YJOqeEpoN0atrBLJ7wCrghI__k7nSoa8dLBtZWkwlxymw1ZuT_rHABUoHwGuWRDyujahheequD2LjzpdXbcFKYxf8i2A');">
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition-colors">건강식</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 group min-w-[72px]">
+                <div
+                    class="size-16 rounded-2xl bg-white dark:bg-[#1C2333] p-1 shadow-sm group-hover:shadow-md group-hover:ring-2 group-hover:ring-primary/20 transition-all flex items-center justify-center">
+                    <div class="w-full h-full rounded-xl bg-cover bg-center"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDllCXNZOvExmOY6LOdMjywWMlotPbhKGQqO13VX5z0TrlR6KraLKSoXOT398dpmBipPCx6ll17MWWAcONauVWU5J2NNxqWnWU6ycVSb8u5-khmlJF5R6lrgBGLY_nJjiu_rXPcls0s6TGi6y7xudNXaGd7jTgvljNlGdUgRz3oGisrzt0nJnaqA0KckPNnjfIaZ6u6utDv1jaHLJTG3-IAwDb0k_C2eik6x4MPY1KJ4KqC9UrEEl6etVc0YaZObwdRV5vz_9yeRaAZ');">
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition-colors">디저트</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Popular Near You -->
+    <section class="mt-6 px-4">
+        <div class="pb-3 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">주변 인기 맛집</h2>
+            <div class="flex gap-2">
+                <button
+                    class="size-8 rounded-full bg-white dark:bg-[#1C2333] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors shadow-sm">
+                    <span class="material-symbols-outlined text-lg">tune</span>
+                </button>
+            </div>
+        </div>
+        <div class="flex flex-col gap-6">
+            <!-- Restaurant Card 1 -->
+            <div class="group cursor-pointer" onclick="trackClick('restaurant_1'); window.location.href='/detail'">
+                <div class="relative h-48 w-full rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 mb-3">
+                    <div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                        data-alt="Grilled beef burger with fries on a wooden board"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBnuP34GLtTQ_qvw-DffQLfbL_anECW2u29qzeZfH0dycc_DV7OaLGEV6SE28u6qzu9NR-wyyXFb1R_uNvBjjOVt6kk7tBWFGsMM_AI1iixkqpE5VPd30nfHpbYtTlzG-4EZbAVIojpUfDRUIXTXXZBmdcZaCD5H5ED3wMKCdax3eagi_U1rzk2zO-4kvvz_ecT5OsuwKeQbrBd5SVXF0I1viJsHFhjSG94mgmSMy4pS-FhxVhGxdIrqPKX_ErF54ay65OYH03Qy2YM');">
+                    </div>
+                    <!-- Badges -->
+                    <div
+                        class="absolute top-3 left-3 bg-white dark:bg-[#1C2333] text-black dark:text-white text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                        <span class="material-symbols-outlined text-primary text-[14px] fill-current">bolt</span>
+                        20-30 분
+                    </div>
+                    <div
+                        class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 p-1.5 rounded-full backdrop-blur-sm">
+                        <span
+                            class="material-symbols-outlined text-gray-600 dark:text-white text-[18px]">favorite</span>
+                    </div>
+                    <!-- Promo Badge -->
+                    <div
+                        class="absolute bottom-3 left-3 bg-primary text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
+                        무료 배달
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-start">
+                        <h3
+                            class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">
+                            버거킹 (Burger King)</h3>
+                        <div
+                            class="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 dark:text-green-400">
+                            <span class="text-xs font-bold">4.5</span>
+                            <span class="material-symbols-outlined text-[12px] fill-current">star</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span>아메리칸</span>
+                        <span class="text-[8px]">•</span>
+                        <span>패스트푸드</span>
+                        <span class="text-[8px]">•</span>
+                        <span>$$</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Restaurant Card 2 -->
+            <div class="group cursor-pointer">
+                <div class="relative h-48 w-full rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 mb-3">
+                    <div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                        data-alt="Close up of a pepperoni pizza fresh from the oven"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuASK3NyrpqxNzoZdW3RH0tvnoeFWj22WVO6YXiypDQc-jcxQrKOmgdhn0MfZRuyrkC0GDbtz46tc3GNfyZM3gWgZnxpdxLS47K_3IJwRydXdOAZeDIJdYAY63aD8r5t8oE9prhQyM-f03VVhtd4PZXRtR2tj9AorVHeUVhjKdV8nI4sjUQZ6YOz65qpJlf9MvNtC_I5xwF-JDc8PtlKaf00uUl_enpgsSOKY8vgXneNzpucBpxjey3__P4emMMvVST7sz5PKbrqz_4M');">
+                    </div>
+                    <div
+                        class="absolute top-3 left-3 bg-white dark:bg-[#1C2333] text-black dark:text-white text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                        <span class="material-symbols-outlined text-gray-500 text-[14px]">schedule</span>
+                        35-45 분
+                    </div>
+                    <div
+                        class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 p-1.5 rounded-full backdrop-blur-sm">
+                        <span
+                            class="material-symbols-outlined text-gray-600 dark:text-white text-[18px]">favorite</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-start">
+                        <h3
+                            class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">
+                            피자헛 (Pizza Hut)</h3>
+                        <div
+                            class="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 dark:text-green-400">
+                            <span class="text-xs font-bold">4.2</span>
+                            <span class="material-symbols-outlined text-[12px] fill-current">star</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span>이탈리안</span>
+                        <span class="text-[8px]">•</span>
+                        <span>피자</span>
+                        <span class="text-[8px]">•</span>
+                        <span>$$$</span>
+                        <span class="text-[8px]">•</span>
+                        <span class="text-gray-400 dark:text-gray-500">배달비 3,000원</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Restaurant Card 3 -->
+            <div class="group cursor-pointer">
+                <div class="relative h-48 w-full rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 mb-3">
+                    <div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                        data-alt="Traditional japanese sushi rolls on a black plate"
+                        style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBh_p6mU802b8QH0C4W7ur61TPDOPfniE6fAhQRdsJsWKDn4qmQcCpcoFKBDv5-nOczVZJDaJeOctg0DqYieu1AuHeBI6xdJg50Z4yu7CELYSSsgaFzCMTFw828S25oMB3pOVWVQ1RjgA6FQP9bYt8czX2DvVuezL3zYaKs11nGVpgX90cJIgrMXpsOKfpY8XP8nCy0rqYMLbS_g4tC09UPFg80mOvNzBmIDzuKt1q3vQ4ZZ9QE3VmQ4P7Enk2znxzvAGk-GUf3uTFw');">
+                    </div>
+                    <div
+                        class="absolute top-3 left-3 bg-white dark:bg-[#1C2333] text-black dark:text-white text-xs font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                        <span class="material-symbols-outlined text-primary text-[14px] fill-current">bolt</span>
+                        15-25 분
+                    </div>
+                    <div
+                        class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 p-1.5 rounded-full backdrop-blur-sm">
+                        <span
+                            class="material-symbols-outlined text-gray-600 dark:text-white text-[18px]">favorite</span>
+                    </div>
+                    <div
+                        class="absolute bottom-3 left-3 bg-primary text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
+                        25,000원 이상 5,000원 할인
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-start">
+                        <h3
+                            class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">
+                            스시 마스터 (Sushi Master)</h3>
+                        <div
+                            class="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded text-green-700 dark:text-green-400">
+                            <span class="text-xs font-bold">4.8</span>
+                            <span class="material-symbols-outlined text-[12px] fill-current">star</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span>일식</span>
+                        <span class="text-[8px]">•</span>
+                        <span>초밥</span>
+                        <span class="text-[8px]">•</span>
+                        <span>$$$$</span>
+                        <span class="text-[8px]">•</span>
+                        <span class="text-gray-400 dark:text-gray-500">무료 배달</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <div class="h-20"></div> <!-- Spacer for bottom nav -->
+    <!-- Bottom Navigation -->
+    <nav
+        class="fixed bottom-0 w-full bg-white dark:bg-[#1C2333] border-t border-gray-100 dark:border-gray-800 pb-safe z-50">
+        <div class="flex justify-around items-center h-16 px-2">
+            <button class="flex flex-col items-center justify-center w-full h-full gap-1 text-primary">
+                <span class="material-symbols-outlined fill-current">home</span>
+                <span class="text-[10px] font-medium">홈</span>
+            </button>
+            <button
+                class="flex flex-col items-center justify-center w-full h-full gap-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                onclick="window.location.href='/search'">
+                <span class="material-symbols-outlined">search</span>
+                <span class="text-[10px] font-medium">검색</span>
+            </button>
+            <div class="relative -top-5">
+                <button
+                    class="flex items-center justify-center size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 hover:scale-105 transition-transform"
+                    onclick="window.location.href='/cart'">
+                    <span class="material-symbols-outlined">shopping_bag</span>
+                </button>
+            </div>
+            <button
+                class="flex flex-col items-center justify-center w-full h-full gap-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                onclick="window.location.href='/tracking'">
+                <span class="material-symbols-outlined">receipt_long</span>
+                <span class="text-[10px] font-medium">주문내역</span>
+            </button>
+            <button
+                class="flex flex-col items-center justify-center w-full h-full gap-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                <span class="material-symbols-outlined">person</span>
+                <span class="text-[10px] font-medium">MY</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- TRACKING SCRIPT (Preserved from original) -->
     <script>
         const uid = "{{ uid }}";
 
         async function trackClick(element) {
             console.log("Click tracked:", element);
-            
-            // Visual Feedback
-            const banner = document.getElementById('hero-banner');
-            banner.style.opacity = '0.7';
-            setTimeout(() => banner.style.opacity = '1.0', 200);
+
+            // Touch feedback
+            const el = event.currentTarget;
+            el.style.transform = "scale(0.98)";
+            setTimeout(() => el.style.transform = "scale(1)", 150);
 
             // API Call
             const formData = new FormData();
@@ -83,24 +437,24 @@
                     method: "POST",
                     body: formData
                 });
-                
-                // If it's a banner click, simulate conversion/purchase chance
-                if(element.includes('banner')) {
-                    // Random purchase simulation for visual effect (client-side only for demo)
-                    if(Math.random() > 0.7) {
-                        // Purchase!
+
+                // Simulation Logic: Random Purchase if it's a "Buy" action
+                // For demo purposes, we treat any banner click or cart click as potential conversion
+                if (element.includes('banner') || element.includes('cart')) {
+                    if (Math.random() > 0.6) { // 40% conversion chance on click (optimistic for demo)
                         const orderData = new FormData();
                         orderData.append("uid", uid);
-                        orderData.append("amount", 25000);
+                        orderData.append("amount", 25000 + Math.floor(Math.random() * 10000));
                         await fetch("/order", { method: "POST", body: orderData });
-                        alert("🎉 주문 완료! (Conversion Tracked)");
+                        console.log("Order simulated!");
                     }
                 }
 
-            } catch(e) {
+            } catch (e) {
                 console.error("Tracking failed", e);
             }
         }
     </script>
 </body>
+
 </html>

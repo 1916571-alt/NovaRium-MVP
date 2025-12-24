@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>상세 페이지</title>
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&amp;display=swap"
+    rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+    rel="stylesheet" />
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#135bec",
+            "background-light": "#f6f6f8",
+            "background-dark": "#101622",
+            "surface-dark": "#1a2332",
+          },
+          fontFamily: {
+            "display": ["Pretendard", "sans-serif"]
+          },
+          borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+        },
+      },
+    }
+  </script>
+  <script src="/static/js/highlight.js"></script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    body {
+      font-family: 'Pretendard', sans-serif !important;
+    }
+  </style>
+  <style>
+    body {
+      min-height: max(700px, 100dvh);
+    }
+  </style>
+</head>
+
+<body
+  class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white transition-colors duration-200">
+  <div
+    class="relative flex min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark">
+    <!-- Top App Bar (Transparent overlay on image) -->
+    <div
+      class="absolute top-0 left-0 right-0 z-20 flex items-center p-4 pt-12 justify-between bg-gradient-to-b from-black/60 to-transparent">
+      <button
+        class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
+        onclick="window.history.back()">
+        <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+      </button>
+      <div class="flex items-center gap-3">
+        <button
+          class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors">
+          <span class="material-symbols-outlined text-[24px]">search</span>
+        </button>
+        <button
+          class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors">
+          <span class="material-symbols-outlined text-[24px]">share</span>
+        </button>
+      </div>
+    </div>
+    <!-- Hero Header Image -->
+    <div class="relative w-full h-80 shrink-0">
+      <div class="w-full h-full bg-center bg-no-repeat bg-cover"
+        data-alt="Juicy gourmet burger with melting cheese and fresh lettuce"
+        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDtIwZeK9zEZsG5yp1fVRexV9GuPYVLtVOIi6nltInC5qaqA3ZaPOAkE2taJkh0grB11_CXuG9MjuOGRzme-OZXc2iPlD-hsob9GcpOI_IGFVIqw1ilSkbC49UKPfy5uX-aIkTLRfDvXploVo8gAlVpwnHjygT_e3h7N4z6ZDDTbZp4XXHYCX7cZAgcIhwmmvaI_QLo14kNOlk898dHbQy6Ddw5jsjzjbVAtDkFHD9oKye-ayNzfNWuEcA7u_RRHT0J1T2naBVqq0tl");'>
+      </div>
+      <!-- Gradient Overlay for text readability at bottom of hero -->
+      <div class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background-dark to-transparent"></div>
+    </div>
+    <!-- Restaurant Info Section -->
+    <div class="px-5 -mt-8 relative z-10">
+      <h1 class="text-3xl font-bold leading-tight mb-2">버거앤코 (Burger &amp; Co.)</h1>
+      <div class="flex items-center gap-1 mb-4">
+        <span class="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1">
+          4.8 <span class="material-symbols-outlined text-[12px] fill-1">star</span>
+        </span>
+        <span class="text-slate-500 dark:text-slate-400 text-sm">(200+ 평가)</span>
+        <span class="text-slate-500 dark:text-slate-400 text-sm mx-1">•</span>
+        <span class="text-slate-500 dark:text-slate-400 text-sm">버거</span>
+        <span class="text-slate-500 dark:text-slate-400 text-sm mx-1">•</span>
+        <span class="text-slate-500 dark:text-slate-400 text-sm">$$</span>
+      </div>
+      <!-- Info Chips -->
+      <div class="flex flex-wrap gap-3 mb-6">
+        <div class="flex items-center gap-2 bg-slate-200 dark:bg-surface-dark px-3 py-1.5 rounded-lg">
+          <span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+          <span class="text-sm font-medium">20-30 분</span>
+        </div>
+        <div class="flex items-center gap-2 bg-slate-200 dark:bg-surface-dark px-3 py-1.5 rounded-lg">
+          <span class="material-symbols-outlined text-primary text-[18px]">location_on</span>
+          <span class="text-sm font-medium">1.2 km</span>
+        </div>
+        <div class="flex items-center gap-2 bg-slate-200 dark:bg-surface-dark px-3 py-1.5 rounded-lg">
+          <span class="material-symbols-outlined text-primary text-[18px]">local_shipping</span>
+          <span class="text-sm font-medium">무료 배달</span>
+        </div>
+      </div>
+    </div>
+    <!-- Sticky Tabs Navigation -->
+    <div
+      class="sticky top-0 z-30 bg-background-light dark:bg-background-dark/95 backdrop-blur shadow-sm border-b border-slate-200 dark:border-slate-800">
+      <div class="flex overflow-x-auto no-scrollbar px-5 gap-6 pt-2">
+        <a class="flex flex-col items-center justify-center border-b-[3px] border-primary text-primary pb-3 min-w-fit"
+          href="#">
+          <p class="text-sm font-bold leading-normal tracking-[0.015em]">인기 메뉴</p>
+        </a>
+        <a class="flex flex-col items-center justify-center border-b-[3px] border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white pb-3 min-w-fit"
+          href="#">
+          <p class="text-sm font-bold leading-normal tracking-[0.015em]">버거</p>
+        </a>
+        <a class="flex flex-col items-center justify-center border-b-[3px] border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white pb-3 min-w-fit"
+          href="#">
+          <p class="text-sm font-bold leading-normal tracking-[0.015em]">콤보</p>
+        </a>
+        <a class="flex flex-col items-center justify-center border-b-[3px] border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white pb-3 min-w-fit"
+          href="#">
+          <p class="text-sm font-bold leading-normal tracking-[0.015em]">사이드</p>
+        </a>
+      </div>
+    </div>
+    <!-- Featured Section (Horizontal Scroll) -->
+    <div class="py-6 border-b border-slate-200 dark:border-slate-800/50">
+      <div class="px-5 mb-4 flex justify-between items-end">
+        <h2 class="text-xl font-bold">추천 메뉴</h2>
+      </div>
+      <div class="flex overflow-x-auto no-scrollbar px-5 gap-4 pb-2">
+        <!-- Featured Card 1 -->
+        <div class="w-64 shrink-0 flex flex-col gap-3 group cursor-pointer">
+          <div class="relative w-full h-40 rounded-xl overflow-hidden">
+            <div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+              data-alt="Double beef burger with cheese and bacon on wooden board"
+              style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAW5qC4BhYhVFswfofZuJQweBlBOWzas5jK0Mzf2ZAzvljyrxuB4fM7GpRAZYPN54bDu91MiqY-zd1DS3TV2Y3jVYQmWjIsmypx03qh6ygT04pRNK_v0pk80WDP0C0uCGxQi7Yl5LywdzNlhpW8PgMHvNdkVoDiWZ0sesJS3B0-4MvdoDWNdT9jDjdDU4Uz9tqJttvj4R10N1KPL1ObkqTELh4Ajt0muWXE9FWnqRfdzI80X4xpm-gndw0e7hD-3GK2J1cfHLOKw0Vm");'>
+            </div>
+            <div class="absolute top-2 left-2 bg-primary text-white text-xs font-bold px-2 py-1 rounded">인기</div>
+          </div>
+          <div>
+            <h3 class="font-bold text-lg leading-tight mb-1">더블 스매쉬</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-sm line-clamp-2 mb-2">두 장의 스매쉬 패티, 더블 아메리칸 치즈, 특제 소스.</p>
+            <div class="flex items-center justify-between">
+              <span id="price-tag" class="font-bold text-lg">14,500원</span>
+              <button id="add-to-cart-btn"
+                class="size-8 rounded-full bg-slate-200 dark:bg-surface-dark flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-[20px]">add</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Featured Card 2 -->
+        <div class="w-64 shrink-0 flex flex-col gap-3 group cursor-pointer">
+          <div class="relative w-full h-40 rounded-xl overflow-hidden">
+            <div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+              data-alt="Crispy spicy chicken burger with coleslaw"
+              style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA4twQ7cDkq2tO5NxHKaDliDydrXps6wYgh-dbweXVr5uurm5KaivcWMFQ5OvMVQF6TrqemTyNHoDlsim_fAJiGVJrHdKzwjNN-JqN2xMSUQOGbGLARLM5v49n69U_0HKQ4vbbqQfJeVOm0RjTzAlsm1KIzogRfTKXaz5OdSyIwWRa_5nmalImwzx0IcdMdKkcLATgc3G7AUF0-y6sYodmF4Qi8CbFhcSpwjwmxg2gLpd9QHJc7A_Aryt3u8cg0gG3coxrsvxcyoNgX");'>
+            </div>
+          </div>
+          <div>
+            <h3 class="font-bold text-lg leading-tight mb-1">스파이시 치킨</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-sm line-clamp-2 mb-2">바삭한 닭가슴살 튀김, 매콤 마요, 피클, 양상추.</p>
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-lg">12,900원</span>
+              <button
+                class="size-8 rounded-full bg-slate-200 dark:bg-surface-dark flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-[20px]">add</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Menu List Section -->
+    <div class="px-5 pb-32">
+      <!-- Category Header -->
+      <div class="pt-6 pb-4">
+        <h2 class="text-2xl font-bold">버거 (Burgers)</h2>
+      </div>
+      <!-- Menu Item 1 -->
+      <div class="flex gap-4 py-4 border-b border-slate-200 dark:border-slate-800/50">
+        <div class="flex-1 flex flex-col justify-between">
+          <div>
+            <h3 class="text-lg font-bold mb-1">클래식 치즈버거</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-sm line-clamp-2 leading-relaxed">쿼터파운드 비프 패티, 체다 치즈, 양상추,
+              토마토, 양파, 피클.</p>
+          </div>
+          <div class="flex items-center justify-between mt-3">
+            <span class="font-bold text-lg">10,000원</span>
+            <button
+              class="h-8 px-4 rounded-full bg-slate-200 dark:bg-surface-dark text-primary text-sm font-bold hover:bg-primary hover:text-white transition-colors flex items-center gap-1">
+              담기 <span class="material-symbols-outlined text-[16px]">add</span>
+            </button>
+          </div>
+        </div>
+        <div class="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-slate-200 dark:bg-surface-dark">
+          <div class="w-full h-full bg-cover bg-center" data-alt="Classic cheeseburger with fresh vegetables"
+            style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCa8ba9OXxHIaoHaG9CmXrVB5hkjEZyr-bVEKY4h-9o4HGQ3A_qeK1p_PmqJFjkjKHGAgcmL_B5TRcUk4tE-t9fh5-wcHg1hnikEtjmhnIxZ5hAeEc4PTYCjmnM-zsRxphWbYsusnK42unhWrSwF-6yud9piZIz-rr0QSg7AzHmBshQdnqg0ixGFL73hdplg_nWXsBHrnCa3RQ6Dj03k25LeyCUW4msABZ7r4Ccgt1MWzDOUehY6jWG5DS6CLNMzdDNUP6VYXyXn3y6");'>
+          </div>
+        </div>
+      </div>
+      <!-- Menu Item 2 -->
+      <div class="flex gap-4 py-4 border-b border-slate-200 dark:border-slate-800/50">
+        <div class="flex-1 flex flex-col justify-between">
+          <div>
+            <h3 class="text-lg font-bold mb-1">머쉬룸 스위스</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-sm line-clamp-2 leading-relaxed">볶은 버섯, 스위스 치즈, 카라멜 라이징
+              양파.</p>
+          </div>
+          <div class="flex items-center justify-between mt-3">
+            <span class="font-bold text-lg">13,500원</span>
+            <button
+              class="h-8 px-4 rounded-full bg-slate-200 dark:bg-surface-dark text-primary text-sm font-bold hover:bg-primary hover:text-white transition-colors flex items-center gap-1">
+              담기 <span class="material-symbols-outlined text-[16px]">add</span>
+            </button>
+          </div>
+        </div>
+        <div class="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-slate-200 dark:bg-surface-dark">
+          <div class="w-full h-full bg-cover bg-center" data-alt="Gourmet mushroom burger with melted swiss cheese"
+            style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCllrdOdRTbKy32NvBULifsDjXCndKFWmjum52qxDu4cFXcf3ksiVmCfhtpLhqLMqBgRjqtw49zTrm-eRwqt1G2WwlAXUC-4KZL2k9C0zWnJ00iq5V5ONm3QeOfPYne81NI-26thyXUJHpflCtZIuudUueSrkWfkZwtPFvhgWVwl0soXxxUzKzxByjzmblOgTwsjvvCb_mqhBq0BwuZ8b-OZBife7IK4QImCiMcU1524ZIRlly_737bxoq5HOrFxYp50f2ZeKazBh3L");'>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Sticky Bottom Cart Bar -->
+    <div
+      class="fixed bottom-0 left-0 right-0 p-4 bg-background-light dark:bg-background-dark border-t border-slate-200 dark:border-slate-800 z-50 max-w-md mx-auto">
+      <button
+        class="w-full bg-primary text-white h-14 rounded-xl flex items-center justify-between px-6 hover:bg-blue-600 transition-colors shadow-lg shadow-blue-900/20"
+        onclick="window.location.href='/cart'">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center justify-center bg-white/20 size-8 rounded-full text-sm font-bold">2</div>
+          <div class="flex flex-col items-start">
+            <span class="text-xs text-blue-100 font-medium">합계</span>
+            <span class="text-base font-bold">24,000원</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 font-bold">
+          장바구니 보기
+          <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+        </div>
+      </button>
+    </div>
+  </div>
+</body>
+
+</html>

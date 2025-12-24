@@ -58,28 +58,30 @@ def generate_history():
             # 2. Click Event
             if random.random() < ctr:
                 click_time = visit_time + timedelta(seconds=random.randint(2, 60))
-                events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time))
+                events.append((f'evt_click_{user_counter}', uid, 'click_banner', click_time, 0.0))
                 
                 # 3. Order Event
                 if random.random() < cvr:
                     order_time = click_time + timedelta(seconds=random.randint(30, 300))
-                    events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time))
+                    # Random Amount between 15000 and 50000 KRW
+                    amount = float(random.randint(15000, 50000))
+                    events.append((f'evt_order_{user_counter}', uid, 'purchase', order_time, amount))
 
     # Bulk Insert
     print("[+] Saving to DuckDB...")
     df_u = pd.DataFrame(users, columns=['uid', 'eid', 'var', 'ts'])
-    df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts'])
+    df_e = pd.DataFrame(events, columns=['eid', 'uid', 'name', 'ts', 'val'])
     
     # We need to match schema:
     # assignments: user_id, experiment_id, variant, assigned_at
-    # events: event_id, user_id, event_name, timestamp
+    # events: event_id, user_id, event_name, timestamp, value
     
     # Fix column names for insert
     # assignments
     con.execute("INSERT INTO assignments SELECT uid, eid, var, ts FROM df_u")
     
     # events (event_id is first arg in tuple)
-    con.execute("INSERT INTO events SELECT eid, uid, name, ts FROM df_e")
+    con.execute("INSERT INTO events SELECT eid, uid, name, ts, val FROM df_e")
     
     con.close()
     print("[*] History Generation Complete!")

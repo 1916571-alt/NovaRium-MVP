@@ -6,8 +6,8 @@ import pandas as pd
 from scipy import stats
 
 # Constants (DB Path)
-# Assuming this script is in scripts/ folder, so db is one level up
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'novarium_local.db')
+# Assuming this script is in src/core/ folder, so db is two levels up
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'novarium_local.db')
 
 def get_connection():
     """
@@ -15,16 +15,21 @@ def get_connection():
     """
     return duckdb.connect(DB_PATH)
 
-def run_query(query, con):
+def run_query(query, con=None):
     """
     Execute a SQL query and return the result as a DataFrame.
-    Gracefully handles errors by returning string error message or empty DF.
+    Handles connection lifecycle if con is None (Transient Read-Only).
+    Gracefully handles errors by returning empty DF.
     """
     try:
-        return con.execute(query).df()
+        if con:
+            return con.execute(query).df()
+        else:
+            with duckdb.connect(DB_PATH, read_only=True) as conn:
+                return conn.execute(query).df()
     except Exception as e:
         print(f"Query Error: {e}")
-        return str(e)
+        return pd.DataFrame() # Return empty DF to prevent dashboard crash
 
 def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     """

@@ -3,10 +3,10 @@ import numpy as np
 import sys
 import os
 
-# Add scripts to path to import modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+# Add root to path to import src modules
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-import analytics as al
+from src.core import stats as al
 
 def test_calculate_sample_size():
     # Baseline 10%, MDE 50% (Target 15%) -> Large effect, small sample
