@@ -1317,8 +1317,9 @@ GROUP BY 1
                 with col_adopt:
                     if st.button("✅ 채택 (Adopt)", type="primary", use_container_width=True):
                         # Save adoption intent to session state (will be saved with retrospective)
+                        # variant_config stores the winning variant info for Target App
                         st.session_state['pending_adoption'] = {
-                            'variant': st.session_state.get('test_variant', {}),
+                            'variant': {'winning_variant': 'B', 'banner_type': 'test'},  # Adopting means Test variant (B) won
                             'experiment_id': current_run_id,
                             'lift': res['lift'],
                             'p_value': res['p_value'],
@@ -1658,9 +1659,30 @@ GROUP BY 1
 elif st.session_state['page'] == 'portfolio':
     st.title("📚 실험 회고록 (Experiment Retrospective)")
 
-    # Show Adoption History first
+    # Load all experiments data
+    df_history = al.run_query("SELECT * FROM experiments ORDER BY created_at DESC")
+
+    # Sidebar filters
+    with st.sidebar:
+        st.markdown("### 필터")
+
+        # Get unique targets for filtering
+        if not df_history.empty:
+            targets = ['전체'] + sorted(df_history['target'].dropna().unique().tolist())
+            selected_target = st.selectbox("대상 (Target)", targets)
+
+            # Decision filter
+            decisions = ['전체', 'positive', 'negative', 'neutral']
+            selected_decision = st.selectbox("결과", decisions)
+        else:
+            selected_target = '전체'
+            selected_decision = '전체'
+
+    # ==========================================
+    # Section 1: Adopted Experiments
+    # ==========================================
     st.markdown("### ✅ 채택된 실험 (Adopted Experiments)")
-    st.caption("플랫폼에 실제로 적용된 성공적인 실험들")
+    st.caption("플랫폼에 실제로 적용되어 비즈니스에 기여한 실험들")
 
     try:
         df_adoptions = al.run_query("""
@@ -1671,22 +1693,50 @@ elif st.session_state['page'] == 'portfolio':
                 a.p_value,
                 e.hypothesis,
                 e.target,
-                e.primary_metric
+                e.primary_metric,
+                e.learning_note,
+                e.control_rate,
+                e.test_rate,
+                e.guardrails,
+                e.guardrail_results
             FROM adoptions a
             LEFT JOIN experiments e ON a.experiment_id = e.run_id
             ORDER BY a.adopted_at DESC
         """)
 
         if not df_adoptions.empty:
-            for _, row in df_adoptions.iterrows():
-                with st.container(border=True):
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"**✨ {row.get('hypothesis', '실험 가설')}**")
-                        st.caption(f"📍 Target: {row.get('target', 'N/A')} | 📊 Metric: {row.get('primary_metric', 'N/A')}")
-                    with col2:
-                        st.metric("Lift", f"+{row['lift']*100:.1f}%", delta=f"p={row['p_value']:.4f}")
-                    st.caption(f"🕐 채택일시: {row['adopted_at']}")
+            # Group by target
+            grouped = df_adoptions.groupby('target')
+            for target_name, group in grouped:
+                with st.expander(f"📍 {target_name or '미분류'} ({len(group)}건)", expanded=True):
+                    for _, row in group.iterrows():
+                        with st.container(border=True):
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.markdown(f"**✨ {row.get('hypothesis', '실험 가설')}**")
+                                st.caption(f"📊 Metric: {row.get('primary_metric', 'N/A')}")
+                            with col2:
+                                lift_val = row['lift'] * 100 if row['lift'] else 0
+                                st.metric("Lift", f"{lift_val:+.1f}%", delta=f"p={row['p_value']:.4f}" if row['p_value'] else "N/A")
+
+                            # Expandable details
+                            with st.expander("상세 보기"):
+                                detail_col1, detail_col2 = st.columns(2)
+                                with detail_col1:
+                                    st.markdown("**📈 성과 지표**")
+                                    st.write(f"- Control 전환율: {row.get('control_rate', 0):.2f}%")
+                                    st.write(f"- Test 전환율: {row.get('test_rate', 0):.2f}%")
+                                    st.write(f"- 상대적 개선: {lift_val:+.1f}%")
+                                with detail_col2:
+                                    st.markdown("**🛡️ 가드레일**")
+                                    st.write(f"- 설정: {row.get('guardrails', 'N/A')}")
+                                    st.write(f"- 결과: {row.get('guardrail_results', 'N/A')}")
+
+                                if row.get('learning_note'):
+                                    st.markdown("**📝 학습 내용**")
+                                    st.info(row['learning_note'])
+
+                            st.caption(f"🕐 채택일시: {row['adopted_at']}")
         else:
             st.info("아직 채택된 실험이 없습니다. 성공적인 실험을 채택하면 여기에 표시됩니다!")
     except Exception as e:
@@ -1694,14 +1744,92 @@ elif st.session_state['page'] == 'portfolio':
 
     st.divider()
 
-    # Show all experiment history
+    # ==========================================
+    # Section 2: All Experiments by Category
+    # ==========================================
     st.markdown("### 📋 전체 실험 기록 (All Experiments)")
-    df_history = al.run_query("SELECT * FROM experiments ORDER BY created_at DESC")
 
     if df_history.empty:
         st.info("실험 기록이 없습니다.")
     else:
-        for _, row in df_history.iterrows():
-            with st.container(border=True):
-                st.markdown(f"**{row['hypothesis']}**")
-                st.caption(f"{row['created_at']} | Result: {row['decision']}")
+        # Apply filters
+        filtered_df = df_history.copy()
+        if selected_target != '전체':
+            filtered_df = filtered_df[filtered_df['target'] == selected_target]
+        if selected_decision != '전체':
+            filtered_df = filtered_df[filtered_df['decision'] == selected_decision]
+
+        if filtered_df.empty:
+            st.info("선택한 필터에 해당하는 실험이 없습니다.")
+        else:
+            # Group by target
+            grouped = filtered_df.groupby('target')
+
+            for target_name, group in grouped:
+                with st.expander(f"📍 {target_name or '미분류'} ({len(group)}건)", expanded=True):
+                    for _, row in group.iterrows():
+                        # Determine result badge
+                        decision = row.get('decision', '')
+                        if decision == 'positive':
+                            badge = "🟢 Significant Winner"
+                            badge_color = "green"
+                        elif decision == 'negative':
+                            badge = "🔴 Significant Loser"
+                            badge_color = "red"
+                        else:
+                            badge = "🟡 Inconclusive"
+                            badge_color = "orange"
+
+                        with st.container(border=True):
+                            col1, col2, col3 = st.columns([3, 1, 1])
+                            with col1:
+                                st.markdown(f"**{row.get('hypothesis', '실험 가설')}**")
+                                st.caption(f"📊 {row.get('primary_metric', 'N/A')} | {str(row.get('created_at', ''))[:10] if row.get('created_at') else 'N/A'}")
+                            with col2:
+                                lift = row.get('lift', 0) or 0
+                                st.metric("Lift", f"{lift*100:+.1f}%" if lift else "N/A")
+                            with col3:
+                                st.markdown(f"<span style='background-color:{badge_color};color:white;padding:2px 8px;border-radius:4px;font-size:12px;'>{badge.split(' ')[0]} {badge.split(' ')[1] if len(badge.split(' '))>1 else ''}</span>", unsafe_allow_html=True)
+
+                            # Expandable experiment details
+                            with st.expander("📄 실험 상세"):
+                                st.markdown("**가설 (Hypothesis)**")
+                                st.write(row.get('hypothesis', 'N/A'))
+
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    st.markdown("**📈 결과 지표**")
+                                    st.write(f"- Control 전환율: {row.get('control_rate', 0):.2f}%")
+                                    st.write(f"- Test 전환율: {row.get('test_rate', 0):.2f}%")
+                                    st.write(f"- p-value: {row.get('p_value', 'N/A')}")
+
+                                with col_b:
+                                    st.markdown("**🛡️ 가드레일**")
+                                    st.write(f"- 설정: {row.get('guardrails', 'N/A')}")
+                                    st.write(f"- 결과: {row.get('guardrail_results', 'N/A')}")
+
+                                if row.get('learning_note'):
+                                    st.markdown("**📝 학습 및 인사이트**")
+                                    st.info(row['learning_note'])
+
+                                st.caption(f"Run ID: {row.get('run_id', 'N/A')}")
+
+    # ==========================================
+    # Section 3: Summary Statistics
+    # ==========================================
+    st.divider()
+    st.markdown("### 📊 실험 요약 통계")
+
+    if not df_history.empty:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("총 실험 수", len(df_history))
+        with col2:
+            positive_count = len(df_history[df_history['decision'] == 'positive'])
+            st.metric("성공 (Positive)", positive_count)
+        with col3:
+            negative_count = len(df_history[df_history['decision'] == 'negative'])
+            st.metric("실패 (Negative)", negative_count)
+        with col4:
+            win_rate = (positive_count / len(df_history) * 100) if len(df_history) > 0 else 0
+            st.metric("승률", f"{win_rate:.1f}%")

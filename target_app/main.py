@@ -86,11 +86,15 @@ def get_adopted_variant():
                 LIMIT 1
             """).fetchone()
 
-            if result:
+            if result and result[0]:
                 import json
                 variant_config = json.loads(result[0])
-                logger.info(f"Adopted variant detected: {variant_config}")
-                return variant_config
+                # Check if variant_config has actual content (not empty dict)
+                if variant_config and isinstance(variant_config, dict) and variant_config.get('winning_variant'):
+                    logger.info(f"Adopted variant detected: {variant_config}")
+                    return variant_config
+                else:
+                    logger.warning(f"Invalid variant_config found: {variant_config}")
     except Exception as e:
         logger.warning(f"No adoptions table or error: {e}")
 
@@ -101,8 +105,9 @@ def get_assignment(uid: str):
     adopted = get_adopted_variant()
     if adopted:
         # If experiment was adopted, show winning variant to everyone
-        logger.info("Using adopted variant for all users")
-        return 'B'  # Adopted variant is always the test variant
+        winning = adopted.get('winning_variant', 'B')
+        logger.info(f"Using adopted variant for all users: {winning}")
+        return winning
 
     # Otherwise, use deterministic split for A/B testing
     hash_val = int(hashlib.md5(uid.encode()).hexdigest(), 16)
