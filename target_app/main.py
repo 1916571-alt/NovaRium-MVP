@@ -183,39 +183,42 @@ class SqlRequest(BaseModel):
 
 @app.post("/admin/execute_sql")
 async def execute_sql(body: SqlRequest):
-    global db_con
-    if not db_con:
-        return {"status": "error", "message": "DB not connected"}
-    
     try:
         logger.info("Executing Admin SQL")
-        with db_lock:
-            result = None
-            columns = []
-            try:
-                db_con.execute(body.sql)
+
+        # Determine if this is a write operation (CREATE, INSERT, UPDATE, DELETE, etc.)
+        sql_upper = body.sql.strip().upper()
+        is_write_op = any(sql_upper.startswith(kw) for kw in ['CREATE', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER'])
+
+        result = None
+        columns = []
+
+        if is_write_op:
+            # Use temporary write connection for write operations
+            logger.info("Using write connection for admin SQL")
+            with duckdb.connect(DB_PATH) as write_con:
                 try:
-                    result = db_con.fetchall()
+                    write_con.execute(body.sql)
+                    try:
+                        result = write_con.fetchall()
+                        if write_con.description:
+                            columns = [desc[0] for desc in write_con.description]
+                    except Exception:
+                        # Query probably didn't return rows (e.g. INSERT/UPDATE)
+                        pass
+                except Exception as e:
+                    raise e
+        else:
+            # Use read-only connection for SELECT queries
+            logger.info("Using read-only connection for admin SQL")
+            with db_lock:
+                try:
+                    result = db_con.execute(body.sql).fetchall()
                     if db_con.description:
                         columns = [desc[0] for desc in db_con.description]
-                except Exception:
-                    # Query probably didn't return rows (e.g. INSERT/UPDATE)
-                    pass
-                try:
-                    db_con.execute("COMMIT")
                 except Exception as e:
-                    # DDLs like CREATE TABLE might auto-commit, causing "no transaction active" error
-                    if "no transaction is active" in str(e).lower():
-                        pass
-                    else:
-                        raise e
-            except Exception as e:
-                try:
-                    db_con.execute("ROLLBACK")
-                except Exception:
-                    pass
-                raise e
-                
+                    raise e
+
         return {"status": "success", "data": result, "columns": columns}
 
     except Exception as e:
