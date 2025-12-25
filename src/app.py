@@ -134,34 +134,18 @@ elif st.session_state['page'] == 'data_lab':
                         # 1. Generate SQL
                         sql = mb.generate_mart_sql(clean_metrics)
                         
-                        # 2. Execute
-                        # 2. Execute via Server API (Avoids Locking)
-                        import requests
-                        try:
-                            resp = requests.post(
-                                "http://localhost:8000/admin/execute_sql", 
-                                json={"sql": sql}, 
-                                timeout=30
-                            )
-                            if resp.status_code != 200:
-                                raise Exception(f"Server API Error: {resp.text}")
-                            
-                            r_json = resp.json()
-                            if r_json.get("status") != "success":
-                                raise Exception(f"SQL Error: {r_json.get('message')}")
-                                
-                            # 3. Validation (Use Read-Only via stats.py)
-                            check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
-                            df_res = al.run_query(check_sql)
-                            row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
-                            
-                            st.success(f"구축 완료! 총 {row_count:,}개의 일별 데이터가 적재되었습니다.")
-                            
-                        except requests.exceptions.ConnectionError:
-                             st.error("서버 연결 실패: Target App(Localhost:8000)이 실행 중인지 확인하세요.")
-                             raise
-                        except Exception as e:
-                             raise e
+                        # 2. Execute directly with DuckDB write connection
+                        # Use temporary write connection to avoid conflicts with Target App's read-only connection
+                        db_path = os.path.join(os.path.dirname(__file__), '..', 'novarium_local.db')
+                        with duckdb.connect(db_path) as write_con:
+                            write_con.execute(sql)
+
+                        # 3. Validation (Use Read-Only via stats.py)
+                        check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
+                        df_res = al.run_query(check_sql)
+                        row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
+
+                        st.success(f"✅ 구축 완료! 총 {row_count:,}개의 일별 데이터가 적재되었습니다.")
                         
                         # Move to dashboard
                         import time

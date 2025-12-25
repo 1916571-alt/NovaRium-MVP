@@ -8,17 +8,17 @@ def generate_mart_sql(selected_metrics):
     sql = """
     CREATE OR REPLACE TABLE dm_daily_kpi AS
     WITH daily_stats AS (
-        SELECT 
+        SELECT
             date_trunc('day', assigned_at) as report_date,
             COUNT(DISTINCT a.user_id) as total_users,
-            COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END) as click_count,
+            COUNT(DISTINCT CASE WHEN (e.event_name = 'banner_A' OR e.event_name = 'banner_B') THEN e.user_id END) as click_count,
             COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as total_orders,
 """
             
     if 'revenue' in selected_metrics:
         sql += "        COALESCE(SUM(CASE WHEN e.event_name = 'purchase' THEN e.value ELSE 0 END), 0) as total_revenue,\n"
     if 'ctr' in selected_metrics:
-        sql += "        (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / NULLIF(COUNT(DISTINCT a.user_id), 0)) as ctr,\n"
+        sql += "        (COUNT(DISTINCT CASE WHEN (e.event_name = 'banner_A' OR e.event_name = 'banner_B') THEN e.user_id END)::FLOAT / NULLIF(COUNT(DISTINCT a.user_id), 0)) as ctr,\n"
     if 'cvr' in selected_metrics:
         sql += "        (COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END)::FLOAT / NULLIF(COUNT(DISTINCT a.user_id), 0)) as cvr,\n"
     if 'aov' in selected_metrics:
