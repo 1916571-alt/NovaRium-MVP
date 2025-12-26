@@ -1942,18 +1942,12 @@ GROUP BY 1
             save_success = False
             save_error = None
 
-            # DEBUG: Show mode info
-            is_cloud = al.is_cloud_mode()
-            st.info(f"🔍 DEBUG: is_cloud_mode = {is_cloud}, pending_adoption = {st.session_state.get('pending_adoption') is not None}")
-
             # Check if cloud mode (PostgreSQL)
-            if is_cloud:
-                # Cloud mode: Direct PostgreSQL connection (like original local DuckDB)
+            if al.is_cloud_mode():
+                # Cloud mode: Direct PostgreSQL connection
                 try:
                     import psycopg2
                     from src.data.db import DATABASE_URL
-
-                    st.write(f"DEBUG: DATABASE_URL set = {bool(DATABASE_URL)}")
 
                     with psycopg2.connect(DATABASE_URL) as conn:
                         with conn.cursor() as cur:
@@ -2007,13 +2001,9 @@ GROUP BY 1
                         conn.commit()
                     save_success = True
 
-                    st.success("✅ PostgreSQL INSERT 완료!")
-
                 except Exception as e:
                     save_error = str(e)
                     st.error(f"❌ PostgreSQL 저장 실패: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
 
             else:
                 # Local mode: Direct DuckDB connection (original working code)
@@ -2079,20 +2069,17 @@ GROUP BY 1
                 if had_adoption:
                     st.session_state.pop('pending_adoption', None)
                     st.session_state['last_adoption_success'] = True
-                    st.success("🎉 실험이 채택되어 Target App에 적용되었습니다!")
+                    st.toast("🎉 실험이 채택되어 Target App에 적용되었습니다!")
                 else:
-                    st.success("✅ 저장 완료!")
+                    st.toast("✅ 저장 완료!")
 
-                # Show button to proceed instead of auto-redirect (for debugging)
-                st.info("저장이 완료되었습니다. 아래 버튼을 클릭하여 회고록 페이지로 이동하세요.")
-                if st.button("📚 회고록 페이지로 이동"):
-                    # Clear experiment-related session state
-                    st.session_state.pop('current_run_id', None)
-                    st.session_state.pop('guard_results', None)
-                    st.session_state.pop('show_adoption_success', None)
-                    st.session_state['page'] = 'portfolio'
-                    st.session_state['step'] = 1
-                    st.rerun()
+                # Clear experiment-related session state and redirect to portfolio
+                st.session_state.pop('current_run_id', None)
+                st.session_state.pop('guard_results', None)
+                st.session_state.pop('show_adoption_success', None)
+                st.session_state['page'] = 'portfolio'
+                st.session_state['step'] = 1
+                st.rerun()
 
 # =========================================================
 # PAGE: PORTFOLIO
