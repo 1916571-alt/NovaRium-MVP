@@ -35,6 +35,9 @@ from src.core import stats as al
 from src.ui import components as ui
 from src.core import mart_builder as mb  # New Module
 
+# Environment-based URL configuration for cloud deployment
+TARGET_APP_URL = os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+
 # Page Config
 st.set_page_config(
     page_title="NovaRium Edu",
@@ -164,8 +167,8 @@ elif st.session_state['page'] == 'data_lab':
                         import requests
                         try:
                             resp = requests.post(
-                                "http://localhost:8000/admin/execute_sql", 
-                                json={"sql": sql}, 
+                                f"{TARGET_APP_URL}/admin/execute_sql",
+                                json={"sql": sql},
                                 timeout=30
                             )
                             if resp.status_code != 200:
@@ -183,7 +186,7 @@ elif st.session_state['page'] == 'data_lab':
                             st.success(f"구축 완료! 총 {row_count:,}개의 일별 데이터가 적재되었습니다.")
                             
                         except requests.exceptions.ConnectionError:
-                             st.error("서버 연결 실패: Target App(Localhost:8000)이 실행 중인지 확인하세요.")
+                             st.error(f"서버 연결 실패: Target App({TARGET_APP_URL})에 연결할 수 없습니다.")
                              raise
                         except Exception as e:
                              raise e
@@ -293,8 +296,8 @@ if st.session_state['page'] == 'monitor':
         server_status = "Offline"
         
         try:
-             # Check localhost:8000
-             requests.get("http://localhost:8000", timeout=1)
+             # Check Target App server
+             requests.get(TARGET_APP_URL, timeout=3)
              latency_ms = int((time.time() - start_time) * 1000)
              server_status = "Online"
         except:
@@ -657,7 +660,7 @@ elif st.session_state['page'] == 'study':
         sel_comp_id = sel_comp_data['id']
         comp_type = sel_comp_data['type']
         
-        target_url = f"http://localhost:8000{sel_url_path}?highlight={sel_comp_id}"
+        target_url = f"{TARGET_APP_URL}{sel_url_path}?highlight={sel_comp_id}"
 
         # 1. Real Target App (Iframe)
         with col_mock:
