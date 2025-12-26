@@ -41,6 +41,7 @@ def run_agent_swarm(config, progress_callback=None, run_id=None, weight=1.0):
         "success": 0,
         "failed": 0,
         "clicked": 0,
+        "bounced": 0,
         "purchased": 0,
         "by_trait": {}
     }
@@ -61,16 +62,20 @@ def run_agent_swarm(config, progress_callback=None, run_id=None, weight=1.0):
                 results["success"] += 1
                 if result.get("clicked"):
                     results["clicked"] += 1
+                if result.get("bounced"):
+                    results["bounced"] += 1
                 if result.get("purchased"):
                     results["purchased"] += 1
-                
+
                 # Track by trait
                 trait = result["trait"]
                 if trait not in results["by_trait"]:
-                    results["by_trait"][trait] = {"total": 0, "clicked": 0, "purchased": 0}
+                    results["by_trait"][trait] = {"total": 0, "clicked": 0, "bounced": 0, "purchased": 0}
                 results["by_trait"][trait]["total"] += 1
                 if result.get("clicked"):
                     results["by_trait"][trait]["clicked"] += 1
+                if result.get("bounced"):
+                    results["by_trait"][trait]["bounced"] += 1
                 if result.get("purchased"):
                     results["by_trait"][trait]["purchased"] += 1
             else:

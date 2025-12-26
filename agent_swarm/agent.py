@@ -56,6 +56,7 @@ class HeuristicAgent:
             
             # 3. Click Decision (Delegated to Strategy)
             clicked = False
+            bounced = False
             if self.behavior.should_click(variant):
                 clicked = True
                 click_data = {"uid": self.agent_id, "element": f"banner_{variant}"}
@@ -66,16 +67,22 @@ class HeuristicAgent:
                     data=click_data,
                     timeout=5
                 )
-                self.session.post(
-                    f"{self.base_url}/click",
-                    data=click_data,
-                    timeout=5
-                )
                 if not is_turbo:
                     time.sleep(random.uniform(0.5, 2.0))
                 else:
                     time.sleep(0.02) # Minimum delay to prevent starvation
-            
+            else:
+                # User didn't click - record as bounce (left without interaction)
+                bounced = True
+                bounce_data = {"uid": self.agent_id, "element": "bounce"}
+                if self.run_id:
+                    bounce_data["run_id"] = self.run_id
+                self.session.post(
+                    f"{self.base_url}/click",
+                    data=bounce_data,
+                    timeout=5
+                )
+
             # 4. Purchase Decision (Delegated to Strategy)
             purchased = False
             if clicked and self.behavior.should_purchase():
@@ -88,13 +95,14 @@ class HeuristicAgent:
                     data=order_data,
                     timeout=5
                 )
-            
+
             return {
                 "success": True,
                 "agent_id": self.agent_id,
                 "trait": self.behavior.name,
                 "variant": variant,
                 "clicked": clicked,
+                "bounced": bounced,
                 "purchased": purchased
             }
         

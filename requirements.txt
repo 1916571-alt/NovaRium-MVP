@@ -1,11 +1,30 @@
+# Core Dependencies
 faker
 pandas
+numpy
 duckdb
 scipy
-streamlit
+
+# Web Framework
+streamlit>=1.28.0
 plotly
+
+# API Framework
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
-pytest
+
+# Database (Cloud - Supabase/PostgreSQL)
+psycopg2-binary
+python-dotenv
+
+# HTTP Client
 requests
+httpx
+
+# Testing
+pytest
+
+# Jinja2 Templates (for FastAPI)
+jinja2
+aiofiles

@@ -1,0 +1,41 @@
+# Render.com Blueprint Configuration
+# Deploy FastAPI (Target App) as a web service
+
+services:
+  # FastAPI Backend (Target App / NovaEats)
+  - type: web
+    name: novarium-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: DB_MODE
+        value: supabase
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard (from Supabase)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: TARGET_APP_URL
+        fromService:
+          name: novarium-api
+          type: web
+          property: url
+      - key: STREAMLIT_APP_URL
+        sync: false  # Set to your Streamlit Cloud URL
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+# Note: Streamlit (Admin Dashboard) should be deployed to Streamlit Cloud
+# because Render free tier doesn't support two web services well.
+#
+# Streamlit Cloud Configuration:
+# 1. Connect your GitHub repo
+# 2. Set main file path: src/app.py
+# 3. Add secrets in Streamlit Cloud dashboard:
+#    - DB_MODE = supabase
+#    - DATABASE_URL = your_supabase_connection_string
+#    - TARGET_APP_URL = https://novarium-api.onrender.com

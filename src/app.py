@@ -47,6 +47,7 @@ st.set_page_config(
 if 'page' not in st.session_state: st.session_state['page'] = 'data_lab' # Default to Data Lab
 if 'step' not in st.session_state: st.session_state['step'] = 1
 if 'custom_metrics' not in st.session_state: st.session_state['custom_metrics'] = []
+if 'use_db_coordination' not in st.session_state: st.session_state['use_db_coordination'] = True  # DB coordination mode
 
 # --- APPLY STYLES & HEADER ---
 ui.apply_custom_css()
@@ -57,6 +58,30 @@ st.write("") # Spacer
 # con = al.get_connection() # [REMOVED] Global connection causes locking issues
 # DB_PATH will be used for specific query connections
 DB_PATH = al.DB_PATH
+
+# Import DB write utilities
+from src.data.db import safe_write_batch
+
+# =========================================================
+# GLOBAL SIDEBAR: System Settings (visible on all pages)
+# =========================================================
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### ⚙️ 시스템 설정")
+
+    # DB Coordination Mode Toggle
+    use_coordination = st.checkbox(
+        "🔄 DB 협조 모드",
+        value=st.session_state.get('use_db_coordination', True),
+        help="Target App과 DB 연결을 조율합니다. 저장 오류 시 체크 해제하여 레거시 모드로 전환 가능."
+    )
+    st.session_state['use_db_coordination'] = use_coordination
+
+    if use_coordination:
+        st.caption("✅ 권장: Target App과 DB 조율")
+    else:
+        st.warning("⚠️ 레거시 모드")
+        st.caption("Target App 미실행 시만 사용")
 
 # =========================================================
 # PAGE: INTRO (BRAND IDENTITY)
@@ -510,6 +535,74 @@ elif st.session_state['page'] == 'study':
     # --- STEP 1: HYPOTHESIS ---
     if curr == 1:
         st.markdown(f"<h2>Step 1. 목표 정의 (Define Your Vision)</h2>", unsafe_allow_html=True)
+
+        # Show current adoption status banner
+        try:
+            adoption_df = al.run_query("""
+                SELECT a.experiment_id, a.adopted_at, a.variant_config, e.hypothesis, e.target
+                FROM adoptions a
+                LEFT JOIN experiments e ON a.experiment_id = e.run_id
+                ORDER BY a.adopted_at DESC
+                LIMIT 1
+            """)
+            if not adoption_df.empty:
+                latest = adoption_df.iloc[0]
+                variant_config = latest.get('variant_config', '{}')
+                if isinstance(variant_config, str):
+                    try:
+                        variant_config = json.loads(variant_config)
+                    except:
+                        variant_config = {}
+
+                winning_variant = variant_config.get('winning_variant', 'B') if variant_config else 'B'
+                exp_target = variant_config.get('target', '') if variant_config else ''
+                exp_config = variant_config.get('config', {}) if variant_config else {}
+                exp_id = latest.get('experiment_id', 'N/A')
+                hypothesis = latest.get('hypothesis', 'N/A')
+                target = latest.get('target', exp_target) or exp_target or 'N/A'
+                adopted_at = latest.get('adopted_at', 'N/A')
+
+                with st.expander("🏆 현재 적용된 Baseline (채택된 실험)", expanded=False):
+                    col_info, col_variant = st.columns(2)
+                    with col_info:
+                        st.markdown(f"**실험 ID**: `{exp_id}`")
+                        st.markdown(f"**가설**: {hypothesis}")
+                        st.markdown(f"**타겟**: {target}")
+                        st.markdown(f"**채택일**: {adopted_at}")
+                        st.markdown(f"**Winning Variant**: **{winning_variant}**")
+                    with col_variant:
+                        if exp_config:
+                            st.markdown("**적용된 Variant 설정**:")
+                            for key, val in exp_config.items():
+                                st.markdown(f"- `{key}`: **{val}**")
+                        else:
+                            st.info("Variant 설정 정보 없음")
+
+                    # Rollback Button
+                    st.divider()
+                    col_rollback, col_spacer = st.columns([1, 2])
+                    with col_rollback:
+                        if st.button("🔄 롤백 (Rollback)", type="secondary", use_container_width=True,
+                                     help="최신 채택을 취소하고 기본 상태로 복구합니다"):
+                            # Delete the latest adoption record
+                            try:
+                                from src.data.db import safe_write_batch
+                                rollback_ops = [
+                                    (f"DELETE FROM adoptions WHERE experiment_id = '{exp_id}'", None)
+                                ]
+                                result = safe_write_batch(rollback_ops, use_coordination=True)
+
+                                if result['status'] == 'success':
+                                    st.cache_data.clear()
+                                    st.toast("✅ 롤백 완료! Baseline이 기본값으로 복구되었습니다.")
+                                    st.rerun()
+                                else:
+                                    st.error(f"롤백 실패: {result.get('message', 'Unknown error')}")
+                            except Exception as rollback_err:
+                                st.error(f"롤백 중 오류 발생: {rollback_err}")
+        except Exception as e:
+            pass  # Silently ignore if adoptions table doesn't exist or is empty
+
         ui.edu_guide("가설(Hypothesis)", "데이터 분석은 막연한 시도가 아닙니다. **'무엇을(X) 바꾸면 어떤 지표(Y)가 좋아질 것이다'**라는 명확한 믿음을 정의하세요.")
 
         # Component Mapping (Moved up for Iframe Logic)
@@ -784,7 +877,21 @@ elif st.session_state['page'] == 'study':
                             "control": "Default",
                             "variant": variant_val
                         }
-                        
+
+                        # Activate experiment for A/B testing
+                        # (keeps previous adoptions as baseline, enables new A/B split)
+                        try:
+                            from src.data.db import safe_write_batch
+                            result = safe_write_batch([
+                                ("CREATE TABLE IF NOT EXISTS active_experiment (id INTEGER PRIMARY KEY, is_active BOOLEAN, started_at TIMESTAMP)", None),
+                                ("DELETE FROM active_experiment", None),
+                                ("INSERT INTO active_experiment VALUES (1, true, CURRENT_TIMESTAMP)", None)
+                            ], use_coordination=st.session_state.get('db_coordination', True))
+                            if result.get('status') == 'success':
+                                st.toast("🧪 새 실험 활성화 완료", icon="✅")
+                        except Exception as e:
+                            pass  # Table creation may fail
+
                         st.session_state['step'] = 2
                         st.rerun()
 
@@ -1216,11 +1323,19 @@ GROUP BY 1
 
         st.caption(f"🔍 현재 분석 중인 실험: `{current_run_id}`")
 
+        # Build event filter based on metric type
+        # For CTR: match 'click_banner' OR 'banner_%' patterns (agent uses banner_A, banner_B)
+        # For CVR: match 'purchase'
+        if event_name == 'click_banner':
+            event_filter = "(e.event_name = 'click_banner' OR e.event_name LIKE 'banner_%')"
+        else:
+            event_filter = f"e.event_name = '{event_name}'"
+
         sql = f"""
         SELECT
             a.variant,
             COUNT(DISTINCT a.user_id) as users,
-            COUNT(DISTINCT CASE WHEN e.event_name = '{event_name}' THEN e.user_id END) as conversions
+            COUNT(DISTINCT CASE WHEN {event_filter} THEN e.user_id END) as conversions
         FROM assignments a
         LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
         WHERE a.run_id = '{current_run_id}'
@@ -1318,8 +1433,13 @@ GROUP BY 1
                     if st.button("✅ 채택 (Adopt)", type="primary", use_container_width=True):
                         # Save adoption intent to session state (will be saved with retrospective)
                         # variant_config stores the winning variant info for Target App
+                        variant_data = st.session_state.get('exp_variant_data', {})
                         st.session_state['pending_adoption'] = {
-                            'variant': {'winning_variant': 'B', 'banner_type': 'test'},  # Adopting means Test variant (B) won
+                            'variant': {
+                                'winning_variant': 'B',  # Adopting means Test variant (B) won
+                                'target': st.session_state.get('target', ''),
+                                'config': variant_data  # Store actual experiment configuration
+                            },
                             'experiment_id': current_run_id,
                             'lift': res['lift'],
                             'p_value': res['p_value'],
@@ -1360,67 +1480,126 @@ GROUP BY 1
                     else:
                         st.info("💡 **참고**: 유의미한 차이가 없습니다. 실무적 판단 또는 재실험을 고려하세요.")
 
-            # Secondary Metrics Check - Calculate secondary metrics
-            st.markdown("#### 📊 보조 지표 분석 (Secondary Metrics)")
+        with c_plot:
+            # Main CTR Chart
+            st.plotly_chart(fig, use_container_width=True)
+
+            # ==========================================
+            # Guardrail Metrics Section (Below CTR Chart in Right Column)
+            # ==========================================
             guardrails = st.session_state.get('guardrails', [])
             guard_results = []
+            guard_threshold = st.session_state.get('session_guard_threshold', -5.0) / 100
 
             if guardrails:
-                # Calculate each guardrail metric
-                for guardrail in guardrails:
-                    if "CVR" in guardrail:
-                        guard_event = "purchase"
-                    elif "AOV" in guardrail:
-                        guard_event = "purchase_value"
-                    else:
-                        guard_event = "click_banner"
+                st.markdown("#### 🛡️ 가드레일 지표 (Guardrail Metrics)")
 
-                    # Query guardrail metric
-                    guard_sql = f"""
-                    SELECT
-                        a.variant,
-                        COUNT(DISTINCT a.user_id) as users,
-                        COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as conversions,
-                        COALESCE(SUM(CASE WHEN e.event_name = 'purchase' THEN e.value ELSE 0 END), 0) as revenue
-                    FROM assignments a
-                    LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
-                    WHERE a.run_id = '{current_run_id}'
-                    GROUP BY 1 ORDER BY 1
-                    """
-                    df_guard = al.run_query(guard_sql)
+                # Query all metrics at once for efficiency
+                guard_sql = f"""
+                SELECT
+                    a.variant,
+                    COUNT(DISTINCT a.user_id) as users,
+                    COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as conversions,
+                    COALESCE(SUM(CASE WHEN e.event_name = 'purchase' THEN e.value ELSE 0 END), 0) as revenue,
+                    COUNT(DISTINCT CASE WHEN e.event_name LIKE 'banner%' OR e.event_name = 'click_banner' THEN e.user_id END) as clicks,
+                    COUNT(DISTINCT CASE WHEN e.event_name = 'bounce' THEN e.user_id END) as bounces
+                FROM assignments a
+                LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
+                WHERE a.run_id = '{current_run_id}'
+                GROUP BY 1 ORDER BY 1
+                """
+                df_guard = al.run_query(guard_sql)
 
-                    if len(df_guard) >= 2:
+                if len(df_guard) >= 2:
+                    ctrl = df_guard.iloc[0]
+                    test = df_guard.iloc[1]
+
+                    # Calculate each guardrail metric
+                    for guardrail in guardrails:
                         if "CVR" in guardrail:
-                            control_rate = df_guard.iloc[0]['conversions'] / df_guard.iloc[0]['users'] if df_guard.iloc[0]['users'] > 0 else 0
-                            test_rate = df_guard.iloc[1]['conversions'] / df_guard.iloc[1]['users'] if df_guard.iloc[1]['users'] > 0 else 0
+                            control_rate = ctrl['conversions'] / ctrl['users'] if ctrl['users'] > 0 else 0
+                            test_rate = test['conversions'] / test['users'] if test['users'] > 0 else 0
                             guard_lift = (test_rate - control_rate) / control_rate if control_rate > 0 else 0
-                            guard_results.append({"metric": "CVR (전환율)", "control": control_rate, "test": test_rate, "lift": guard_lift})
+                            passed = guard_lift >= guard_threshold
+                            guard_results.append({
+                                "metric": "CVR (전환율)",
+                                "control": control_rate,
+                                "test": test_rate,
+                                "lift": guard_lift,
+                                "passed": passed
+                            })
                         elif "AOV" in guardrail:
-                            control_aov = df_guard.iloc[0]['revenue'] / df_guard.iloc[0]['conversions'] if df_guard.iloc[0]['conversions'] > 0 else 0
-                            test_aov = df_guard.iloc[1]['revenue'] / df_guard.iloc[1]['conversions'] if df_guard.iloc[1]['conversions'] > 0 else 0
+                            control_aov = ctrl['revenue'] / ctrl['conversions'] if ctrl['conversions'] > 0 else 0
+                            test_aov = test['revenue'] / test['conversions'] if test['conversions'] > 0 else 0
                             guard_lift = (test_aov - control_aov) / control_aov if control_aov > 0 else 0
-                            guard_results.append({"metric": "AOV (평균주문액)", "control": control_aov, "test": test_aov, "lift": guard_lift})
+                            passed = guard_lift >= guard_threshold
+                            guard_results.append({
+                                "metric": "AOV (평균주문액)",
+                                "control": control_aov,
+                                "test": test_aov,
+                                "lift": guard_lift,
+                                "passed": passed
+                            })
+                        elif "Bounce" in guardrail:
+                            control_bounce = ctrl['bounces'] / ctrl['users'] if ctrl['users'] > 0 else 0
+                            test_bounce = test['bounces'] / test['users'] if test['users'] > 0 else 0
+                            guard_lift = (test_bounce - control_bounce) / control_bounce if control_bounce > 0 else 0
+                            passed = guard_lift <= abs(guard_threshold)
+                            guard_results.append({
+                                "metric": "Bounce Rate (이탈률)",
+                                "control": control_bounce,
+                                "test": test_bounce,
+                                "lift": guard_lift,
+                                "passed": passed
+                            })
+                        elif "CTR" in guardrail:
+                            control_ctr = ctrl['clicks'] / ctrl['users'] if ctrl['users'] > 0 else 0
+                            test_ctr = test['clicks'] / test['users'] if test['users'] > 0 else 0
+                            guard_lift = (test_ctr - control_ctr) / control_ctr if control_ctr > 0 else 0
+                            passed = guard_lift >= guard_threshold
+                            guard_results.append({
+                                "metric": "CTR (클릭률)",
+                                "control": control_ctr,
+                                "test": test_ctr,
+                                "lift": guard_lift,
+                                "passed": passed
+                            })
 
-                # Display secondary metrics results
-                guard_threshold = st.session_state.get('session_guard_threshold', -5.0) / 100
+                    # Compact display for guardrail metrics
+                    if guard_results:
+                        # Create compact bar chart
+                        guard_metrics = [gr['metric'].split(' ')[0] for gr in guard_results]  # Short names
+                        control_vals = [gr['control'] * 100 for gr in guard_results]
+                        test_vals = [gr['test'] * 100 for gr in guard_results]
 
-                if guard_results:
-                    for gr in guard_results:
-                        col_metric, col_value = st.columns([3, 1])
-                        with col_metric:
-                            st.caption(f"**{gr['metric']}**")
-                        with col_value:
-                            if gr['lift'] < guard_threshold:
-                                st.caption(f"🔻 {gr['lift']*100:+.1f}%")
-                            else:
-                                st.caption(f"✅ {gr['lift']*100:+.1f}%")
+                        fig_guard = go.Figure()
+                        fig_guard.add_trace(go.Bar(
+                            name='A', x=guard_metrics, y=control_vals,
+                            marker_color='#135bec', text=[f"{v:.1f}%" for v in control_vals], textposition='auto'
+                        ))
+                        fig_guard.add_trace(go.Bar(
+                            name='B', x=guard_metrics, y=test_vals,
+                            marker_color='#ef4444', text=[f"{v:.1f}%" for v in test_vals], textposition='auto'
+                        ))
+                        fig_guard.update_layout(
+                            yaxis_title="%", barmode='group', template="plotly_dark", height=220, margin=dict(t=30, b=30),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig_guard, use_container_width=True)
+
+                        # Compact summary below chart
+                        for gr in guard_results:
+                            status = "✅" if gr.get('passed', True) else "❌"
+                            lift_val = gr['lift'] * 100
+                            color = "green" if lift_val >= 0 else "red"
+                            st.caption(f"{status} **{gr['metric']}**: <span style='color:{color}'>{lift_val:+.1f}%</span> (A:{gr['control']*100:.1f}% → B:{gr['test']*100:.1f}%)", unsafe_allow_html=True)
+                    else:
+                        st.caption("가드레일 데이터 없음")
                 else:
-                    st.caption("보조 지표 분석 결과가 없습니다.")
-            else:
-                st.info(f"설정된 보조 지표가 없습니다.")
-                 
-        with c_plot:
-            st.plotly_chart(fig, width="stretch")
+                    st.caption("가드레일 분석 데이터 부족")
+
+            # Store guard_results in session state for saving
+            st.session_state['guard_results'] = guard_results
         
         # Comprehensive Metrics Comparison Table
         st.divider()
@@ -1595,23 +1774,42 @@ GROUP BY 1
         st.divider()
         st.markdown("#### 📝 실험 회고록 작성")
         note = st.text_area("배운 점 (Learning Note)", help="이번 실험에서 얻은 인사이트를 기록하세요.")
+
+        # Show current DB mode status
+        if st.session_state.get('use_db_coordination', True):
+            st.caption("💡 DB 협조 모드 활성화 (사이드바에서 변경 가능)")
+        else:
+            st.caption("⚠️ 레거시 모드 활성화 (사이드바에서 변경 가능)")
+
         if st.button("💾 실험 회고록에 저장", type="primary"):
-            import duckdb
             import json
 
-            # Prepare guardrail results for storage
-            guardrail_results_json = json.dumps(guard_results) if 'guard_results' in locals() else None
+            # Prepare guardrail results for storage - use session state for reliability
+            # Convert numpy types to native Python types for JSON serialization
+            stored_guard_results = st.session_state.get('guard_results', [])
+            serializable_results = []
+            for gr in stored_guard_results:
+                serializable_results.append({
+                    "metric": str(gr.get("metric", "")),
+                    "control": float(gr.get("control", 0)),
+                    "test": float(gr.get("test", 0)),
+                    "lift": float(gr.get("lift", 0)),
+                    "passed": bool(gr.get("passed", True))
+                })
+            guardrail_results_json = json.dumps(serializable_results) if serializable_results else '[]'
 
-            with duckdb.connect(DB_PATH) as txn_con:
-                # Save experiment record
-                txn_con.execute(f"""
-                    INSERT INTO experiments (
-                        target, hypothesis, primary_metric, guardrails,
-                        p_value, decision, learning_note, run_id,
-                        control_rate, test_rate, lift, guardrail_results,
-                        created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, [
+            # Build operations list
+            operations = []
+
+            # 1. Insert experiment record
+            operations.append((
+                """INSERT INTO experiments (
+                    target, hypothesis, primary_metric, guardrails,
+                    p_value, decision, learning_note, run_id,
+                    control_rate, test_rate, lift, guardrail_results,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                [
                     st.session_state.get('target', '-'),
                     st.session_state.get('hypothesis', '-'),
                     st.session_state.get('metric', '-'),
@@ -1619,39 +1817,67 @@ GROUP BY 1
                     res['p_value'], decision, note, current_run_id,
                     res['control_rate'], res['test_rate'], res['lift'],
                     guardrail_results_json
-                ])
+                ]
+            ))
 
-                # If adoption was marked, save it to adoptions table
+            # 2. If adoption was marked, create table and insert
+            if st.session_state.get('pending_adoption'):
+                adoption_data = st.session_state['pending_adoption']
+                # Store lift/p_value in variant_config JSON instead of separate columns
+                # This ensures compatibility with existing table schema
+                variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
+                variant_data['lift'] = adoption_data.get('lift')
+                variant_data['p_value'] = adoption_data.get('p_value')
+                variant_json = json.dumps(variant_data)
+
+                # Create sequence and table if needed (DuckDB uses sequences for auto-increment)
+                operations.append((
+                    "CREATE SEQUENCE IF NOT EXISTS adoptions_seq",
+                    None
+                ))
+                operations.append((
+                    """CREATE TABLE IF NOT EXISTS adoptions (
+                        adoption_id INTEGER DEFAULT nextval('adoptions_seq'),
+                        experiment_id VARCHAR,
+                        variant_config VARCHAR,
+                        adopted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )""",
+                    None
+                ))
+                operations.append((
+                    "INSERT INTO adoptions (experiment_id, variant_config) VALUES (?, ?)",
+                    [current_run_id, variant_json]
+                ))
+                # Deactivate experiment - adopted variant becomes new baseline
+                operations.append(("DELETE FROM active_experiment", None))
+
+            # 3. Clean up run data
+            operations.append((f"DELETE FROM assignments WHERE run_id = '{current_run_id}'", None))
+            operations.append((f"DELETE FROM events WHERE run_id = '{current_run_id}'", None))
+
+            # Execute with coordination mode setting
+            result = safe_write_batch(operations, use_coordination=st.session_state.get('use_db_coordination', True))
+
+            if result['status'] == 'success':
+                # Clear caches to ensure UI reflects latest DB state
+                st.cache_data.clear()
+
                 if st.session_state.get('pending_adoption'):
-                    adoption_data = st.session_state['pending_adoption']
-                    txn_con.execute("""
-                        CREATE TABLE IF NOT EXISTS adoptions (
-                            experiment_id VARCHAR,
-                            variant_config VARCHAR,
-                            adopted_at TIMESTAMP,
-                            lift FLOAT,
-                            p_value FLOAT
-                        )
-                    """)
-                    variant_json = json.dumps(adoption_data['variant'])
-                    txn_con.execute("""
-                        INSERT INTO adoptions VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)
-                    """, [current_run_id, variant_json, adoption_data['lift'], adoption_data['p_value']])
-
                     st.session_state.pop('pending_adoption', None)
+                    st.session_state['last_adoption_success'] = True  # Track adoption for UI feedback
                     st.toast("🎉 실험이 채택되어 Target App에 적용되었습니다!")
 
-                # IMPORTANT: Only delete data for THIS run, preserving historical data and other runs
-                # This allows the dashboard to show cumulative data while experiments are isolated
-                txn_con.execute(f"DELETE FROM assignments WHERE run_id = '{current_run_id}'")
-                txn_con.execute(f"DELETE FROM events WHERE run_id = '{current_run_id}'")
-
-            st.toast("저장 완료!")
-            # Clear current run_id
-            st.session_state.pop('current_run_id', None)
-            st.session_state['page'] = 'portfolio'
-            st.session_state['step'] = 1
-            st.rerun()
+                st.toast("저장 완료!")
+                # Clear experiment-related session state
+                st.session_state.pop('current_run_id', None)
+                st.session_state.pop('guard_results', None)
+                st.session_state.pop('show_adoption_success', None)
+                st.session_state['page'] = 'portfolio'
+                st.session_state['step'] = 1
+                st.rerun()
+            else:
+                st.error(f"❌ 저장 실패: {result.get('message', 'Unknown error')}")
+                st.info("💡 '고급 설정'에서 'DB 협조 모드' 체크박스를 해제하고 다시 시도해보세요.")
 
 # =========================================================
 # PAGE: PORTFOLIO
@@ -1689,14 +1915,15 @@ elif st.session_state['page'] == 'portfolio':
             SELECT
                 a.experiment_id,
                 a.adopted_at,
-                a.lift,
-                a.p_value,
+                a.variant_config,
                 e.hypothesis,
                 e.target,
                 e.primary_metric,
                 e.learning_note,
                 e.control_rate,
                 e.test_rate,
+                e.lift,
+                e.p_value,
                 e.guardrails,
                 e.guardrail_results
             FROM adoptions a
@@ -1724,13 +1951,47 @@ elif st.session_state['page'] == 'portfolio':
                                 detail_col1, detail_col2 = st.columns(2)
                                 with detail_col1:
                                     st.markdown("**📈 성과 지표**")
-                                    st.write(f"- Control 전환율: {row.get('control_rate', 0):.2f}%")
-                                    st.write(f"- Test 전환율: {row.get('test_rate', 0):.2f}%")
-                                    st.write(f"- 상대적 개선: {lift_val:+.1f}%")
+                                    ctrl_rate = row.get('control_rate', 0) or 0
+                                    test_rate = row.get('test_rate', 0) or 0
+                                    st.write(f"- Control 전환율: {ctrl_rate:.2f}%")
+                                    st.write(f"- Test 전환율: {test_rate:.2f}%")
+                                    st.write(f"- p-value: {row.get('p_value', 'N/A')}")
                                 with detail_col2:
                                     st.markdown("**🛡️ 가드레일**")
-                                    st.write(f"- 설정: {row.get('guardrails', 'N/A')}")
-                                    st.write(f"- 결과: {row.get('guardrail_results', 'N/A')}")
+                                    guardrails_str = row.get('guardrails', '')
+                                    st.write(f"- 설정: {guardrails_str if guardrails_str else '없음'}")
+                                    # Parse guardrail_results JSON
+                                    gr_results = row.get('guardrail_results', '')
+                                    if gr_results and gr_results != '[]' and gr_results != 'null' and gr_results != 'None':
+                                        try:
+                                            gr_list = json.loads(gr_results) if isinstance(gr_results, str) else gr_results
+                                            if gr_list and isinstance(gr_list, list) and len(gr_list) > 0:
+                                                for gr in gr_list:
+                                                    status = "✅ Pass" if gr.get('passed', False) else "❌ Fail"
+                                                    lift_val = gr.get('lift', 0) * 100
+                                                    st.write(f"- {gr.get('metric', 'N/A')}: {status} ({lift_val:+.1f}%)")
+                                            else:
+                                                if guardrails_str:
+                                                    st.write("- 결과: 데이터 부족")
+                                                else:
+                                                    st.write("- 결과: 가드레일 미설정")
+                                        except:
+                                            st.write("- 결과: 파싱 오류")
+                                    else:
+                                        if guardrails_str:
+                                            st.write("- 결과: 측정 데이터 없음")
+                                        else:
+                                            st.write("- 결과: 가드레일 미설정")
+
+                                # Show adopted variant config
+                                variant_config = row.get('variant_config', '')
+                                if variant_config:
+                                    st.markdown("**🎨 채택된 변형 설정**")
+                                    try:
+                                        config = json.loads(variant_config) if isinstance(variant_config, str) else variant_config
+                                        st.json(config)
+                                    except:
+                                        st.code(variant_config)
 
                                 if row.get('learning_note'):
                                     st.markdown("**📝 학습 내용**")
@@ -1799,14 +2060,38 @@ elif st.session_state['page'] == 'portfolio':
                                 col_a, col_b = st.columns(2)
                                 with col_a:
                                     st.markdown("**📈 결과 지표**")
-                                    st.write(f"- Control 전환율: {row.get('control_rate', 0):.2f}%")
-                                    st.write(f"- Test 전환율: {row.get('test_rate', 0):.2f}%")
+                                    ctrl_rate = row.get('control_rate', 0) or 0
+                                    test_rate = row.get('test_rate', 0) or 0
+                                    st.write(f"- Control 전환율: {ctrl_rate:.2f}%")
+                                    st.write(f"- Test 전환율: {test_rate:.2f}%")
                                     st.write(f"- p-value: {row.get('p_value', 'N/A')}")
 
                                 with col_b:
                                     st.markdown("**🛡️ 가드레일**")
-                                    st.write(f"- 설정: {row.get('guardrails', 'N/A')}")
-                                    st.write(f"- 결과: {row.get('guardrail_results', 'N/A')}")
+                                    guardrails_str = row.get('guardrails', '')
+                                    st.write(f"- 설정: {guardrails_str if guardrails_str else '없음'}")
+                                    # Parse guardrail_results JSON
+                                    gr_results = row.get('guardrail_results', '')
+                                    if gr_results and gr_results != '[]' and gr_results != 'null' and gr_results != 'None':
+                                        try:
+                                            gr_list = json.loads(gr_results) if isinstance(gr_results, str) else gr_results
+                                            if gr_list and isinstance(gr_list, list) and len(gr_list) > 0:
+                                                for gr in gr_list:
+                                                    status = "✅ Pass" if gr.get('passed', False) else "❌ Fail"
+                                                    lift_val = gr.get('lift', 0) * 100
+                                                    st.write(f"- {gr.get('metric', 'N/A')}: {status} ({lift_val:+.1f}%)")
+                                            else:
+                                                if guardrails_str:
+                                                    st.write("- 결과: 데이터 부족 (시뮬레이션 데이터 없음)")
+                                                else:
+                                                    st.write("- 결과: 가드레일 미설정")
+                                        except Exception as e:
+                                            st.write(f"- 결과: 파싱 오류")
+                                    else:
+                                        if guardrails_str:
+                                            st.write("- 결과: 측정 데이터 없음 (시뮬레이션 미실행)")
+                                        else:
+                                            st.write("- 결과: 가드레일 미설정")
 
                                 if row.get('learning_note'):
                                     st.markdown("**📝 학습 및 인사이트**")
@@ -1815,21 +2100,30 @@ elif st.session_state['page'] == 'portfolio':
                                 st.caption(f"Run ID: {row.get('run_id', 'N/A')}")
 
     # ==========================================
-    # Section 3: Summary Statistics
+    # Section 3: Summary Statistics (Based on Adoptions, not p-value)
     # ==========================================
     st.divider()
     st.markdown("### 📊 실험 요약 통계")
 
     if not df_history.empty:
+        # Get adopted experiment IDs from adoptions table
+        try:
+            adopted_ids_df = al.run_query("SELECT DISTINCT experiment_id FROM adoptions")
+            adopted_ids = set(adopted_ids_df['experiment_id'].tolist()) if not adopted_ids_df.empty else set()
+        except:
+            adopted_ids = set()
+
+        # Count adopted experiments (based on adoptions table, not decision field)
+        adopted_count = len([rid for rid in df_history['run_id'].tolist() if rid in adopted_ids])
+        non_adopted_count = len(df_history) - adopted_count
+
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("총 실험 수", len(df_history))
         with col2:
-            positive_count = len(df_history[df_history['decision'] == 'positive'])
-            st.metric("성공 (Positive)", positive_count)
+            st.metric("채택 (Adopted)", adopted_count)
         with col3:
-            negative_count = len(df_history[df_history['decision'] == 'negative'])
-            st.metric("실패 (Negative)", negative_count)
+            st.metric("미채택 (Not Adopted)", non_adopted_count)
         with col4:
-            win_rate = (positive_count / len(df_history) * 100) if len(df_history) > 0 else 0
-            st.metric("승률", f"{win_rate:.1f}%")
+            adoption_rate = (adopted_count / len(df_history) * 100) if len(df_history) > 0 else 0
+            st.metric("채택률", f"{adoption_rate:.1f}%")
