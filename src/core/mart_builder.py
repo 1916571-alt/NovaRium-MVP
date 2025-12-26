@@ -1,14 +1,35 @@
+import os
+
+# Check if running in cloud mode (PostgreSQL)
+DB_MODE = os.getenv('DB_MODE', 'duckdb')
+
 def generate_mart_sql(selected_metrics):
     """
     Generates the SQL query to build the Data Mart based on selected metrics.
+    Supports both DuckDB (local) and PostgreSQL (Supabase cloud).
     """
-    
+
+    # Use PostgreSQL-compatible syntax for cloud, DuckDB syntax for local
+    is_postgres = DB_MODE == 'supabase'
+
     # Base CTE (Common Table Expression)
-    # Always need report_date, users, orders, clicks as base counters
-    sql = """
+    # PostgreSQL: DROP + CREATE, DuckDB: CREATE OR REPLACE
+    if is_postgres:
+        sql = """
+    DROP TABLE IF EXISTS dm_daily_kpi;
+    CREATE TABLE dm_daily_kpi AS
+    WITH daily_stats AS (
+        SELECT
+            DATE_TRUNC('day', assigned_at) as report_date,
+            COUNT(DISTINCT a.user_id) as total_users,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END) as click_count,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as total_orders,
+"""
+    else:
+        sql = """
     CREATE OR REPLACE TABLE dm_daily_kpi AS
     WITH daily_stats AS (
-        SELECT 
+        SELECT
             date_trunc('day', assigned_at) as report_date,
             COUNT(DISTINCT a.user_id) as total_users,
             COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END) as click_count,
@@ -34,7 +55,7 @@ def generate_mart_sql(selected_metrics):
 
     sql += """
         FROM assignments a
-        LEFT JOIN events e ON a.user_id = e.user_id AND DATE_TRUNC('day', e.timestamp) = date_trunc('day', a.assigned_at)
+        LEFT JOIN events e ON a.user_id = e.user_id AND DATE_TRUNC('day', e.timestamp) = DATE_TRUNC('day', a.assigned_at)
         GROUP BY 1
     )
     SELECT

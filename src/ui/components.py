@@ -121,6 +121,45 @@ def apply_custom_css():
     .stProgress > div > div > div > div {
         background: linear-gradient(90deg, #6366F1, #EC4899);
     }
+
+    /* 10. Code Blocks - Dark Theme */
+    code, pre, .stCode, .stCodeBlock {
+        background-color: #1a1a2e !important;
+        color: #e2e8f0 !important;
+    }
+
+    pre {
+        background-color: #1a1a2e !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+    }
+
+    /* Streamlit code block specific */
+    .stCodeBlock > div {
+        background-color: #1a1a2e !important;
+    }
+
+    div[data-testid="stCode"] {
+        background-color: #1a1a2e !important;
+    }
+
+    div[data-testid="stCode"] pre {
+        background-color: #1a1a2e !important;
+    }
+
+    /* Syntax highlighting colors */
+    .hljs-keyword { color: #c792ea !important; }
+    .hljs-string { color: #c3e88d !important; }
+    .hljs-number { color: #f78c6c !important; }
+    .hljs-function { color: #82aaff !important; }
+    .hljs-comment { color: #676e95 !important; }
+    .hljs-built_in { color: #ffcb6b !important; }
+
+    /* SQL specific highlighting */
+    .sql .hljs-keyword { color: #ff79c6 !important; font-weight: bold; }
+    .sql .hljs-string { color: #f1fa8c !important; }
+    .sql .hljs-number { color: #bd93f9 !important; }
 </style>
 """, unsafe_allow_html=True)
 
