@@ -76,21 +76,27 @@ def is_cloud_mode():
     """Check if running in cloud mode (Supabase)."""
     return DB_MODE == 'supabase' and bool(DATABASE_URL)
 
+# Store last connection error for debugging
+_pg_pool_error = None
+
 def get_pg_pool():
     """Get or create PostgreSQL connection pool."""
-    global pg_pool
+    global pg_pool, _pg_pool_error
     if pg_pool is None and DATABASE_URL:
         try:
             import psycopg2
             from psycopg2 import pool
 
             logger.info("Creating PostgreSQL connection pool...")
+            logger.info(f"DATABASE_URL length: {len(DATABASE_URL)}")
+
             pg_pool = pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
                 dsn=DATABASE_URL
             )
             logger.info("PostgreSQL connection pool created successfully!")
+            _pg_pool_error = None
 
             # Test the connection
             test_conn = pg_pool.getconn()
@@ -102,16 +108,26 @@ def get_pg_pool():
                 pg_pool.putconn(test_conn)
 
         except psycopg2.OperationalError as e:
-            logger.error(f"PostgreSQL OperationalError: {e}")
+            error_msg = f"OperationalError: {e}"
+            logger.error(f"PostgreSQL {error_msg}")
             logger.error("This usually means: wrong password, host unreachable, or SSL issue")
+            _pg_pool_error = error_msg
             pg_pool = None
         except psycopg2.Error as e:
-            logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+            error_msg = f"Error [{e.pgcode}]: {e.pgerror or e}"
+            logger.error(f"PostgreSQL {error_msg}")
+            _pg_pool_error = error_msg
             pg_pool = None
         except Exception as e:
-            logger.error(f"Failed to create PostgreSQL pool: {type(e).__name__}: {e}")
+            error_msg = f"{type(e).__name__}: {e}"
+            logger.error(f"Failed to create PostgreSQL pool: {error_msg}")
+            _pg_pool_error = error_msg
             pg_pool = None
     return pg_pool
+
+def get_pg_pool_error():
+    """Get the last pool creation error."""
+    return _pg_pool_error
 
 @app.on_event("startup")
 async def startup_event():
@@ -223,12 +239,17 @@ async def db_status():
     """Detailed database status for debugging."""
     import re
 
+    # Try to create pool if not exists
+    if is_cloud_mode() and pg_pool is None:
+        get_pg_pool()
+
     status = {
         "db_mode": DB_MODE,
         "is_cloud_mode": is_cloud_mode(),
         "database_url_set": bool(DATABASE_URL),
         "database_url_masked": re.sub(r':([^:@]+)@', ':****@', DATABASE_URL) if DATABASE_URL else None,
         "pg_pool_exists": pg_pool is not None,
+        "pg_pool_error": get_pg_pool_error(),
         "duckdb_con_exists": db_con is not None,
     }
 
