@@ -1772,6 +1772,14 @@ GROUP BY 1
             st.markdown("#### 📊 원 데이터 (Raw Data)")
         with col_download:
             # Fetch full event data for download with enriched fields
+            # Use different syntax for DuckDB vs PostgreSQL
+            if al.is_cloud_mode():
+                # PostgreSQL: Use EXTRACT(EPOCH FROM ...) for time difference
+                time_diff_expr = "EXTRACT(EPOCH FROM (e.timestamp - LAG(e.timestamp) OVER (PARTITION BY e.user_id ORDER BY e.timestamp)))"
+            else:
+                # DuckDB: Use DATEDIFF
+                time_diff_expr = "DATEDIFF('second', LAG(e.timestamp) OVER (PARTITION BY e.user_id ORDER BY e.timestamp), e.timestamp)"
+
             raw_data_sql = f"""
             WITH user_journey AS (
                 SELECT
@@ -1785,7 +1793,7 @@ GROUP BY 1
                     ROW_NUMBER() OVER (PARTITION BY e.user_id ORDER BY e.timestamp) as event_sequence,
                     LAG(e.event_name) OVER (PARTITION BY e.user_id ORDER BY e.timestamp) as prev_event,
                     LEAD(e.event_name) OVER (PARTITION BY e.user_id ORDER BY e.timestamp) as next_event,
-                    DATEDIFF('second', LAG(e.timestamp) OVER (PARTITION BY e.user_id ORDER BY e.timestamp), e.timestamp) as time_since_last_event
+                    {time_diff_expr} as time_since_last_event
                 FROM events e
                 LEFT JOIN assignments a ON e.user_id = a.user_id AND e.run_id = a.run_id
                 WHERE e.run_id = '{current_run_id}'

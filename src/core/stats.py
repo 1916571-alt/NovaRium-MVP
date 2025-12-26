@@ -188,6 +188,15 @@ def _convert_duckdb_to_pg(query):
         flags=re.IGNORECASE
     )
 
+    # DATEDIFF('second', start, end) -> EXTRACT(EPOCH FROM (end - start))
+    # Simple case without nested parentheses (complex cases should be handled in app.py directly)
+    pg_query = re.sub(
+        r"DATEDIFF\s*\(\s*['\"]second['\"]\s*,\s*([^,)]+)\s*,\s*([^)]+)\s*\)",
+        r"EXTRACT(EPOCH FROM (\2 - \1))",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
     return pg_query
 
 def _pg_query(query):
