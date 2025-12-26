@@ -1999,6 +1999,13 @@ GROUP BY 1
             # Execute with coordination mode setting
             result = safe_write_batch(operations, use_coordination=st.session_state.get('use_db_coordination', True))
 
+            # Debug: Show result status (temporary)
+            st.write(f"DEBUG: save result = {result.get('status')}")
+            if result.get('results'):
+                with st.expander("DEBUG: Operation Results", expanded=False):
+                    for r in result.get('results', []):
+                        st.write(r)
+
             # Accept both 'success' and 'partial_error' (some non-critical ops may fail)
             if result['status'] in ['success', 'partial_error']:
                 # Clear caches to ensure UI reflects latest DB state

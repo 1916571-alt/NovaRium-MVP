@@ -40,8 +40,20 @@ def _get_secret(key: str, default: str = '') -> str:
     return os.getenv(key, default)
 
 DB_MODE = _get_secret('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
-DATABASE_URL = _get_secret('DATABASE_URL', '')  # PostgreSQL connection string
+_raw_database_url = _get_secret('DATABASE_URL', '')  # PostgreSQL connection string
 TARGET_APP_URL = _get_secret('TARGET_APP_URL', 'http://localhost:8000')
+
+# Ensure SSL mode is set for cloud PostgreSQL connections
+def _ensure_ssl(url: str) -> str:
+    """Add sslmode=require if not present in DATABASE_URL."""
+    if not url:
+        return url
+    if 'sslmode=' not in url:
+        separator = '&' if '?' in url else '?'
+        return f"{url}{separator}sslmode=require"
+    return url
+
+DATABASE_URL = _ensure_ssl(_raw_database_url)
 
 # =========================================================
 # PostgreSQL Support (Supabase Cloud)
