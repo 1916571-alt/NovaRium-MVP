@@ -181,7 +181,7 @@ def render_navbar():
     """
     c_logo, c_nav = st.columns([1, 4])
     with c_logo:
-        if st.button("🌌 NovaRium", type="secondary", use_container_width=True):
+        if st.button("🌌 NovaRium", type="primary" if st.session_state.get('page')=='intro' else "secondary", use_container_width=True):
             st.session_state['page'] = 'intro'
             st.rerun()
 

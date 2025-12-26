@@ -63,7 +63,7 @@ st.set_page_config(
 )
 
 # Initialize Session State
-if 'page' not in st.session_state: st.session_state['page'] = 'data_lab' # Default to Data Lab
+if 'page' not in st.session_state: st.session_state['page'] = 'intro' # Default to NovaRium intro page
 if 'step' not in st.session_state: st.session_state['step'] = 1
 if 'custom_metrics' not in st.session_state: st.session_state['custom_metrics'] = []
 if 'use_db_coordination' not in st.session_state: st.session_state['use_db_coordination'] = True  # DB coordination mode
