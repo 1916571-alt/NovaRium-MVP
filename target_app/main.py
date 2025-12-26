@@ -584,6 +584,12 @@ async def read_root(request: Request, uid: str = None, run_id: str = None, weigh
     if is_new:
         response.set_cookie(key="user_id", value=user_id)
 
+    # Log page_view event for all visitors
+    try:
+        log_event(user_id, variant, 'page_view', 0.0, run_id)
+    except Exception as e:
+        print(f"[App] Page view log error: {e}")
+
     # Prevent browser caching to ensure variant changes are reflected immediately
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -595,24 +601,28 @@ async def read_root(request: Request, uid: str = None, run_id: str = None, weigh
 async def view_cart(request: Request):
     uid = request.cookies.get("user_id") or "guest"
     group = get_assignment(uid)
+    log_event(uid, group, 'page_view_cart', 0.0, None)
     return templates.TemplateResponse("cart.html", {"request": request, "uid": uid, "group": group})
 
 @app.get("/detail", response_class=HTMLResponse)
 async def view_detail(request: Request, id: str = "item_001"):
     uid = request.cookies.get("user_id") or "guest"
     group = get_assignment(uid)
+    log_event(uid, group, 'page_view_detail', 0.0, None)
     return templates.TemplateResponse("detail.html", {"request": request, "uid": uid, "group": group, "item_id": id})
 
 @app.get("/search", response_class=HTMLResponse)
 async def view_search(request: Request, q: str = ""):
     uid = request.cookies.get("user_id") or "guest"
     group = get_assignment(uid)
+    log_event(uid, group, 'page_view_search', 0.0, None)
     return templates.TemplateResponse("search.html", {"request": request, "uid": uid, "group": group, "query": q})
 
 @app.get("/tracking", response_class=HTMLResponse)
 async def view_tracking(request: Request):
     uid = request.cookies.get("user_id") or "guest"
     group = get_assignment(uid)
+    log_event(uid, group, 'page_view_tracking', 0.0, None)
     return templates.TemplateResponse("tracking.html", {"request": request, "uid": uid, "group": group})
 
 @app.post("/click")

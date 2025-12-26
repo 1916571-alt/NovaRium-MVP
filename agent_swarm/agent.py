@@ -5,6 +5,18 @@ import random
 import os
 from agent_swarm.behaviors import BehaviorStrategy, get_behavior_by_name
 
+def _get_target_url():
+    """Get TARGET_APP_URL from Streamlit secrets or environment variable."""
+    # Try Streamlit secrets first (for Streamlit Cloud)
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'TARGET_APP_URL' in st.secrets:
+            return str(st.secrets['TARGET_APP_URL'])
+    except Exception:
+        pass
+    # Fall back to environment variable
+    return os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+
 class HeuristicAgent:
     """
     Refactored Agent complying with SOLID Principles.
@@ -12,7 +24,7 @@ class HeuristicAgent:
     - OCP: New behaviors added via BehaviorStrategy classes.
     - DIP: Depends on BehaviorStrategy abstraction.
     """
-    
+
     def __init__(self, agent_id: str, behavior: BehaviorStrategy, run_id: str = None, weight: float = 1.0):
         self.agent_id = agent_id
         if isinstance(behavior, str):
@@ -23,7 +35,7 @@ class HeuristicAgent:
 
         self.run_id = run_id
         self.weight = weight  # For hybrid simulation
-        self.base_url = "http://localhost:8000"
+        self.base_url = _get_target_url()  # Use cloud URL from secrets/env
         self.session = requests.Session()
     
     def _get_variant(self):
