@@ -198,15 +198,66 @@ async def health_check():
                     with conn.cursor() as cur:
                         cur.execute("SELECT 1")
                     status["database"] = "postgresql"
+                    status["db_connected"] = True
                 finally:
                     pool.putconn(conn)
+            else:
+                status["db_connected"] = False
+                status["error"] = "PostgreSQL pool is None"
         else:
             if db_con:
                 db_con.execute("SELECT 1")
                 status["database"] = "duckdb"
+                status["db_connected"] = True
+            else:
+                status["db_connected"] = False
     except Exception as e:
         status["status"] = "unhealthy"
+        status["db_connected"] = False
         status["error"] = str(e)
+    return status
+
+# Debug endpoint for diagnostics
+@app.get("/debug/db-status")
+async def db_status():
+    """Detailed database status for debugging."""
+    import re
+
+    status = {
+        "db_mode": DB_MODE,
+        "is_cloud_mode": is_cloud_mode(),
+        "database_url_set": bool(DATABASE_URL),
+        "database_url_masked": re.sub(r':([^:@]+)@', ':****@', DATABASE_URL) if DATABASE_URL else None,
+        "pg_pool_exists": pg_pool is not None,
+        "duckdb_con_exists": db_con is not None,
+    }
+
+    # Test connection
+    try:
+        if is_cloud_mode():
+            pool = get_pg_pool()
+            if pool:
+                conn = pool.getconn()
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT COUNT(*) FROM assignments")
+                        count = cur.fetchone()[0]
+                    status["connection_test"] = "SUCCESS"
+                    status["assignments_count"] = count
+                finally:
+                    pool.putconn(conn)
+            else:
+                status["connection_test"] = "FAILED - pool is None"
+        else:
+            if db_con:
+                result = db_con.execute("SELECT COUNT(*) FROM assignments").fetchone()
+                status["connection_test"] = "SUCCESS"
+                status["assignments_count"] = result[0] if result else 0
+            else:
+                status["connection_test"] = "FAILED - db_con is None"
+    except Exception as e:
+        status["connection_test"] = f"ERROR: {type(e).__name__}: {e}"
+
     return status
 
 def log_event(uid, variant, event_name, value=0.0, run_id=None):
@@ -468,43 +519,70 @@ class SqlRequest(BaseModel):
 
 @app.post("/admin/execute_sql")
 async def execute_sql(body: SqlRequest):
+    """Execute SQL query (supports both DuckDB and PostgreSQL)."""
     global db_con
-    if not db_con:
-        return {"status": "error", "message": "DB not connected"}
-    
+
     try:
-        logger.info("Executing Admin SQL")
-        with db_lock:
-            result = None
-            columns = []
+        logger.info(f"Executing Admin SQL (mode={DB_MODE})")
+
+        if is_cloud_mode():
+            # PostgreSQL mode
+            pool = get_pg_pool()
+            if not pool:
+                logger.error("PostgreSQL pool is None")
+                return {"status": "error", "message": "PostgreSQL pool not available"}
+
+            conn = pool.getconn()
             try:
-                db_con.execute(body.sql)
-                try:
-                    result = db_con.fetchall()
-                    if db_con.description:
-                        columns = [desc[0] for desc in db_con.description]
-                except Exception:
-                    # Query probably didn't return rows (e.g. INSERT/UPDATE)
-                    pass
-                try:
-                    db_con.execute("COMMIT")
-                except Exception as e:
-                    # DDLs like CREATE TABLE might auto-commit, causing "no transaction active" error
-                    if "no transaction is active" in str(e).lower():
-                        pass
-                    else:
-                        raise e
+                result = None
+                columns = []
+                with conn.cursor() as cur:
+                    cur.execute(body.sql)
+                    if cur.description:
+                        columns = [desc[0] for desc in cur.description]
+                        result = cur.fetchall()
+                conn.commit()
+                logger.info(f"SQL executed successfully, rows={len(result) if result else 0}")
+                return {"status": "success", "data": result, "columns": columns}
             except Exception as e:
-                try:
-                    db_con.execute("ROLLBACK")
-                except Exception:
-                    pass
+                conn.rollback()
                 raise e
-                
-        return {"status": "success", "data": result, "columns": columns}
+            finally:
+                pool.putconn(conn)
+        else:
+            # DuckDB mode
+            if not db_con:
+                return {"status": "error", "message": "DuckDB not connected"}
+
+            with db_lock:
+                result = None
+                columns = []
+                try:
+                    db_con.execute(body.sql)
+                    try:
+                        result = db_con.fetchall()
+                        if db_con.description:
+                            columns = [desc[0] for desc in db_con.description]
+                    except Exception:
+                        pass
+                    try:
+                        db_con.execute("COMMIT")
+                    except Exception as e:
+                        if "no transaction is active" in str(e).lower():
+                            pass
+                        else:
+                            raise e
+                except Exception as e:
+                    try:
+                        db_con.execute("ROLLBACK")
+                    except Exception:
+                        pass
+                    raise e
+
+            return {"status": "success", "data": result, "columns": columns}
 
     except Exception as e:
-        logger.error(f"SQL Exec Error: {e}")
+        logger.error(f"SQL Exec Error: {type(e).__name__}: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.post("/admin/db_release")
