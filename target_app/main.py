@@ -6,11 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import duckdb
 import os
+import time
 from datetime import datetime
 import hashlib
 import uuid
 import threading
 import logging
+from typing import Optional
 
 # Try to load environment variables
 try:
@@ -76,58 +78,126 @@ def is_cloud_mode():
     """Check if running in cloud mode (Supabase)."""
     return DB_MODE == 'supabase' and bool(DATABASE_URL)
 
-# Store last connection error for debugging
-_pg_pool_error = None
+# =========================================================
+# PostgreSQL Connection Pool with Retry Logic
+# =========================================================
 
-def get_pg_pool():
-    """Get or create PostgreSQL connection pool."""
-    global pg_pool, _pg_pool_error
-    if pg_pool is None and DATABASE_URL:
+_pg_pool_error: Optional[str] = None
+_pg_pool_last_attempt: float = 0
+_PG_RETRY_INTERVAL = 30  # Seconds between retry attempts
+
+def get_pg_pool(force_retry: bool = False):
+    """
+    Get or create PostgreSQL connection pool with lazy initialization and retry logic.
+
+    Args:
+        force_retry: If True, attempt connection even if recently failed
+
+    Returns:
+        Connection pool or None if connection fails
+    """
+    global pg_pool, _pg_pool_error, _pg_pool_last_attempt
+
+    if not DATABASE_URL:
+        _pg_pool_error = "DATABASE_URL not set"
+        return None
+
+    # If pool exists and is valid, return it
+    if pg_pool is not None:
+        return pg_pool
+
+    # Throttle retry attempts (don't hammer the database)
+    current_time = time.time()
+    if not force_retry and _pg_pool_last_attempt > 0:
+        time_since_last = current_time - _pg_pool_last_attempt
+        if time_since_last < _PG_RETRY_INTERVAL:
+            logger.debug(f"Skipping pool creation - retry in {_PG_RETRY_INTERVAL - time_since_last:.0f}s")
+            return None
+
+    # Attempt to create pool with retries
+    max_retries = 3
+    retry_delay = 2  # seconds
+
+    for attempt in range(1, max_retries + 1):
+        _pg_pool_last_attempt = time.time()
+
         try:
             import psycopg2
-            from psycopg2 import pool
+            from psycopg2 import pool as pg_pool_module
 
-            logger.info("Creating PostgreSQL connection pool...")
+            logger.info(f"Attempting PostgreSQL connection (attempt {attempt}/{max_retries})...")
             logger.info(f"DATABASE_URL length: {len(DATABASE_URL)}")
 
-            pg_pool = pool.ThreadedConnectionPool(
+            # Create connection pool with timeout
+            pg_pool = pg_pool_module.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
-                dsn=DATABASE_URL
+                dsn=DATABASE_URL,
+                connect_timeout=10  # 10 second connection timeout
             )
-            logger.info("PostgreSQL connection pool created successfully!")
-            _pg_pool_error = None
 
-            # Test the connection
+            # Test the connection immediately
             test_conn = pg_pool.getconn()
             try:
                 with test_conn.cursor() as cur:
                     cur.execute("SELECT 1")
-                logger.info("PostgreSQL connection test: SUCCESS")
+                logger.info("PostgreSQL connection pool created and tested successfully!")
+                _pg_pool_error = None  # Clear error on success
+                return pg_pool
             finally:
                 pg_pool.putconn(test_conn)
 
         except psycopg2.OperationalError as e:
-            error_msg = f"OperationalError: {e}"
-            logger.error(f"PostgreSQL {error_msg}")
-            logger.error("This usually means: wrong password, host unreachable, or SSL issue")
-            _pg_pool_error = error_msg
-            pg_pool = None
-        except psycopg2.Error as e:
-            error_msg = f"Error [{e.pgcode}]: {e.pgerror or e}"
-            logger.error(f"PostgreSQL {error_msg}")
-            _pg_pool_error = error_msg
-            pg_pool = None
-        except Exception as e:
-            error_msg = f"{type(e).__name__}: {e}"
-            logger.error(f"Failed to create PostgreSQL pool: {error_msg}")
-            _pg_pool_error = error_msg
-            pg_pool = None
-    return pg_pool
+            error_msg = str(e)
+            _pg_pool_error = f"OperationalError: {error_msg}"
+            logger.error(f"PostgreSQL OperationalError (attempt {attempt}): {error_msg}")
 
-def get_pg_pool_error():
+            # Check for specific error types
+            if "password authentication failed" in error_msg.lower():
+                logger.error("Password is incorrect - check DATABASE_URL")
+                break  # Don't retry for auth failures
+            elif "could not connect to server" in error_msg.lower():
+                logger.error("Cannot reach database server - check network/host")
+            elif "network is unreachable" in error_msg.lower():
+                logger.error("Network unreachable - possible IPv6 issue, trying to continue...")
+
+            pg_pool = None
+
+        except psycopg2.Error as e:
+            _pg_pool_error = f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}"
+            logger.error(f"PostgreSQL Error (attempt {attempt}): {_pg_pool_error}")
+            pg_pool = None
+
+        except Exception as e:
+            _pg_pool_error = f"{type(e).__name__}: {e}"
+            logger.error(f"Unexpected error (attempt {attempt}): {_pg_pool_error}")
+            pg_pool = None
+
+        # Wait before retry (except on last attempt)
+        if attempt < max_retries:
+            logger.info(f"Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+            retry_delay *= 2  # Exponential backoff
+
+    logger.error(f"Failed to create PostgreSQL pool after {max_retries} attempts")
+    return None
+
+def get_pg_pool_error() -> Optional[str]:
     """Get the last pool creation error."""
     return _pg_pool_error
+
+def reset_pg_pool():
+    """Reset pool state to force a fresh connection attempt."""
+    global pg_pool, _pg_pool_error, _pg_pool_last_attempt
+    if pg_pool:
+        try:
+            pg_pool.closeall()
+        except Exception:
+            pass
+    pg_pool = None
+    _pg_pool_error = None
+    _pg_pool_last_attempt = 0
+    logger.info("PostgreSQL pool reset - will retry on next request")
 
 @app.on_event("startup")
 async def startup_event():
@@ -235,13 +305,22 @@ async def health_check():
 
 # Debug endpoint for diagnostics
 @app.get("/debug/db-status")
-async def db_status():
-    """Detailed database status for debugging."""
+async def db_status(force_retry: bool = False):
+    """
+    Detailed database status for debugging.
+
+    Args:
+        force_retry: If True, reset pool and force a new connection attempt
+    """
     import re
+
+    # Force retry if requested
+    if force_retry:
+        reset_pg_pool()
 
     # Try to create pool if not exists
     if is_cloud_mode() and pg_pool is None:
-        get_pg_pool()
+        get_pg_pool(force_retry=force_retry)
 
     status = {
         "db_mode": DB_MODE,
@@ -251,6 +330,7 @@ async def db_status():
         "pg_pool_exists": pg_pool is not None,
         "pg_pool_error": get_pg_pool_error(),
         "duckdb_con_exists": db_con is not None,
+        "retry_interval_seconds": _PG_RETRY_INTERVAL,
     }
 
     # Test connection
@@ -280,6 +360,20 @@ async def db_status():
         status["connection_test"] = f"ERROR: {type(e).__name__}: {e}"
 
     return status
+
+@app.post("/debug/reset-pool")
+async def reset_pool_endpoint():
+    """Force reset the PostgreSQL connection pool."""
+    reset_pg_pool()
+
+    # Attempt reconnection
+    pool = get_pg_pool(force_retry=True)
+
+    return {
+        "status": "reset_complete",
+        "pool_created": pool is not None,
+        "error": get_pg_pool_error() if pool is None else None
+    }
 
 def log_event(uid, variant, event_name, value=0.0, run_id=None):
     """Log an event to the database (supports both DuckDB and PostgreSQL)."""

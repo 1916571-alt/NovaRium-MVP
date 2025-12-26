@@ -35,8 +35,24 @@ from src.core import stats as al
 from src.ui import components as ui
 from src.core import mart_builder as mb  # New Module
 
-# Environment-based URL configuration for cloud deployment
-TARGET_APP_URL = os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+# =========================================================
+# Environment Configuration with Streamlit Secrets Priority
+# =========================================================
+
+def _get_env(key: str, default: str = '') -> str:
+    """
+    Get environment variable with Streamlit secrets priority.
+    1. Check st.secrets first (Streamlit Cloud)
+    2. Fall back to os.getenv (local/Render)
+    """
+    try:
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+TARGET_APP_URL = _get_env('TARGET_APP_URL', 'http://localhost:8000')
 
 # Page Config
 st.set_page_config(
@@ -187,18 +203,45 @@ elif st.session_state['page'] == 'data_lab':
                             
                         except requests.exceptions.ConnectionError:
                              st.error(f"서버 연결 실패: Target App({TARGET_APP_URL})에 연결할 수 없습니다.")
+                             st.info("💡 Render 백엔드가 아직 시작 중일 수 있습니다. 30초 후 다시 시도해주세요.")
                              raise
                         except Exception as e:
                              raise e
-                        
+
                         # Move to dashboard
                         import time
                         time.sleep(1)
                         st.session_state['page'] = 'monitor'
                         st.rerun()
-                        
+
                     except Exception as e:
-                        st.error(f"ETL 실패: {e}")
+                        error_msg = str(e)
+                        st.error(f"ETL 실패: {error_msg}")
+
+                        # Show detailed diagnostics for connection errors
+                        if "pool not available" in error_msg.lower() or "connection" in error_msg.lower():
+                            with st.expander("🔍 상세 진단 정보"):
+                                st.markdown(f"""
+                                **Target App URL**: `{TARGET_APP_URL}`
+
+                                **가능한 원인**:
+                                1. 🔄 Render 서버가 아직 시작 중 (Free tier는 15분 비활성화 후 Sleep)
+                                2. 🔐 DATABASE_URL 환경 변수가 잘못 설정됨
+                                3. 🌐 네트워크 연결 문제 (IPv6 vs IPv4)
+
+                                **해결 방법**:
+                                1. Render Dashboard에서 Manual Deploy 실행
+                                2. `{TARGET_APP_URL}/debug/db-status?force_retry=true` 접속하여 상태 확인
+                                3. Streamlit Cloud Secrets에 DATABASE_URL 확인
+                                """)
+
+                                # Try to get debug info from server
+                                try:
+                                    debug_resp = requests.get(f"{TARGET_APP_URL}/debug/db-status", timeout=10)
+                                    if debug_resp.status_code == 200:
+                                        st.json(debug_resp.json())
+                                except Exception:
+                                    st.warning("백엔드 서버에 연결할 수 없어 상세 정보를 가져올 수 없습니다.")
 
             st.divider()
 

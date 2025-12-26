@@ -10,6 +10,7 @@ Usage:
 """
 import os
 import logging
+import time
 from typing import Optional, List, Tuple, Dict, Any
 from contextlib import contextmanager
 
@@ -25,14 +26,34 @@ except ImportError:
     pass  # dotenv not installed, use system env vars
 
 # =========================================================
+# Configuration Helper: Streamlit Secrets Priority
+# =========================================================
+
+def _get_env(key: str, default: str = '') -> str:
+    """
+    Get environment variable with Streamlit secrets priority.
+    1. Check st.secrets first (Streamlit Cloud)
+    2. Fall back to os.getenv (local/Render)
+    """
+    # Try Streamlit secrets first
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass  # Not in Streamlit context or secrets not available
+
+    return os.getenv(key, default)
+
+# =========================================================
 # Configuration
 # =========================================================
 
 # Database mode: 'supabase' for cloud, 'duckdb' for local
-DB_MODE = os.getenv('DB_MODE', 'duckdb')
+DB_MODE = _get_env('DB_MODE', 'duckdb')
 
 # Supabase connection string (PostgreSQL)
-_raw_database_url = os.getenv('DATABASE_URL', '')
+_raw_database_url = _get_env('DATABASE_URL', '')
 
 # Ensure SSL mode is set for cloud PostgreSQL connections
 def _ensure_ssl(url: str) -> str:
@@ -45,8 +66,8 @@ def _ensure_ssl(url: str) -> str:
     return url
 
 DATABASE_URL = _ensure_ssl(_raw_database_url)
-SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+SUPABASE_URL = _get_env('SUPABASE_URL', '')
+SUPABASE_KEY = _get_env('SUPABASE_KEY', '')
 
 # Log configuration on import (for debugging)
 logger.info(f"DB_MODE: {DB_MODE}")
@@ -64,56 +85,147 @@ EXPERIMENT_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_experiment.db')
 WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')
 
 # =========================================================
-# PostgreSQL Connection Pool (Supabase)
+# PostgreSQL Connection Pool (Supabase) with Retry Logic
 # =========================================================
 
 _pg_pool = None
+_pg_pool_error = None  # Store last error for diagnostics
+_pg_pool_last_attempt = 0  # Timestamp of last connection attempt
+_PG_RETRY_INTERVAL = 30  # Seconds between retry attempts
 
-def get_pg_pool():
-    """Get or create PostgreSQL connection pool."""
-    global _pg_pool
-    if _pg_pool is None and DATABASE_URL:
+def get_pg_pool(force_retry: bool = False):
+    """
+    Get or create PostgreSQL connection pool with lazy initialization and retry logic.
+
+    Args:
+        force_retry: If True, attempt connection even if recently failed
+
+    Returns:
+        Connection pool or None if connection fails
+    """
+    global _pg_pool, _pg_pool_error, _pg_pool_last_attempt
+
+    if not DATABASE_URL:
+        _pg_pool_error = "DATABASE_URL not set"
+        return None
+
+    # If pool exists and is valid, return it
+    if _pg_pool is not None:
+        return _pg_pool
+
+    # Throttle retry attempts (don't hammer the database)
+    current_time = time.time()
+    if not force_retry and _pg_pool_last_attempt > 0:
+        time_since_last = current_time - _pg_pool_last_attempt
+        if time_since_last < _PG_RETRY_INTERVAL:
+            logger.debug(f"Skipping pool creation - retry in {_PG_RETRY_INTERVAL - time_since_last:.0f}s")
+            return None
+
+    # Attempt to create pool with retries
+    max_retries = 3
+    retry_delay = 2  # seconds
+
+    for attempt in range(1, max_retries + 1):
+        _pg_pool_last_attempt = time.time()
+
         try:
             import psycopg2
             from psycopg2 import pool
 
-            logger.info("Attempting to create PostgreSQL connection pool...")
+            logger.info(f"Attempting PostgreSQL connection (attempt {attempt}/{max_retries})...")
+
+            # Create connection pool
             _pg_pool = pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
-                dsn=DATABASE_URL
+                dsn=DATABASE_URL,
+                connect_timeout=10  # 10 second connection timeout
             )
-            logger.info("PostgreSQL connection pool created successfully!")
 
             # Test the connection immediately
             test_conn = _pg_pool.getconn()
             try:
                 with test_conn.cursor() as cur:
                     cur.execute("SELECT 1")
-                logger.info("PostgreSQL connection test: SUCCESS")
+                logger.info("PostgreSQL connection pool created and tested successfully!")
+                _pg_pool_error = None  # Clear error on success
+                return _pg_pool
             finally:
                 _pg_pool.putconn(test_conn)
 
         except psycopg2.OperationalError as e:
-            logger.error(f"PostgreSQL OperationalError: {e}")
-            logger.error(f"This usually means: wrong password, host unreachable, or SSL issue")
+            error_msg = str(e)
+            _pg_pool_error = f"OperationalError: {error_msg}"
+            logger.error(f"PostgreSQL OperationalError (attempt {attempt}): {error_msg}")
+
+            # Check for specific error types
+            if "password authentication failed" in error_msg.lower():
+                logger.error("Password is incorrect - check DATABASE_URL")
+                break  # Don't retry for auth failures
+            elif "could not connect to server" in error_msg.lower():
+                logger.error("Cannot reach database server - check network/host")
+            elif "network is unreachable" in error_msg.lower():
+                logger.error("Network unreachable - possible IPv6 issue")
+
             _pg_pool = None
+
         except psycopg2.Error as e:
-            logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+            _pg_pool_error = f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}"
+            logger.error(f"PostgreSQL Error (attempt {attempt}): {_pg_pool_error}")
             _pg_pool = None
+
         except Exception as e:
-            logger.error(f"Unexpected error creating PostgreSQL pool: {type(e).__name__}: {e}")
+            _pg_pool_error = f"{type(e).__name__}: {e}"
+            logger.error(f"Unexpected error (attempt {attempt}): {_pg_pool_error}")
             _pg_pool = None
-    return _pg_pool
+
+        # Wait before retry (except on last attempt)
+        if attempt < max_retries:
+            logger.info(f"Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+            retry_delay *= 2  # Exponential backoff
+
+    logger.error(f"Failed to create PostgreSQL pool after {max_retries} attempts")
+    return None
+
+def get_pg_pool_error() -> Optional[str]:
+    """Get the last connection pool error for diagnostics."""
+    return _pg_pool_error
+
+def reset_pg_pool():
+    """Reset pool state to force a fresh connection attempt."""
+    global _pg_pool, _pg_pool_error, _pg_pool_last_attempt
+    if _pg_pool:
+        try:
+            _pg_pool.closeall()
+        except Exception:
+            pass
+    _pg_pool = None
+    _pg_pool_error = None
+    _pg_pool_last_attempt = 0
+    logger.info("PostgreSQL pool reset - will retry on next request")
 
 @contextmanager
 def get_pg_connection():
-    """Get a connection from the pool."""
+    """Get a connection from the pool with detailed error reporting."""
     pool = get_pg_pool()
     if pool is None:
-        logger.error("PostgreSQL pool is None - connection cannot be established")
-        logger.error(f"Check: DB_MODE={DB_MODE}, DATABASE_URL set={bool(DATABASE_URL)}")
-        raise ConnectionError("PostgreSQL connection pool not available. Check DATABASE_URL and DB_MODE settings.")
+        # Build detailed error message
+        error_details = []
+        error_details.append(f"DB_MODE={DB_MODE}")
+        error_details.append(f"DATABASE_URL set={bool(DATABASE_URL)}")
+
+        if DATABASE_URL:
+            import re
+            masked = re.sub(r':([^:@]+)@', ':****@', DATABASE_URL)
+            error_details.append(f"URL (masked): {masked}")
+
+        if _pg_pool_error:
+            error_details.append(f"Last error: {_pg_pool_error}")
+
+        error_msg = f"PostgreSQL pool not available. {'; '.join(error_details)}"
+        logger.error(error_msg)
+        raise ConnectionError(error_msg)
 
     conn = None
     try:
