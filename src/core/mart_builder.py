@@ -1,7 +1,17 @@
 import os
 
+def _get_secret(key: str, default: str = '') -> str:
+    """Get config from Streamlit secrets first, then env vars."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
 # Check if running in cloud mode (PostgreSQL)
-DB_MODE = os.getenv('DB_MODE', 'duckdb')
+DB_MODE = _get_secret('DB_MODE', 'duckdb')
 
 def generate_mart_sql(selected_metrics):
     """

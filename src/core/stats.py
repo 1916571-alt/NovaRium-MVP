@@ -178,6 +178,16 @@ def _convert_duckdb_to_pg(query):
         flags=re.IGNORECASE
     )
 
+    # DATE_DIFF('day', start, end) -> EXTRACT(DAY FROM (end - start))
+    # DuckDB: DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE)
+    # PostgreSQL: EXTRACT(DAY FROM (CURRENT_DATE - MIN(u.joined_at)::TIMESTAMP))
+    pg_query = re.sub(
+        r"DATE_DIFF\s*\(\s*['\"]day['\"]\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)",
+        r"EXTRACT(DAY FROM (\2 - \1))",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
     return pg_query
 
 def _pg_query(query):

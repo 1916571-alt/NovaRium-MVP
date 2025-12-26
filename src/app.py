@@ -529,44 +529,56 @@ if st.session_state['page'] == 'monitor':
             st.warning("⚠️ **데이터 마트(`dm_daily_kpi`)가 비어있습니다.** '🛠️ 데이터 랩'에서 ETL을 실행하여 데이터를 생성하세요.")
             st.info("💡 Data Lab → Step 2에서 '실행' 버튼을 눌러 데이터 마트를 구축하세요.")
 
+        # Educational Mode: Always show at least one alert for learning purposes
+        if not alerts and not df_trend.empty:
+            # Generate a sample educational alert to guide users
+            sample_ctr = latest.get('ctr', 0.03) if 'ctr' in df_trend.columns else 0.03
+            alerts.append({
+                "level": "Educational",
+                "title": "📚 [학습 모드] 배너 최적화 기회",
+                "desc": f"현재 CTR **{sample_ctr*100:.1f}%** - 업계 평균(15%) 대비 개선 여지가 있습니다.",
+                "cause": "사용자 참여도(Engagement)를 높이기 위한 A/B 테스트가 권장됩니다",
+                "action": "메인 배너 문구/디자인 변형 실험을 시작해보세요!",
+                "target": "메인 배너 (할인 문구)",
+                "metric_key": "ctr",
+                "threshold": 0.15
+            })
+
         # Render Alerts
-        elif alerts:
+        if alerts:
             for alert in alerts:
                 with st.container(border=True):
                     # Layout: Text (Left) | Button (Right)
                     c_text, c_btn = st.columns([3.5, 1])
-                    
+
                     with c_text:
                         st.markdown(f"#### 🚨 {alert['title']}")
-                        st.markdown(f"**현상**: {alert['desc']}") 
+                        st.markdown(f"**현상**: {alert['desc']}")
                         st.info(f"**원인/조치**: {alert['cause']} → {alert['action']}")
-                        
+
                     with c_btn:
                         st.write("") # Vertical spacer
-                        st.write("") 
+                        st.write("")
                         if st.button(f"⚡ 개선 실험 생성", key=f"btn_{alert['title']}", type="primary", width="stretch"):
                             st.session_state['page'] = 'study'
                             st.session_state['step'] = 1
                             st.session_state['target'] = alert['target']
                             st.rerun()
-                    
+
                     # Interactive Trend Chart
                     with st.expander("📉 상세 트렌드 분석 (Trend Analysis)", expanded=False):
                         metric = alert['metric_key']
                         if metric in df_trend.columns:
                             fig_alert = px.line(df_trend, x='report_date', y=metric, markers=True, title=f"{alert['title']} - Trend View", template="plotly_dark")
                             fig_alert.update_traces(line_color='#ef4444', line_width=3)
-                            
+
                             # Add Threshold Line if exists
                             if alert.get('threshold'):
                                 fig_alert.add_hline(y=alert['threshold'], line_dash="dash", line_color="yellow", annotation_text="Threshold (위험 기준)")
-                                
+
                             st.plotly_chart(fig_alert, width="stretch")
                         else:
                             st.warning("해당 지표의 상세 데이터를 불러올 수 없습니다.")
-        else:
-            st.success("✅ 모든 시스템 및 비즈니스 지표가 정상 범위(Normal) 내에서 운영 중입니다.")
-            st.caption(f"Based on real-time data from `dm_daily_kpi` (Updated: {datetime.now().strftime('%H:%M')})")
             
         with st.expander("⚙️ 데이터 관리 (Admin)"):
              if st.button("데이터 재생성 (Reset History)"):
