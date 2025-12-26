@@ -1492,17 +1492,20 @@ GROUP BY 1
                     st.warning(f"⚖️ **유의미한 차이 없음** (p >= 0.05)")
                     decision = "Inconclusive"
 
-                # Decision Action Buttons - Always show both Adopt and Re-experiment
+                # Decision Action - Checkbox for persistent adoption state
                 st.divider()
                 st.markdown("#### 🎯 의사결정 (Decision)")
 
-                # Always show both buttons - analyst can decide based on practical significance
-                col_adopt, col_redesign = st.columns(2)
+                # Use checkbox instead of button - checkbox state persists across rerenders
+                adopt_checked = st.checkbox(
+                    "✅ **채택 (Adopt)** - 이 실험 결과를 Target App에 적용합니다",
+                    value=st.session_state.get('pending_adoption') is not None,
+                    key='adopt_checkbox'
+                )
 
-                with col_adopt:
-                    if st.button("✅ 채택 (Adopt)", type="primary", use_container_width=True):
-                        # Save adoption intent to session state (will be saved with retrospective)
-                        # variant_config stores the winning variant info for Target App
+                # Update pending_adoption based on checkbox state
+                if adopt_checked:
+                    if st.session_state.get('pending_adoption') is None:
                         variant_data = st.session_state.get('exp_variant_data', {})
                         st.session_state['pending_adoption'] = {
                             'variant': {
@@ -1515,40 +1518,41 @@ GROUP BY 1
                             'p_value': res['p_value'],
                             'timestamp': pd.Timestamp.now().isoformat()
                         }
-                        st.toast("✅ 채택 표시됨! 회고록 저장 시 Target App에 적용됩니다.")
-                        st.session_state['show_adoption_success'] = True
+                    st.success("✅ **채택 선택됨** - 회고록 저장 시 Target App에 Variant B가 적용됩니다.")
+                else:
+                    # Clear pending adoption if unchecked
+                    if st.session_state.get('pending_adoption') is not None:
+                        st.session_state.pop('pending_adoption', None)
+                    st.info("💡 채택하려면 위 체크박스를 선택하세요.")
 
-                with col_redesign:
-                    if st.button("🔄 재실험 설계 (Re-design)", type="secondary", use_container_width=True):
-                        # Save learning from this experiment
-                        st.session_state['previous_experiment_learning'] = {
-                            'run_id': current_run_id,
-                            'p_value': res['p_value'],
-                            'lift': res['lift'],
-                            'decision': decision,
-                            'hypothesis': st.session_state.get('hypothesis', ''),
-                            'target': st.session_state.get('target', '')
-                        }
+                # Re-experiment button
+                if st.button("🔄 재실험 설계 (Re-design)", type="secondary", use_container_width=True):
+                    # Save learning from this experiment
+                    st.session_state['previous_experiment_learning'] = {
+                        'run_id': current_run_id,
+                        'p_value': res['p_value'],
+                        'lift': res['lift'],
+                        'decision': decision,
+                        'hypothesis': st.session_state.get('hypothesis', ''),
+                        'target': st.session_state.get('target', '')
+                    }
 
-                        # Clear current experiment data
-                        st.session_state.pop('current_run_id', None)
-                        st.session_state.pop('sim_complete', None)
+                    # Clear current experiment data
+                    st.session_state.pop('current_run_id', None)
+                    st.session_state.pop('sim_complete', None)
 
-                        # Navigate back to Step 1
-                        st.session_state['step'] = 1
-                        st.toast("🔄 새로운 실험을 설계해보세요!")
-                        st.rerun()
+                    # Navigate back to Step 1
+                    st.session_state['step'] = 1
+                    st.toast("🔄 새로운 실험을 설계해보세요!")
+                    st.rerun()
 
                 # Show guidance based on statistical and practical significance
-                if st.session_state.get('show_adoption_success'):
-                    st.success("✨ 채택 완료! 다음 실험을 설계하여 플랫폼을 더욱 개선하세요.")
+                if res['p_value'] < 0.05 and res['lift'] > 0:
+                    st.info("💡 **권장**: 통계적으로 유의미한 개선입니다. 채택을 고려하세요.")
+                elif res['p_value'] < 0.05 and res['lift'] < 0:
+                    st.warning("⚠️ **주의**: 통계적으로 유의미한 악화입니다. 재실험을 권장합니다.")
                 else:
-                    if res['p_value'] < 0.05 and res['lift'] > 0:
-                        st.info("💡 **권장**: 통계적으로 유의미한 개선입니다. 채택을 고려하세요.")
-                    elif res['p_value'] < 0.05 and res['lift'] < 0:
-                        st.warning("⚠️ **주의**: 통계적으로 유의미한 악화입니다. 재실험을 권장합니다.")
-                    else:
-                        st.info("💡 **참고**: 유의미한 차이가 없습니다. 실무적 판단 또는 재실험을 고려하세요.")
+                    st.info("💡 **참고**: 유의미한 차이가 없습니다. 실무적 판단 또는 재실험을 고려하세요.")
 
         with c_plot:
             # Main CTR Chart
@@ -1908,7 +1912,7 @@ GROUP BY 1
         if st.session_state.get('pending_adoption'):
             st.success("✅ **채택 예정** - 저장 시 Target App에 Variant B가 적용됩니다.")
         else:
-            st.info("💡 채택하려면 위의 '채택 (Adopt)' 버튼을 먼저 클릭하세요.")
+            st.info("💡 채택하려면 위의 '채택 (Adopt)' 체크박스를 선택하세요.")
 
         note = st.text_area("배운 점 (Learning Note)", help="이번 실험에서 얻은 인사이트를 기록하세요.")
 
@@ -1958,12 +1962,8 @@ GROUP BY 1
             ))
 
             # 2. If adoption was marked, create table and insert
-            has_pending_adoption = st.session_state.get('pending_adoption') is not None
-            st.write(f"DEBUG: pending_adoption exists = {has_pending_adoption}")  # Debug line
-
             if st.session_state.get('pending_adoption'):
                 adoption_data = st.session_state['pending_adoption']
-                st.write(f"DEBUG: Adding adoption ops for run_id = {current_run_id}")  # Debug line
                 # Store lift/p_value in variant_config JSON instead of separate columns
                 # This ensures compatibility with existing table schema
                 variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
