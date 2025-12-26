@@ -51,8 +51,21 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # Database Configuration (DuckDB local or PostgreSQL cloud)
 DB_MODE = os.getenv('DB_MODE', 'duckdb')
-DATABASE_URL = os.getenv('DATABASE_URL', '')
+_raw_database_url = os.getenv('DATABASE_URL', '')
 DB_PATH = os.path.join(PROJECT_ROOT, 'data', 'db', 'novarium_experiment.db')
+
+# Ensure SSL mode is set for cloud PostgreSQL connections
+def _ensure_ssl(url: str) -> str:
+    """Add sslmode=require if not present in DATABASE_URL."""
+    if not url:
+        return url
+    if 'sslmode=' not in url:
+        separator = '&' if '?' in url else '?'
+        return f"{url}{separator}sslmode=require"
+    return url
+
+DATABASE_URL = _ensure_ssl(_raw_database_url)
+logger.info(f"DB_MODE: {DB_MODE}, DATABASE_URL set: {bool(DATABASE_URL)}")
 
 # Singleton DB Connection (DuckDB for local, PostgreSQL pool for cloud)
 db_con = None
@@ -70,14 +83,34 @@ def get_pg_pool():
         try:
             import psycopg2
             from psycopg2 import pool
+
+            logger.info("Creating PostgreSQL connection pool...")
             pg_pool = pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
                 dsn=DATABASE_URL
             )
-            logger.info("PostgreSQL connection pool created")
+            logger.info("PostgreSQL connection pool created successfully!")
+
+            # Test the connection
+            test_conn = pg_pool.getconn()
+            try:
+                with test_conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                logger.info("PostgreSQL connection test: SUCCESS")
+            finally:
+                pg_pool.putconn(test_conn)
+
+        except psycopg2.OperationalError as e:
+            logger.error(f"PostgreSQL OperationalError: {e}")
+            logger.error("This usually means: wrong password, host unreachable, or SSL issue")
+            pg_pool = None
+        except psycopg2.Error as e:
+            logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+            pg_pool = None
         except Exception as e:
-            logger.error(f"Failed to create PostgreSQL pool: {e}")
+            logger.error(f"Failed to create PostgreSQL pool: {type(e).__name__}: {e}")
+            pg_pool = None
     return pg_pool
 
 @app.on_event("startup")

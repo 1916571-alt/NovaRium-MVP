@@ -32,9 +32,30 @@ except ImportError:
 DB_MODE = os.getenv('DB_MODE', 'duckdb')
 
 # Supabase connection string (PostgreSQL)
-DATABASE_URL = os.getenv('DATABASE_URL', '')
+_raw_database_url = os.getenv('DATABASE_URL', '')
+
+# Ensure SSL mode is set for cloud PostgreSQL connections
+def _ensure_ssl(url: str) -> str:
+    """Add sslmode=require if not present in DATABASE_URL."""
+    if not url:
+        return url
+    if 'sslmode=' not in url:
+        separator = '&' if '?' in url else '?'
+        return f"{url}{separator}sslmode=require"
+    return url
+
+DATABASE_URL = _ensure_ssl(_raw_database_url)
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+
+# Log configuration on import (for debugging)
+logger.info(f"DB_MODE: {DB_MODE}")
+logger.info(f"DATABASE_URL set: {bool(DATABASE_URL)}")
+if DATABASE_URL:
+    # Log masked URL for debugging (hide password)
+    import re
+    masked_url = re.sub(r':([^:@]+)@', ':****@', DATABASE_URL)
+    logger.info(f"DATABASE_URL (masked): {masked_url}")
 
 # For backward compatibility with local development
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -55,20 +76,45 @@ def get_pg_pool():
         try:
             import psycopg2
             from psycopg2 import pool
+
+            logger.info("Attempting to create PostgreSQL connection pool...")
             _pg_pool = pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
                 dsn=DATABASE_URL
             )
-            logger.info("PostgreSQL connection pool created")
+            logger.info("PostgreSQL connection pool created successfully!")
+
+            # Test the connection immediately
+            test_conn = _pg_pool.getconn()
+            try:
+                with test_conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                logger.info("PostgreSQL connection test: SUCCESS")
+            finally:
+                _pg_pool.putconn(test_conn)
+
+        except psycopg2.OperationalError as e:
+            logger.error(f"PostgreSQL OperationalError: {e}")
+            logger.error(f"This usually means: wrong password, host unreachable, or SSL issue")
+            _pg_pool = None
+        except psycopg2.Error as e:
+            logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+            _pg_pool = None
         except Exception as e:
-            logger.error(f"Failed to create PostgreSQL pool: {e}")
+            logger.error(f"Unexpected error creating PostgreSQL pool: {type(e).__name__}: {e}")
+            _pg_pool = None
     return _pg_pool
 
 @contextmanager
 def get_pg_connection():
     """Get a connection from the pool."""
     pool = get_pg_pool()
+    if pool is None:
+        logger.error("PostgreSQL pool is None - connection cannot be established")
+        logger.error(f"Check: DB_MODE={DB_MODE}, DATABASE_URL set={bool(DATABASE_URL)}")
+        raise ConnectionError("PostgreSQL connection pool not available. Check DATABASE_URL and DB_MODE settings.")
+
     conn = None
     try:
         conn = pool.getconn()
@@ -77,6 +123,7 @@ def get_pg_connection():
     except Exception as e:
         if conn:
             conn.rollback()
+        logger.error(f"PostgreSQL connection error: {type(e).__name__}: {e}")
         raise e
     finally:
         if conn and pool:

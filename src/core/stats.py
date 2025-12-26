@@ -30,8 +30,20 @@ DB_PATH = EXPERIMENT_DB_PATH
 
 # Cloud deployment configuration
 DB_MODE = os.getenv('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
-DATABASE_URL = os.getenv('DATABASE_URL', '')  # PostgreSQL connection string
+_raw_database_url = os.getenv('DATABASE_URL', '')  # PostgreSQL connection string
 TARGET_APP_URL = os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+
+# Ensure SSL mode is set for cloud PostgreSQL connections
+def _ensure_ssl(url: str) -> str:
+    """Add sslmode=require if not present in DATABASE_URL."""
+    if not url:
+        return url
+    if 'sslmode=' not in url:
+        separator = '&' if '?' in url else '?'
+        return f"{url}{separator}sslmode=require"
+    return url
+
+DATABASE_URL = _ensure_ssl(_raw_database_url)
 
 def is_cloud_mode():
     """Check if running in cloud mode (Supabase)."""
@@ -130,18 +142,20 @@ def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experime
 
 def _pg_query(query):
     """Execute query on PostgreSQL (Supabase cloud)."""
+    global _pg_pool
     try:
         import psycopg2
         from psycopg2 import pool
 
         # Get connection from pool (create if needed)
-        global _pg_pool
-        if '_pg_pool' not in globals() or _pg_pool is None:
+        if _pg_pool is None:
+            logger.info(f"Creating PostgreSQL pool (DB_MODE={DB_MODE})")
             _pg_pool = pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=5,
                 dsn=DATABASE_URL
             )
+            logger.info("PostgreSQL pool created successfully")
 
         conn = _pg_pool.getconn()
         try:
@@ -154,8 +168,16 @@ def _pg_query(query):
                 return pd.DataFrame()
         finally:
             _pg_pool.putconn(conn)
+    except psycopg2.OperationalError as e:
+        logger.error(f"PostgreSQL OperationalError: {e}")
+        logger.error("Check: DATABASE_URL, password, SSL settings")
+        _pg_pool = None
+        return pd.DataFrame()
+    except psycopg2.Error as e:
+        logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+        return pd.DataFrame()
     except Exception as e:
-        logger.error(f"PostgreSQL query error: {e}")
+        logger.error(f"PostgreSQL query error: {type(e).__name__}: {e}")
         return pd.DataFrame()
 
 _pg_pool = None
