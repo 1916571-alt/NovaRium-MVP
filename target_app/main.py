@@ -642,6 +642,41 @@ from pydantic import BaseModel
 class SqlRequest(BaseModel):
     sql: str
 
+@app.get("/admin/debug")
+async def debug_status():
+    """Debug endpoint to check adoption status and DB mode."""
+    import json
+    adopted = get_adopted_variant()
+    experiment_active = is_experiment_active()
+    pool = get_pg_pool() if is_cloud_mode() else None
+
+    # Try to query adoptions directly
+    adoptions_data = None
+    try:
+        if is_cloud_mode() and pool:
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM adoptions ORDER BY adopted_at DESC LIMIT 5")
+                    if cur.description:
+                        cols = [d[0] for d in cur.description]
+                        rows = cur.fetchall()
+                        adoptions_data = [dict(zip(cols, row)) for row in rows]
+            finally:
+                pool.putconn(conn)
+    except Exception as e:
+        adoptions_data = f"Error: {e}"
+
+    return {
+        "DB_MODE": DB_MODE,
+        "is_cloud_mode": is_cloud_mode(),
+        "DATABASE_URL_set": bool(DATABASE_URL),
+        "pg_pool_available": pool is not None,
+        "experiment_active": experiment_active,
+        "adopted_variant": adopted,
+        "adoptions_table": adoptions_data
+    }
+
 @app.post("/admin/execute_sql")
 async def execute_sql(body: SqlRequest):
     """Execute SQL query (supports both DuckDB and PostgreSQL)."""
