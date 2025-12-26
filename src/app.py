@@ -723,17 +723,53 @@ elif st.session_state['page'] == 'study':
         sel_comp_id = sel_comp_data['id']
         comp_type = sel_comp_data['type']
         
-        target_url = f"{TARGET_APP_URL}{sel_url_path}?highlight={sel_comp_id}"
+        # Generate deterministic UIDs for consistent A/B display
+        # These UIDs are pre-calculated to hash into specific variant ranges
+        uid_variant_a = "demo_user_0"  # Hash: 8 (0-49 range) -> Variant A
+        uid_variant_b = "demo_user_1"  # Hash: 95 (50-99 range) -> Variant B
 
-        # 1. Real Target App (Iframe)
+        # URLs for each variant
+        target_url_a = f"{TARGET_APP_URL}{sel_url_path}?uid={uid_variant_a}&highlight={sel_comp_id}"
+        target_url_b = f"{TARGET_APP_URL}{sel_url_path}?uid={uid_variant_b}&highlight={sel_comp_id}"
+
+        # 1. Real Target App (Iframe) - Side by Side A/B Comparison
         with col_mock:
             with st.container(border=True):
-                st.markdown("#### 📱 NovaEats (Live Target)")
-                st.caption(f"실제 서버 화면: `{sel_url_path}` (Highlight: `{sel_comp_id}`)")
-                try:
-                    components.iframe(target_url, height=600, scrolling=True)
-                except Exception:
-                    st.error("서버 연결 실패: Target App이 실행 중인지 확인하세요.")
+                st.markdown("#### 📱 NovaEats - A/B 비교 (Live Target)")
+                st.caption(f"실제 서버 화면: `{sel_url_path}` | 두 Variant를 비교해보세요")
+
+                # Tabs for A/B comparison
+                tab_a, tab_b, tab_info = st.tabs(["🅰️ Variant A (Control)", "🅱️ Variant B (Test)", "ℹ️ 설명"])
+
+                with tab_a:
+                    st.markdown("**Control Group** - 현재 기준 (파란색 배너)")
+                    try:
+                        components.iframe(target_url_a, height=550, scrolling=True)
+                    except Exception:
+                        st.error("서버 연결 실패: Target App이 실행 중인지 확인하세요.")
+
+                with tab_b:
+                    st.markdown("**Test Group** - 새로운 시안 (빨간색 긴급 배너)")
+                    try:
+                        components.iframe(target_url_b, height=550, scrolling=True)
+                    except Exception:
+                        st.error("서버 연결 실패: Target App이 실행 중인지 확인하세요.")
+
+                with tab_info:
+                    st.markdown("""
+                    **A/B 테스트 설명**
+
+                    | 항목 | Variant A (Control) | Variant B (Test) |
+                    |------|---------------------|------------------|
+                    | 배너 스타일 | 파란색 (친근함) | 빨간색 (긴급성) |
+                    | 헤드라인 | "환영합니다!" | "⏰ 선착순 마감" |
+                    | CTA 문구 | "지금 주문하기" | "쿠폰 받고 주문하기" |
+                    | 할인 표시 | 없음 | 50% 할인 강조 |
+
+                    **왜 다른 화면이 보이나요?**
+                    - 사용자 ID의 해시값(0-99)에 따라 A(0-49) 또는 B(50-99) 그룹으로 배정됩니다.
+                    - 이 탭에서는 고정된 ID를 사용하여 항상 같은 Variant를 보여줍니다.
+                    """)
 
         # 2. Form (Glass Card) - Dynamic Builder
         with col_form:
