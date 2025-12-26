@@ -1958,6 +1958,12 @@ GROUP BY 1
                     with psycopg2.connect(DATABASE_URL) as conn:
                         with conn.cursor() as cur:
                             # 1. Insert experiment record
+                            # Convert numpy types to Python native types for PostgreSQL
+                            p_value = float(res['p_value']) if res['p_value'] is not None else None
+                            control_rate = float(res['control_rate']) if res['control_rate'] is not None else None
+                            test_rate = float(res['test_rate']) if res['test_rate'] is not None else None
+                            lift_val = float(res['lift']) if res['lift'] is not None else None
+
                             cur.execute("""
                                 INSERT INTO experiments (
                                     target, hypothesis, primary_metric, guardrails,
@@ -1970,8 +1976,8 @@ GROUP BY 1
                                 st.session_state.get('hypothesis', '-'),
                                 st.session_state.get('metric', '-'),
                                 ','.join(st.session_state.get('guardrails', [])),
-                                res['p_value'], decision, note, current_run_id,
-                                res['control_rate'], res['test_rate'], res['lift'],
+                                p_value, decision, note, current_run_id,
+                                control_rate, test_rate, lift_val,
                                 guardrail_results_json
                             ])
 
@@ -1979,8 +1985,11 @@ GROUP BY 1
                             if st.session_state.get('pending_adoption'):
                                 adoption_data = st.session_state['pending_adoption']
                                 variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
-                                variant_data['lift'] = adoption_data.get('lift')
-                                variant_data['p_value'] = adoption_data.get('p_value')
+                                # Convert numpy types to Python native for JSON serialization
+                                adoption_lift = adoption_data.get('lift')
+                                adoption_p_value = adoption_data.get('p_value')
+                                variant_data['lift'] = float(adoption_lift) if adoption_lift is not None else None
+                                variant_data['p_value'] = float(adoption_p_value) if adoption_p_value is not None else None
                                 variant_json = json.dumps(variant_data)
 
                                 cur.execute("""
