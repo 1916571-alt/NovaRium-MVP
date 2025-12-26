@@ -1958,8 +1958,12 @@ GROUP BY 1
             ))
 
             # 2. If adoption was marked, create table and insert
+            has_pending_adoption = st.session_state.get('pending_adoption') is not None
+            st.write(f"DEBUG: pending_adoption exists = {has_pending_adoption}")  # Debug line
+
             if st.session_state.get('pending_adoption'):
                 adoption_data = st.session_state['pending_adoption']
+                st.write(f"DEBUG: Adding adoption ops for run_id = {current_run_id}")  # Debug line
                 # Store lift/p_value in variant_config JSON instead of separate columns
                 # This ensures compatibility with existing table schema
                 variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
