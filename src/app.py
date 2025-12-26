@@ -652,7 +652,10 @@ elif st.session_state['page'] == 'study':
                             except Exception as rollback_err:
                                 st.error(f"롤백 중 오류 발생: {rollback_err}")
         except Exception as e:
-            pass  # Silently ignore if adoptions table doesn't exist or is empty
+            # Show error in debug mode or if it's not a "table doesn't exist" error
+            error_msg = str(e).lower()
+            if 'does not exist' not in error_msg and 'relation' not in error_msg:
+                st.warning(f"⚠️ 채택 정보 로드 실패: {e}")
 
         ui.edu_guide("가설(Hypothesis)", "데이터 분석은 막연한 시도가 아닙니다. **'무엇을(X) 바꾸면 어떤 지표(Y)가 좋아질 것이다'**라는 명확한 믿음을 정의하세요.")
 
@@ -2052,7 +2055,11 @@ elif st.session_state['page'] == 'portfolio':
         else:
             st.info("아직 채택된 실험이 없습니다. 성공적인 실험을 채택하면 여기에 표시됩니다!")
     except Exception as e:
-        st.info("아직 채택된 실험이 없습니다.")
+        error_msg = str(e).lower()
+        if 'does not exist' in error_msg or 'relation' in error_msg:
+            st.info("아직 채택된 실험이 없습니다.")
+        else:
+            st.warning(f"⚠️ 채택 정보 조회 오류: {e}")
 
     st.divider()
 

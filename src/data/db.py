@@ -28,10 +28,20 @@ DB_PATH = EXPERIMENT_DB_PATH
 
 RAW_DATA_DIR = os.path.join(DATA_DIR, 'raw')
 
-# Cloud deployment configuration
-DB_MODE = os.getenv('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
-DATABASE_URL = os.getenv('DATABASE_URL', '')  # PostgreSQL connection string
-TARGET_APP_URL = os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+# Cloud deployment configuration - prioritize Streamlit secrets
+def _get_secret(key: str, default: str = '') -> str:
+    """Get config from Streamlit secrets first, then env vars."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+DB_MODE = _get_secret('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
+DATABASE_URL = _get_secret('DATABASE_URL', '')  # PostgreSQL connection string
+TARGET_APP_URL = _get_secret('TARGET_APP_URL', 'http://localhost:8000')
 
 # =========================================================
 # PostgreSQL Support (Supabase Cloud)
@@ -224,7 +234,9 @@ def safe_write_batch(operations: list, use_coordination: bool = True):
 
 def _pg_batch_write(operations: list):
     """Execute batch write on PostgreSQL (Supabase)."""
+    import re
     results = []
+    has_error = False
     try:
         with get_pg_connection() as conn:
             with conn.cursor() as cur:
@@ -240,12 +252,10 @@ def _pg_batch_write(operations: list):
                         # Convert DuckDB-style table creation to PostgreSQL
                         pg_sql = sql
                         if 'create table' in sql_lower and 'nextval' in sql_lower:
-                            # Replace DuckDB's nextval with PostgreSQL SERIAL
-                            # adoption_id INTEGER DEFAULT nextval('adoptions_seq') -> adoption_id SERIAL
-                            import re
+                            # Replace DuckDB's nextval with PostgreSQL SERIAL PRIMARY KEY
                             pg_sql = re.sub(
                                 r'(\w+)\s+INTEGER\s+DEFAULT\s+nextval\([\'"][^\'"]+[\'"]\)',
-                                r'\1 SERIAL',
+                                r'\1 SERIAL PRIMARY KEY',
                                 sql,
                                 flags=re.IGNORECASE
                             )
@@ -253,15 +263,23 @@ def _pg_batch_write(operations: list):
                         # Convert DuckDB-style placeholders to PostgreSQL
                         pg_sql = pg_sql.replace('?', '%s')
 
+                        logger.info(f"PG Executing: {pg_sql[:100]}...")
                         if params:
                             cur.execute(pg_sql, tuple(params))
                         else:
                             cur.execute(pg_sql)
                         results.append({"sql": sql[:50], "status": "success"})
                     except Exception as e:
+                        has_error = True
+                        logger.error(f"PG Batch Error: {e} | SQL: {sql[:100]}")
                         results.append({"sql": sql[:50], "status": "error", "message": str(e)})
+
+        # Return error status if any operation failed
+        if has_error:
+            return {"status": "partial_error", "message": "Some operations failed", "results": results}
         return {"status": "success", "results": results}
     except Exception as e:
+        logger.error(f"PG Batch Connection Error: {e}")
         return {"status": "error", "message": str(e), "results": results}
 
 # =========================================================

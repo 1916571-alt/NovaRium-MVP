@@ -28,10 +28,19 @@ EXPERIMENT_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_experiment.db')  # a
 # Default DB_PATH points to experiment DB (most queries use this)
 DB_PATH = EXPERIMENT_DB_PATH
 
-# Cloud deployment configuration
-DB_MODE = os.getenv('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
-_raw_database_url = os.getenv('DATABASE_URL', '')  # PostgreSQL connection string
-TARGET_APP_URL = os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+# Cloud deployment configuration - prioritize Streamlit secrets
+def _get_secret(key: str, default: str = '') -> str:
+    """Get config from Streamlit secrets first, then env vars."""
+    try:
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+DB_MODE = _get_secret('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
+_raw_database_url = _get_secret('DATABASE_URL', '')  # PostgreSQL connection string
+TARGET_APP_URL = _get_secret('TARGET_APP_URL', 'http://localhost:8000')
 
 # Ensure SSL mode is set for cloud PostgreSQL connections
 def _ensure_ssl(url: str) -> str:
