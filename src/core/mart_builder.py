@@ -1,24 +1,55 @@
+import os
+
+def _get_secret(key: str, default: str = '') -> str:
+    """Get config from Streamlit secrets first, then env vars."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+# Check if running in cloud mode (PostgreSQL)
+DB_MODE = _get_secret('DB_MODE', 'duckdb')
+
 def generate_mart_sql(selected_metrics):
     """
     Generates the SQL query to build the Data Mart based on selected metrics.
+    Supports both DuckDB (local) and PostgreSQL (Supabase cloud).
     """
-    
+
+    # Use PostgreSQL-compatible syntax for cloud, DuckDB syntax for local
+    is_postgres = DB_MODE == 'supabase'
+
     # Base CTE (Common Table Expression)
-    # Always need report_date, users, orders, clicks as base counters
-    sql = """
+    # PostgreSQL: DROP + CREATE, DuckDB: CREATE OR REPLACE
+    if is_postgres:
+        sql = """
+    DROP TABLE IF EXISTS dm_daily_kpi;
+    CREATE TABLE dm_daily_kpi AS
+    WITH daily_stats AS (
+        SELECT
+            DATE_TRUNC('day', assigned_at) as report_date,
+            COUNT(DISTINCT a.user_id) as total_users,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END) as click_count,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as total_orders,
+"""
+    else:
+        sql = """
     CREATE OR REPLACE TABLE dm_daily_kpi AS
     WITH daily_stats AS (
         SELECT
             date_trunc('day', assigned_at) as report_date,
             COUNT(DISTINCT a.user_id) as total_users,
-            COUNT(DISTINCT CASE WHEN (e.event_name = 'banner_A' OR e.event_name = 'banner_B') THEN e.user_id END) as click_count,
+            COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END) as click_count,
             COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END) as total_orders,
 """
             
     if 'revenue' in selected_metrics:
         sql += "        COALESCE(SUM(CASE WHEN e.event_name = 'purchase' THEN e.value ELSE 0 END), 0) as total_revenue,\n"
     if 'ctr' in selected_metrics:
-        sql += "        (COUNT(DISTINCT CASE WHEN (e.event_name = 'banner_A' OR e.event_name = 'banner_B') THEN e.user_id END)::FLOAT / NULLIF(COUNT(DISTINCT a.user_id), 0)) as ctr,\n"
+        sql += "        (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / NULLIF(COUNT(DISTINCT a.user_id), 0)) as ctr,\n"
     if 'cvr' in selected_metrics:
         sql += "        (COUNT(DISTINCT CASE WHEN e.event_name = 'purchase' THEN e.user_id END)::FLOAT / NULLIF(COUNT(DISTINCT a.user_id), 0)) as cvr,\n"
     if 'aov' in selected_metrics:
@@ -34,7 +65,7 @@ def generate_mart_sql(selected_metrics):
 
     sql += """
         FROM assignments a
-        LEFT JOIN events e ON a.user_id = e.user_id AND DATE_TRUNC('day', e.timestamp) = date_trunc('day', a.assigned_at)
+        LEFT JOIN events e ON a.user_id = e.user_id AND DATE_TRUNC('day', e.timestamp) = DATE_TRUNC('day', a.assigned_at)
         GROUP BY 1
     )
     SELECT

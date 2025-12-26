@@ -5,6 +5,18 @@ import random
 import os
 from agent_swarm.behaviors import BehaviorStrategy, get_behavior_by_name
 
+def _get_target_url():
+    """Get TARGET_APP_URL from Streamlit secrets or environment variable."""
+    # Try Streamlit secrets first (for Streamlit Cloud)
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'TARGET_APP_URL' in st.secrets:
+            return str(st.secrets['TARGET_APP_URL'])
+    except Exception:
+        pass
+    # Fall back to environment variable
+    return os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+
 class HeuristicAgent:
     """
     Refactored Agent complying with SOLID Principles.
@@ -12,7 +24,7 @@ class HeuristicAgent:
     - OCP: New behaviors added via BehaviorStrategy classes.
     - DIP: Depends on BehaviorStrategy abstraction.
     """
-    
+
     def __init__(self, agent_id: str, behavior: BehaviorStrategy, run_id: str = None, weight: float = 1.0):
         self.agent_id = agent_id
         if isinstance(behavior, str):
@@ -23,7 +35,7 @@ class HeuristicAgent:
 
         self.run_id = run_id
         self.weight = weight  # For hybrid simulation
-        self.base_url = "http://localhost:8000"
+        self.base_url = _get_target_url()  # Use cloud URL from secrets/env
         self.session = requests.Session()
     
     def _get_variant(self):
@@ -38,13 +50,13 @@ class HeuristicAgent:
         try:
             is_turbo = os.getenv("AGENT_TURBO") == "1"
             
-            # 1. Visit Home
+            # 1. Visit Home (longer timeout for Render cold start)
             params = {"uid": self.agent_id, "weight": self.weight}
             if self.run_id:
                 params["run_id"] = self.run_id
-            res = self.session.get(f"{self.base_url}/", params=params, timeout=5)
+            res = self.session.get(f"{self.base_url}/", params=params, timeout=30)
             if res.status_code != 200:
-                return {"success": False, "error": "Server error"}
+                return {"success": False, "error": f"Server error: {res.status_code}"}
             
             if not is_turbo:
                 time.sleep(random.uniform(0.3, 1.5))
@@ -56,6 +68,7 @@ class HeuristicAgent:
             
             # 3. Click Decision (Delegated to Strategy)
             clicked = False
+            bounced = False
             if self.behavior.should_click(variant):
                 clicked = True
                 click_data = {"uid": self.agent_id, "element": f"banner_{variant}"}
@@ -64,18 +77,24 @@ class HeuristicAgent:
                 self.session.post(
                     f"{self.base_url}/click",
                     data=click_data,
-                    timeout=5
-                )
-                self.session.post(
-                    f"{self.base_url}/click",
-                    data=click_data,
-                    timeout=5
+                    timeout=15
                 )
                 if not is_turbo:
                     time.sleep(random.uniform(0.5, 2.0))
                 else:
                     time.sleep(0.02) # Minimum delay to prevent starvation
-            
+            else:
+                # User didn't click - record as bounce (left without interaction)
+                bounced = True
+                bounce_data = {"uid": self.agent_id, "element": "bounce"}
+                if self.run_id:
+                    bounce_data["run_id"] = self.run_id
+                self.session.post(
+                    f"{self.base_url}/click",
+                    data=bounce_data,
+                    timeout=15
+                )
+
             # 4. Purchase Decision (Delegated to Strategy)
             purchased = False
             if clicked and self.behavior.should_purchase():
@@ -86,15 +105,16 @@ class HeuristicAgent:
                 self.session.post(
                     f"{self.base_url}/order",
                     data=order_data,
-                    timeout=5
+                    timeout=15
                 )
-            
+
             return {
                 "success": True,
                 "agent_id": self.agent_id,
                 "trait": self.behavior.name,
                 "variant": variant,
                 "clicked": clicked,
+                "bounced": bounced,
                 "purchased": purchased
             }
         

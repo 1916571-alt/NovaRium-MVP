@@ -5,83 +5,244 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import streamlit as st
+import logging
 
-# Constants (DB Path)
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Stats")
+
+# Try to load environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# Constants (DB Paths - Split Architecture)
 # Assuming this script is in src/core/ folder, so db is two levels up
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'novarium_local.db')
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(_BASE_DIR, 'data')
+WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')  # users, orders, 30-day history
+EXPERIMENT_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_experiment.db')  # assignments, events, experiments
+
+# Default DB_PATH points to experiment DB (most queries use this)
+DB_PATH = EXPERIMENT_DB_PATH
+
+# Cloud deployment configuration - prioritize Streamlit secrets
+def _get_secret(key: str, default: str = '') -> str:
+    """Get config from Streamlit secrets first, then env vars."""
+    try:
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+DB_MODE = _get_secret('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
+_raw_database_url = _get_secret('DATABASE_URL', '')  # PostgreSQL connection string
+TARGET_APP_URL = _get_secret('TARGET_APP_URL', 'http://localhost:8000')
+
+# Ensure SSL mode is set for cloud PostgreSQL connections
+def _ensure_ssl(url: str) -> str:
+    """Add sslmode=require if not present in DATABASE_URL."""
+    if not url:
+        return url
+    if 'sslmode=' not in url:
+        separator = '&' if '?' in url else '?'
+        return f"{url}{separator}sslmode=require"
+    return url
+
+DATABASE_URL = _ensure_ssl(_raw_database_url)
+
+def is_cloud_mode():
+    """Check if running in cloud mode (Supabase)."""
+    return DB_MODE == 'supabase' and bool(DATABASE_URL)
 
 def get_connection():
     """
-    Establish a connection to the DuckDB database.
+    Establish a connection to the database.
+    Returns DuckDB connection for local, None for cloud (use run_query instead).
     """
+    if is_cloud_mode():
+        return None
     return duckdb.connect(DB_PATH)
 
-def run_query(query, con=None, max_retries=5, retry_delay=0.5):
+def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experiment'):
     """
     Execute a SQL query and return the result as a DataFrame.
-    Prioritizes Server API to avoid file locking, then falls back to direct access.
+    Supports both DuckDB (local) and PostgreSQL (Supabase cloud).
+
+    Args:
+        query: SQL query string
+        con: Optional existing connection
+        max_retries: Number of retry attempts for lock errors
+        retry_delay: Base delay between retries
+        db_type: 'experiment' (default) or 'warehouse'
     """
     import time
     import requests
-    
+
+    # Cloud mode: Use PostgreSQL
+    if is_cloud_mode():
+        return _pg_query(query)
+
+    # Select DB path based on type
+    target_db = WAREHOUSE_DB_PATH if db_type == 'warehouse' else EXPERIMENT_DB_PATH
+
     if con:
         # If connection is provided, use it directly (no retry needed)
         try:
             return con.execute(query).df()
         except Exception as e:
             try:
-                print(f"Query Error (Existing Conn): {repr(e)}")
+                logger.error(f"Query Error (Existing Conn): {repr(e)}")
             except:
                 pass
             return pd.DataFrame()
 
-    # 1. Try via Server API (Preferred)
-    try:
-        response = requests.post("http://localhost:8000/admin/execute_sql", json={"sql": query}, timeout=2)
-        if response.status_code == 200:
-            res_json = response.json()
-            if res_json.get("status") == "success":
-                data = res_json.get("data")
-                cols = res_json.get("columns", [])
-                
-                if data is not None:
-                    if not data and not cols:
-                         return pd.DataFrame()
-                    if cols:
-                        return pd.DataFrame(data, columns=cols)
-                    return pd.DataFrame(data)
-                else:
-                    return pd.DataFrame()
-    except:
-        pass # API failed, fallback to direct DB
+    # 1. Try via Server API (Preferred) - only for experiment DB in local mode
+    if db_type == 'experiment':
+        try:
+            response = requests.post(f"{TARGET_APP_URL}/admin/execute_sql", json={"sql": query}, timeout=2)
+            if response.status_code == 200:
+                res_json = response.json()
+                if res_json.get("status") == "success":
+                    data = res_json.get("data")
+                    cols = res_json.get("columns", [])
+
+                    if data is not None:
+                        if not data and not cols:
+                             return pd.DataFrame()
+                        if cols:
+                            return pd.DataFrame(data, columns=cols)
+                        return pd.DataFrame(data)
+                    else:
+                        return pd.DataFrame()
+        except:
+            pass # API failed, fallback to direct DB
 
     # 2. Retry logic for transient connections (handles file locks)
     for attempt in range(max_retries):
         try:
             # Explicitly set read_only=True to allow concurrent reads even if locked by writer
-            with duckdb.connect(DB_PATH, read_only=True) as conn:
+            with duckdb.connect(target_db, read_only=True) as conn:
                 return conn.execute(query).df()
         except Exception as e:
             error_msg = str(e).lower()
-            
+
             # Check if it's a lock error
             if 'cannot open file' in error_msg or 'lock' in error_msg or 'access' in error_msg or 'process' in error_msg:
                 if attempt < max_retries - 1:
                     # Exponential backoff
                     wait_time = retry_delay * (2 ** attempt)
                     try:
-                        print(f"[Stats] DB locked, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
+                        logger.warning(f"DB locked, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
                     except:
                         pass
                     time.sleep(wait_time)
                     continue
-            
+
             # Non-lock error or final retry failed
             try:
-                print(f"[Stats] Query failed: {repr(e)}")
+                logger.error(f"Query failed: {repr(e)}")
             except:
                 pass
             return pd.DataFrame()
+
+def _convert_duckdb_to_pg(query):
+    """Convert DuckDB SQL syntax to PostgreSQL."""
+    import re
+    pg_query = query
+
+    # INTERVAL 30 MINUTE -> INTERVAL '30 minutes'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+MINUTE",
+        r"INTERVAL '\1 minutes'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # INTERVAL 1 DAY -> INTERVAL '1 day'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+DAY",
+        r"INTERVAL '\1 days'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # INTERVAL 1 HOUR -> INTERVAL '1 hour'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+HOUR",
+        r"INTERVAL '\1 hours'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # DATE_DIFF('day', start, end) -> EXTRACT(DAY FROM (end - start))
+    # DuckDB: DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE)
+    # PostgreSQL: EXTRACT(DAY FROM (CURRENT_DATE - MIN(u.joined_at)::TIMESTAMP))
+    pg_query = re.sub(
+        r"DATE_DIFF\s*\(\s*['\"]day['\"]\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)",
+        r"EXTRACT(DAY FROM (\2 - \1))",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # DATEDIFF('second', start, end) -> EXTRACT(EPOCH FROM (end - start))
+    # Simple case without nested parentheses (complex cases should be handled in app.py directly)
+    pg_query = re.sub(
+        r"DATEDIFF\s*\(\s*['\"]second['\"]\s*,\s*([^,)]+)\s*,\s*([^)]+)\s*\)",
+        r"EXTRACT(EPOCH FROM (\2 - \1))",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    return pg_query
+
+def _pg_query(query):
+    """Execute query on PostgreSQL (Supabase cloud)."""
+    global _pg_pool
+    try:
+        import psycopg2
+        from psycopg2 import pool
+
+        # Convert DuckDB syntax to PostgreSQL
+        pg_query = _convert_duckdb_to_pg(query)
+
+        # Get connection from pool (create if needed)
+        if _pg_pool is None:
+            logger.info(f"Creating PostgreSQL pool (DB_MODE={DB_MODE})")
+            _pg_pool = pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=5,
+                dsn=DATABASE_URL
+            )
+            logger.info("PostgreSQL pool created successfully")
+
+        conn = _pg_pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(pg_query)
+                if cur.description:
+                    columns = [desc[0] for desc in cur.description]
+                    data = cur.fetchall()
+                    return pd.DataFrame(data, columns=columns)
+                return pd.DataFrame()
+        finally:
+            _pg_pool.putconn(conn)
+    except psycopg2.OperationalError as e:
+        logger.error(f"PostgreSQL OperationalError: {e}")
+        logger.error("Check: DATABASE_URL, password, SSL settings")
+        _pg_pool = None
+        return pd.DataFrame()
+    except psycopg2.Error as e:
+        logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+        return pd.DataFrame()
+    except Exception as e:
+        logger.error(f"PostgreSQL query error: {type(e).__name__}: {e}")
+        return pd.DataFrame()
+
+_pg_pool = None
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
@@ -171,10 +332,11 @@ def get_user_segments(con=None):
     """
     Analyze existing user behavior in DB to define Persona Distribution.
     Returns a dictionary with percentage values (0-100) for each segment.
+    Uses WAREHOUSE DB (users, orders tables).
     """
     sql = """
     WITH user_metrics AS (
-        SELECT 
+        SELECT
             u.user_id,
             COUNT(o.order_id) as order_count,
             COALESCE(SUM(o.amount), 0) as total_spent,
@@ -198,7 +360,8 @@ def get_user_segments(con=None):
     FROM user_metrics
     GROUP BY 1
     """
-    df = run_query(sql, con)
+    # Uses warehouse DB for users/orders data
+    df = run_query(sql, con, db_type='warehouse')
     
     if df.empty:
         # Fallback default
