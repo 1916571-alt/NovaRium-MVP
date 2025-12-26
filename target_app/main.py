@@ -533,12 +533,18 @@ async def read_root(request: Request, uid: str = None, run_id: str = None, weigh
     variant = get_assignment(user_id)
     adopted = get_adopted_variant()
 
+    # Extract adopted config for dynamic banner customization
+    adopted_config = None
+    if adopted and 'config' in adopted:
+        adopted_config = adopted['config']
+
     # Render
     response = templates.TemplateResponse("index.html", {
         "request": request,
         "uid": user_id,
         "variant": variant,
-        "is_adopted": adopted is not None  # Flag to show adoption badge
+        "is_adopted": adopted is not None,  # Flag to show adoption badge
+        "adopted_config": adopted_config  # Dynamic banner config (title, badge, theme)
     })
 
     if is_new or uid:  # Log assignment if new OR if explicitly passed (Agent run)
