@@ -1924,9 +1924,9 @@ GROUP BY 1
 
         if st.button("💾 실험 회고록에 저장", type="primary"):
             import json
+            import duckdb
 
-            # Prepare guardrail results for storage - use session state for reliability
-            # Convert numpy types to native Python types for JSON serialization
+            # Prepare guardrail results for storage
             stored_guard_results = st.session_state.get('guard_results', [])
             serializable_results = []
             for gr in stored_guard_results:
@@ -1939,86 +1939,127 @@ GROUP BY 1
                 })
             guardrail_results_json = json.dumps(serializable_results) if serializable_results else '[]'
 
-            # Build operations list
-            operations = []
+            save_success = False
+            save_error = None
 
-            # 1. Insert experiment record
-            operations.append((
-                """INSERT INTO experiments (
-                    target, hypothesis, primary_metric, guardrails,
-                    p_value, decision, learning_note, run_id,
-                    control_rate, test_rate, lift, guardrail_results,
-                    created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
-                [
-                    st.session_state.get('target', '-'),
-                    st.session_state.get('hypothesis', '-'),
-                    st.session_state.get('metric', '-'),
-                    ','.join(st.session_state.get('guardrails', [])),
-                    res['p_value'], decision, note, current_run_id,
-                    res['control_rate'], res['test_rate'], res['lift'],
-                    guardrail_results_json
-                ]
-            ))
+            # Check if cloud mode (PostgreSQL)
+            if al.is_cloud_mode():
+                # Cloud mode: Direct PostgreSQL connection (like original local DuckDB)
+                try:
+                    import psycopg2
+                    from src.data.db import DATABASE_URL
 
-            # 2. If adoption was marked, create table and insert
-            if st.session_state.get('pending_adoption'):
-                adoption_data = st.session_state['pending_adoption']
-                # Store lift/p_value in variant_config JSON instead of separate columns
-                # This ensures compatibility with existing table schema
-                variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
-                variant_data['lift'] = adoption_data.get('lift')
-                variant_data['p_value'] = adoption_data.get('p_value')
-                variant_json = json.dumps(variant_data)
+                    with psycopg2.connect(DATABASE_URL) as conn:
+                        with conn.cursor() as cur:
+                            # 1. Insert experiment record
+                            cur.execute("""
+                                INSERT INTO experiments (
+                                    target, hypothesis, primary_metric, guardrails,
+                                    p_value, decision, learning_note, run_id,
+                                    control_rate, test_rate, lift, guardrail_results,
+                                    created_at
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                            """, [
+                                st.session_state.get('target', '-'),
+                                st.session_state.get('hypothesis', '-'),
+                                st.session_state.get('metric', '-'),
+                                ','.join(st.session_state.get('guardrails', [])),
+                                res['p_value'], decision, note, current_run_id,
+                                res['control_rate'], res['test_rate'], res['lift'],
+                                guardrail_results_json
+                            ])
 
-                # Create sequence and table if needed (DuckDB uses sequences for auto-increment)
-                operations.append((
-                    "CREATE SEQUENCE IF NOT EXISTS adoptions_seq",
-                    None
-                ))
-                operations.append((
-                    """CREATE TABLE IF NOT EXISTS adoptions (
-                        adoption_id INTEGER DEFAULT nextval('adoptions_seq'),
-                        experiment_id VARCHAR,
-                        variant_config VARCHAR,
-                        adopted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )""",
-                    None
-                ))
-                operations.append((
-                    "INSERT INTO adoptions (experiment_id, variant_config) VALUES (?, ?)",
-                    [current_run_id, variant_json]
-                ))
-                # Deactivate experiment - adopted variant becomes new baseline
-                operations.append(("DELETE FROM active_experiment", None))
+                            # 2. If adoption was marked, insert into adoptions
+                            if st.session_state.get('pending_adoption'):
+                                adoption_data = st.session_state['pending_adoption']
+                                variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
+                                variant_data['lift'] = adoption_data.get('lift')
+                                variant_data['p_value'] = adoption_data.get('p_value')
+                                variant_json = json.dumps(variant_data)
 
-            # 3. Clean up run data
-            operations.append((f"DELETE FROM assignments WHERE run_id = '{current_run_id}'", None))
-            operations.append((f"DELETE FROM events WHERE run_id = '{current_run_id}'", None))
+                                cur.execute("""
+                                    INSERT INTO adoptions (experiment_id, variant_config, adopted_at)
+                                    VALUES (%s, %s, CURRENT_TIMESTAMP)
+                                """, [current_run_id, variant_json])
 
-            # Execute with coordination mode setting
-            result = safe_write_batch(operations, use_coordination=st.session_state.get('use_db_coordination', True))
+                                # Deactivate experiment
+                                cur.execute("DELETE FROM active_experiment")
 
-            # Debug: Show result status (temporary)
-            st.write(f"DEBUG: save result = {result.get('status')}")
-            if result.get('results'):
-                with st.expander("DEBUG: Operation Results", expanded=False):
-                    for r in result.get('results', []):
-                        st.write(r)
+                            # 3. Clean up run data
+                            cur.execute("DELETE FROM assignments WHERE run_id = %s", [current_run_id])
+                            cur.execute("DELETE FROM events WHERE run_id = %s", [current_run_id])
 
-            # Accept both 'success' and 'partial_error' (some non-critical ops may fail)
-            if result['status'] in ['success', 'partial_error']:
-                # Clear caches to ensure UI reflects latest DB state
+                        conn.commit()
+                    save_success = True
+
+                except Exception as e:
+                    save_error = str(e)
+                    st.error(f"❌ PostgreSQL 저장 실패: {e}")
+
+            else:
+                # Local mode: Direct DuckDB connection (original working code)
+                try:
+                    with duckdb.connect(DB_PATH) as txn_con:
+                        # 1. Insert experiment record
+                        txn_con.execute("""
+                            INSERT INTO experiments (
+                                target, hypothesis, primary_metric, guardrails,
+                                p_value, decision, learning_note, run_id,
+                                control_rate, test_rate, lift, guardrail_results,
+                                created_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        """, [
+                            st.session_state.get('target', '-'),
+                            st.session_state.get('hypothesis', '-'),
+                            st.session_state.get('metric', '-'),
+                            ','.join(st.session_state.get('guardrails', [])),
+                            res['p_value'], decision, note, current_run_id,
+                            res['control_rate'], res['test_rate'], res['lift'],
+                            guardrail_results_json
+                        ])
+
+                        # 2. If adoption was marked, insert into adoptions
+                        if st.session_state.get('pending_adoption'):
+                            adoption_data = st.session_state['pending_adoption']
+                            variant_data = adoption_data['variant'].copy() if isinstance(adoption_data['variant'], dict) else {}
+                            variant_data['lift'] = adoption_data.get('lift')
+                            variant_data['p_value'] = adoption_data.get('p_value')
+                            variant_json = json.dumps(variant_data)
+
+                            txn_con.execute("""
+                                CREATE TABLE IF NOT EXISTS adoptions (
+                                    experiment_id VARCHAR,
+                                    variant_config VARCHAR,
+                                    adopted_at TIMESTAMP,
+                                    lift FLOAT,
+                                    p_value FLOAT
+                                )
+                            """)
+                            txn_con.execute("""
+                                INSERT INTO adoptions VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)
+                            """, [current_run_id, variant_json, adoption_data['lift'], adoption_data['p_value']])
+
+                            # Deactivate experiment
+                            txn_con.execute("DELETE FROM active_experiment")
+
+                        # 3. Clean up run data
+                        txn_con.execute(f"DELETE FROM assignments WHERE run_id = '{current_run_id}'")
+                        txn_con.execute(f"DELETE FROM events WHERE run_id = '{current_run_id}'")
+
+                    save_success = True
+
+                except Exception as e:
+                    save_error = str(e)
+                    st.error(f"❌ DuckDB 저장 실패: {e}")
+
+            if save_success:
+                # Clear caches
                 st.cache_data.clear()
 
                 if st.session_state.get('pending_adoption'):
                     st.session_state.pop('pending_adoption', None)
-                    st.session_state['last_adoption_success'] = True  # Track adoption for UI feedback
+                    st.session_state['last_adoption_success'] = True
                     st.toast("🎉 실험이 채택되어 Target App에 적용되었습니다!")
-
-                if result['status'] == 'partial_error':
-                    # Show warning but still proceed
-                    st.toast("⚠️ 일부 작업 실패 (중요 데이터는 저장됨)")
                 else:
                     st.toast("저장 완료!")
 
@@ -2029,16 +2070,6 @@ GROUP BY 1
                 st.session_state['page'] = 'portfolio'
                 st.session_state['step'] = 1
                 st.rerun()
-            else:
-                # Show detailed error info
-                st.error(f"❌ 저장 실패: {result.get('message', 'Unknown error')}")
-                if 'results' in result:
-                    failed_ops = [r for r in result['results'] if r.get('status') == 'error']
-                    if failed_ops:
-                        with st.expander("🔍 실패한 작업 상세"):
-                            for op in failed_ops:
-                                st.code(f"SQL: {op.get('sql', 'N/A')}\nError: {op.get('message', 'N/A')}")
-                st.info("💡 '고급 설정'에서 'DB 협조 모드' 체크박스를 해제하고 다시 시도해보세요.")
 
 # =========================================================
 # PAGE: PORTFOLIO
