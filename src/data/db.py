@@ -230,8 +230,29 @@ def _pg_batch_write(operations: list):
             with conn.cursor() as cur:
                 for sql, params in operations:
                     try:
+                        # Skip DuckDB-specific SQL that PostgreSQL doesn't support
+                        sql_lower = sql.lower().strip()
+                        if 'create sequence' in sql_lower and 'nextval' not in sql_lower:
+                            # Skip DuckDB sequence creation - PostgreSQL uses SERIAL
+                            results.append({"sql": sql[:50], "status": "skipped", "message": "DuckDB-specific"})
+                            continue
+
+                        # Convert DuckDB-style table creation to PostgreSQL
+                        pg_sql = sql
+                        if 'create table' in sql_lower and 'nextval' in sql_lower:
+                            # Replace DuckDB's nextval with PostgreSQL SERIAL
+                            # adoption_id INTEGER DEFAULT nextval('adoptions_seq') -> adoption_id SERIAL
+                            import re
+                            pg_sql = re.sub(
+                                r'(\w+)\s+INTEGER\s+DEFAULT\s+nextval\([\'"][^\'"]+[\'"]\)',
+                                r'\1 SERIAL',
+                                sql,
+                                flags=re.IGNORECASE
+                            )
+
                         # Convert DuckDB-style placeholders to PostgreSQL
-                        pg_sql = sql.replace('?', '%s')
+                        pg_sql = pg_sql.replace('?', '%s')
+
                         if params:
                             cur.execute(pg_sql, tuple(params))
                         else:
