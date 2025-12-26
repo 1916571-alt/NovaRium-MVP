@@ -1903,6 +1903,13 @@ GROUP BY 1
         # Report Saving
         st.divider()
         st.markdown("#### 📝 실험 회고록 작성")
+
+        # Show adoption status prominently
+        if st.session_state.get('pending_adoption'):
+            st.success("✅ **채택 예정** - 저장 시 Target App에 Variant B가 적용됩니다.")
+        else:
+            st.info("💡 채택하려면 위의 '채택 (Adopt)' 버튼을 먼저 클릭하세요.")
+
         note = st.text_area("배운 점 (Learning Note)", help="이번 실험에서 얻은 인사이트를 기록하세요.")
 
         # Show current DB mode status
