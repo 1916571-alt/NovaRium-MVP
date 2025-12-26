@@ -140,12 +140,46 @@ def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experime
                 pass
             return pd.DataFrame()
 
+def _convert_duckdb_to_pg(query):
+    """Convert DuckDB SQL syntax to PostgreSQL."""
+    import re
+    pg_query = query
+
+    # INTERVAL 30 MINUTE -> INTERVAL '30 minutes'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+MINUTE",
+        r"INTERVAL '\1 minutes'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # INTERVAL 1 DAY -> INTERVAL '1 day'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+DAY",
+        r"INTERVAL '\1 days'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # INTERVAL 1 HOUR -> INTERVAL '1 hour'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+HOUR",
+        r"INTERVAL '\1 hours'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    return pg_query
+
 def _pg_query(query):
     """Execute query on PostgreSQL (Supabase cloud)."""
     global _pg_pool
     try:
         import psycopg2
         from psycopg2 import pool
+
+        # Convert DuckDB syntax to PostgreSQL
+        pg_query = _convert_duckdb_to_pg(query)
 
         # Get connection from pool (create if needed)
         if _pg_pool is None:
@@ -160,7 +194,7 @@ def _pg_query(query):
         conn = _pg_pool.getconn()
         try:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(pg_query)
                 if cur.description:
                     columns = [desc[0] for desc in cur.description]
                     data = cur.fetchall()

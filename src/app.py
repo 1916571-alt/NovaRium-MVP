@@ -524,8 +524,13 @@ if st.session_state['page'] == 'monitor':
 
         st.caption("ℹ️ **감지 로직(Detection Logic)**: CTR < 5% (소재 피로), 매출 하락 > 30% (이탈 위험), CVR < 1% (UX 마찰). 모든 데이터는 실제 DB(`dm_daily_kpi`)에서 실시간으로 연산됩니다.")
 
+        # Check if data mart exists
+        if df_trend.empty:
+            st.warning("⚠️ **데이터 마트(`dm_daily_kpi`)가 비어있습니다.** '🛠️ 데이터 랩'에서 ETL을 실행하여 데이터를 생성하세요.")
+            st.info("💡 Data Lab → Step 2에서 '실행' 버튼을 눌러 데이터 마트를 구축하세요.")
+
         # Render Alerts
-        if alerts:
+        elif alerts:
             for alert in alerts:
                 with st.container(border=True):
                     # Layout: Text (Left) | Button (Right)
@@ -1172,8 +1177,8 @@ GROUP BY 1
                 # Use total_needed from Step 2, fallback to n*2 for backwards compatibility
                 total_target = st.session_state.get('total_needed', st.session_state.get('n', 100) * 2)
                 
-                # Fixed 50 agents (no hybrid simulation UI)
-                actual_agents = 50
+                # Fixed 10 agents for testing (reduced for Render free tier)
+                actual_agents = 10
                 weight_multiplier = total_target / actual_agents
 
                 st.info(f"📊 **투입 규모**: {actual_agents}명 에이전트 → 효과: {total_target:,}명 (×{weight_multiplier:.1f} 증폭)")
