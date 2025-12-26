@@ -7,6 +7,17 @@
 
 ---
 
+## 라이브 데모 (Live Demo)
+
+| 서비스 | URL | 설명 |
+|--------|-----|------|
+| **Dashboard** | https://novarium-mvp-s9fouprzj5apgznzehprcr.streamlit.app | Streamlit 분석 대시보드 |
+| **Target App** | https://novarium-mvp.onrender.com | 실험 대상 가상 쇼핑몰 |
+
+> **참고**: 무료 티어 서버(Streamlit Cloud, Render)를 사용하고 있어 첫 접속 시 Cold Start로 30초 정도 소요될 수 있습니다.
+
+---
+
 ## 프로젝트 배경 (Why Project?)
 
 ### "실무 경험의 닭과 달걀 문제를 해결하다"
@@ -94,6 +105,68 @@ graph TD
 | **Visual** | **Streamlit** | 인터랙티브 대시보드 및 실험 설계 도구 |
 | **App** | **FastAPI** | 실험 대상 서비스(Target App) 백엔드 구현 |
 | **Viz** | **Plotly** | 시계열 데이터 및 분포 시각화 |
+| **Cloud DB** | **Supabase (PostgreSQL)** | 클라우드 환경 데이터 영속성 |
+| **Hosting** | **Streamlit Cloud + Render** | 무료 티어 클라우드 배포 |
+
+---
+
+## 클라우드 배포 아키텍처 (Cloud Deployment)
+
+로컬 개발 환경을 클라우드로 확장하여 **실제 프로덕션과 유사한 환경**을 구축했습니다.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Cloud Architecture                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   ┌──────────────────┐         ┌──────────────────┐             │
+│   │  Streamlit Cloud │         │     Render       │             │
+│   │  (Dashboard)     │◄───────►│   (Target App)   │             │
+│   │                  │  HTTP   │    FastAPI       │             │
+│   └────────┬─────────┘         └────────┬─────────┘             │
+│            │                            │                        │
+│            │     ┌──────────────────┐   │                        │
+│            └────►│    Supabase      │◄──┘                        │
+│                  │   (PostgreSQL)   │                            │
+│                  │                  │                            │
+│                  │  - assignments   │                            │
+│                  │  - events        │                            │
+│                  │  - experiments   │                            │
+│                  │  - adoptions     │                            │
+│                  └──────────────────┘                            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 서비스 연결 구성
+
+| 서비스 | 역할 | 환경변수 |
+|--------|------|----------|
+| **Streamlit Cloud** | 분석 대시보드 UI | `DB_MODE=supabase`, `DATABASE_URL`, `TARGET_APP_URL` |
+| **Render** | Target App (FastAPI) | `DB_MODE=supabase`, `DATABASE_URL` |
+| **Supabase** | PostgreSQL 데이터베이스 | Connection Pooler (Transaction Mode) |
+
+### 환경변수 설정
+
+**Streamlit Cloud** (`.streamlit/secrets.toml` 또는 Dashboard Settings):
+```toml
+DB_MODE = "supabase"
+DATABASE_URL = "postgresql://postgres.xxxx:password@xxxx.pooler.supabase.com:6543/postgres"
+TARGET_APP_URL = "https://novarium-mvp.onrender.com"
+```
+
+**Render** (Environment Variables):
+```
+DB_MODE=supabase
+DATABASE_URL=postgresql://postgres.xxxx:password@xxxx.pooler.supabase.com:6543/postgres
+```
+
+### 왜 이 구성을 선택했나?
+
+1. **Supabase (PostgreSQL)**: DuckDB는 파일 기반이라 서버 재시작 시 데이터 유실. PostgreSQL로 영속성 확보.
+2. **Connection Pooler**: Serverless 환경에서 커넥션 수 제한 문제 해결 (Transaction Mode 사용).
+3. **서비스 분리**: Dashboard와 Target App을 분리하여 독립적 스케일링 가능.
+4. **무료 티어 활용**: 포트폴리오 목적으로 비용 없이 운영 가능.
 
 ## 실행 방법 (How to Run)
 
