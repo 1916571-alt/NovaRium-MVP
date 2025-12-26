@@ -50,13 +50,13 @@ class HeuristicAgent:
         try:
             is_turbo = os.getenv("AGENT_TURBO") == "1"
             
-            # 1. Visit Home
+            # 1. Visit Home (longer timeout for Render cold start)
             params = {"uid": self.agent_id, "weight": self.weight}
             if self.run_id:
                 params["run_id"] = self.run_id
-            res = self.session.get(f"{self.base_url}/", params=params, timeout=5)
+            res = self.session.get(f"{self.base_url}/", params=params, timeout=30)
             if res.status_code != 200:
-                return {"success": False, "error": "Server error"}
+                return {"success": False, "error": f"Server error: {res.status_code}"}
             
             if not is_turbo:
                 time.sleep(random.uniform(0.3, 1.5))
@@ -77,7 +77,7 @@ class HeuristicAgent:
                 self.session.post(
                     f"{self.base_url}/click",
                     data=click_data,
-                    timeout=5
+                    timeout=15
                 )
                 if not is_turbo:
                     time.sleep(random.uniform(0.5, 2.0))
@@ -92,7 +92,7 @@ class HeuristicAgent:
                 self.session.post(
                     f"{self.base_url}/click",
                     data=bounce_data,
-                    timeout=5
+                    timeout=15
                 )
 
             # 4. Purchase Decision (Delegated to Strategy)
@@ -105,7 +105,7 @@ class HeuristicAgent:
                 self.session.post(
                     f"{self.base_url}/order",
                     data=order_data,
-                    timeout=5
+                    timeout=15
                 )
 
             return {
