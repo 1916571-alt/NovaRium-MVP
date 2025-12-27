@@ -5,16 +5,33 @@ import os
 import pandas as pd
 import numpy as np
 
-# Config
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'novarium_local.db')
+# Config - Use Experiment DB (stores assignments, events)
+# scripts/data/generate_history.py -> scripts/ -> project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_PATH = os.path.join(PROJECT_ROOT, 'data', 'db', 'novarium_experiment.db')
 DAYS_HISTORY = 30
 DAILY_USERS = 500  # Scale down slightly for speed
 
 def generate_history():
     print(f"[>] Generating {DAYS_HISTORY} days of history...")
+    print(f"[>] DB Path: {DB_PATH}")
     con = duckdb.connect(DB_PATH)
-    
-    # Clean old history
+
+    # Ensure tables exist
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS assignments (
+            user_id VARCHAR, experiment_id VARCHAR, variant VARCHAR,
+            assigned_at TIMESTAMP, run_id VARCHAR, weight FLOAT DEFAULT 1.0
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            event_id VARCHAR, user_id VARCHAR, event_name VARCHAR,
+            timestamp TIMESTAMP, value DOUBLE, run_id VARCHAR
+        )
+    """)
+
+    # Clean old history (preserve other data)
     con.execute("DELETE FROM assignments WHERE user_id LIKE 'user_hist_%'")
     con.execute("DELETE FROM events WHERE user_id LIKE 'user_hist_%'")
     

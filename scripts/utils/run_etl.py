@@ -4,7 +4,8 @@ from datetime import datetime
 import os
 
 # Config
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'novarium_local.db')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_PATH = os.path.join(PROJECT_ROOT, 'data', 'db', 'novarium_experiment.db')
 
 def run_etl():
     print(f"[{datetime.now()}] Starting ETL Process...")
