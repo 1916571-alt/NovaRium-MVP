@@ -20,7 +20,7 @@ _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 DATA_DIR = os.path.join(_BASE_DIR, 'data')
 
 # DB Split: Warehouse (persistent) vs Experiment (volatile)
-WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')  # users, orders, 30-day history
+WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')  # customers, orders, 30-day history
 EXPERIMENT_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_experiment.db')  # assignments, events, experiments, adoptions, active_experiment
 
 # Legacy alias (for gradual migration)
@@ -299,7 +299,7 @@ def _pg_batch_write(operations: list):
 # =========================================================
 
 def initialize_warehouse_db():
-    """Initialize Warehouse DB (persistent data: users, orders, history)."""
+    """Initialize Warehouse DB (persistent data: customers, orders, history)."""
     print(f"Connecting to Warehouse DB at {WAREHOUSE_DB_PATH}...")
     con = duckdb.connect(WAREHOUSE_DB_PATH)
     return con
@@ -315,17 +315,32 @@ def initialize_db():
     return initialize_experiment_db()
 
 def setup_warehouse_schema(con):
-    """Setup warehouse schema (users, orders from CSV)."""
+    """Setup warehouse schema (customers, orders from CSV)."""
     print("=== Setting up Warehouse DB ===")
 
     # Load CSVs (persistent data)
-    tables = ['users', 'orders']
-    for table_name in tables:
-        csv_path = os.path.join(RAW_DATA_DIR, f'{table_name}.csv')
+    # CSV file name -> DB table name mapping
+    csv_to_table = {
+        'users.csv': 'customers',  # users.csv loads as customers table
+        'orders.csv': 'orders'
+    }
+
+    for csv_file, table_name in csv_to_table.items():
+        csv_path = os.path.join(RAW_DATA_DIR, csv_file)
         if os.path.exists(csv_path):
-            print(f"Loading {table_name} from {csv_path}...")
+            print(f"Loading {csv_file} -> {table_name} table...")
             con.execute(f"DROP TABLE IF EXISTS {table_name}")
-            con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{csv_path}')")
+            # For customers table, rename user_id to customer_id
+            if table_name == 'customers':
+                con.execute(f"""
+                    CREATE TABLE {table_name} AS
+                    SELECT
+                        user_id AS customer_id,
+                        name, gender, age, job, segment, joined_at
+                    FROM read_csv_auto('{csv_path}')
+                """)
+            else:
+                con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{csv_path}')")
         else:
             print(f"Warning: {csv_path} not found.")
 
@@ -437,7 +452,7 @@ def load_data(con):
 def verify_warehouse(con):
     """Verify warehouse DB tables."""
     print("\nVerifying Warehouse DB...")
-    tables = ['users', 'orders']
+    tables = ['customers', 'orders']
     for table_name in tables:
         try:
             result = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()

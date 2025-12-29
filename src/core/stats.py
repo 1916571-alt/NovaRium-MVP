@@ -22,7 +22,7 @@ except ImportError:
 # Assuming this script is in src/core/ folder, so db is two levels up
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(_BASE_DIR, 'data')
-WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')  # users, orders, 30-day history
+WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')  # customers, orders, 30-day history
 EXPERIMENT_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_experiment.db')  # assignments, events, experiments
 
 # Default DB_PATH points to experiment DB (most queries use this)
@@ -332,17 +332,17 @@ def get_user_segments(con=None):
     """
     Analyze existing user behavior in DB to define Persona Distribution.
     Returns a dictionary with percentage values (0-100) for each segment.
-    Uses WAREHOUSE DB (users, orders tables).
+    Uses WAREHOUSE DB (customers, orders tables).
     """
     sql = """
     WITH user_metrics AS (
         SELECT
-            u.user_id,
+            c.customer_id,
             COUNT(o.order_id) as order_count,
             COALESCE(SUM(o.amount), 0) as total_spent,
-            DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
-        FROM users u
-        LEFT JOIN orders o ON u.user_id = o.user_id
+            DATE_DIFF('day', MIN(c.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
+        FROM customers c
+        LEFT JOIN orders o ON c.customer_id = o.customer_id
         GROUP BY 1
     ),
     averages AS (
@@ -360,7 +360,7 @@ def get_user_segments(con=None):
     FROM user_metrics
     GROUP BY 1
     """
-    # Uses warehouse DB for users/orders data
+    # Uses warehouse DB for customers/orders data
     df = run_query(sql, con, db_type='warehouse')
     
     if df.empty:
