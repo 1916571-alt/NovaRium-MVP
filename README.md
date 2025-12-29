@@ -279,6 +279,76 @@ NovaRium-MVP/
 | `adoptions` | 채택된 실험 기록 (experiment_id, variant_config) |
 
 ---
+
+## 패치 노트 (Patch Notes)
+
+### v2.0 — Cloud Integration & Auth System (2025-12-30)
+
+> 로컬 프로토타입에서 **프로덕션 레디 클라우드 애플리케이션**으로의 대규모 전환
+
+#### [New] JWT 기반 인증 시스템
+**도전 과제**: 여러 사용자가 동시에 플랫폼을 사용하고, 브라우저 새로고침 시에도 로그인 상태가 유지되어야 했습니다.
+
+**해결 방안**:
+- `PyJWT` 라이브러리를 활용한 **Stateless JWT 토큰** 인증 구현
+- 비밀번호 `bcrypt` 해싱으로 보안 강화
+- 회원가입 시 **이메일 형식 검증** 및 **비밀번호 강도 검사** (8자 이상, 영문+숫자)
+- `st.query_params`를 활용한 **로그인 상태 영속성** (브라우저 새로고침 대응)
+- 7일 만료 토큰으로 사용자 편의성과 보안 균형
+
+#### [New] Supabase 클라우드 마이그레이션
+**도전 과제**: 로컬 DuckDB는 서버 재시작 시 데이터 유실, 동시 접근 시 파일 잠금 문제가 발생했습니다.
+
+**해결 방안**:
+- **Supabase PostgreSQL**로 완전 이전 (Connection Pooler 적용)
+- 고객 1,000명 + 주문 10,000건 데이터 **무결성 검증 완료**
+- `scripts/migrate_data_to_supabase.py` 마이그레이션 스크립트 제공
+- 환경변수 `DB_MODE`로 로컬(DuckDB) ↔ 클라우드(Supabase) **자동 스위칭**
+
+#### [Improved] Twelve-Factor App 아키텍처
+**도전 과제**: 환경별 설정이 코드에 하드코딩되어 있어 배포 시 수동 수정이 필요했습니다.
+
+**해결 방안**:
+- `src/data/database.py` **추상화 계층** 도입 (DB 벤더 독립적 인터페이스)
+- `.env` 기반 환경 설정 분리 (개발/스테이징/프로덕션)
+- `requirements.txt` 의존성 명시적 선언
+- 로그 레벨 환경변수 제어 (`LOG_LEVEL`)
+
+#### [Technical] 버그 수정 및 안정화
+| 이슈 | 원인 | 해결 |
+|------|------|------|
+| DuckDB IO Error | 동시 접근 시 파일 잠금 | PostgreSQL 전환 + Connection Pool |
+| Windows 인코딩 오류 | CP949 vs UTF-8 충돌 | `encoding='utf-8'` 명시 |
+| Streamlit 세션 유실 | 페이지 전환 시 상태 초기화 | `st.session_state` 초기화 로직 개선 |
+
+#### [New] 디자인 시스템 문서화
+- **'Cosmic Glass' 테마** 디자인 브리프 작성 (`docs/STITCH_DESIGN_BRIEF.md`)
+- 색상 팔레트, 타이포그래피, 컴포넌트 스타일 가이드 정의
+- Stitch AI 플랫폼 연동을 위한 기술 컨텍스트 문서화
+- UX 개선 포인트 6가지 도출 및 우선순위 정리
+
+---
+
+### 향후 업데이트 계획 (Next Steps)
+
+| 우선순위 | 항목 | 설명 |
+|----------|------|------|
+| 🔥 P1 | **Cosmic Glass 테마 UI 적용** | Stitch 제안 기반 전면 UI 리뉴얼 |
+| 🔥 P1 | 실험 위저드 UX 개선 | 4단계 프로세스 직관성 향상 |
+| P2 | 대시보드 드릴다운 기능 | Summary → Detail 탐색 경험 |
+| P2 | 소셜 로그인 연동 | Google, GitHub OAuth |
+| P3 | 모바일 반응형 최적화 | 차트 및 레이아웃 개선 |
+
+---
+
+### v1.0 — Initial Release (2025-12)
+- A/B 테스트 시뮬레이션 코어 기능 구현
+- DuckDB 기반 로컬 데이터 웨어하우스
+- Agent Swarm 유저 행동 시뮬레이션
+- Streamlit 대시보드 + FastAPI Target App
+
+---
+
 <div align="center">
   <p>Developed with care by <b>Geonyul Shin</b></p>
   <p><i>Building Bridges Between Theory and Practice.</i></p>

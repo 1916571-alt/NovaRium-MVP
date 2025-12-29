@@ -1,4 +1,13 @@
-# Python
+# ============================================================
+# NovaRium .gitignore
+# ============================================================
+# Organized following Twelve-Factor App principles
+# https://12factor.net/
+# ============================================================
+
+# ===========================================
+# 1. Python Build & Cache
+# ===========================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -22,33 +31,144 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual Environments
+# ===========================================
+# 2. Virtual Environments
+# ===========================================
 venv/
 env/
 ENV/
-.env
-.venv
+.venv/
 env.bak/
 venv.bak/
+.conda/
 
-# Streamlit secrets (cloud deployment)
+# ===========================================
+# 3. Environment & Secrets (CRITICAL)
+# ===========================================
+# Factor III: Store config in the environment
+# NEVER commit actual secrets
+
+# Local environment file (contains secrets)
+.env
+
+# Streamlit secrets (contains secrets)
 .streamlit/secrets.toml
 
+# Example files are OK to commit
+!.env.example
+!.streamlit/secrets.toml.example
+
+# ===========================================
+# 4. Local Data (Git ignored)
+# ===========================================
+# Factor IV: Backing services - Local data should not be in repo
+# Data is generated/migrated separately for each environment
+
+# Database files (DuckDB local storage)
+*.db
+*.db.wal
+*.wal
+
+# Data directories
+/data/db/
+!/data/db/.gitkeep
+
+# Raw CSV data (can be large, regenerate locally)
+/data/raw/*.csv
+!/data/raw/.gitkeep
+
+# Parquet files
+*.parquet
+
+# ===========================================
+# 5. IDE & Editor
+# ===========================================
 # VS Code
 .vscode/
 *.code-workspace
 
-# Data
-*.db
-*.wal
-*.parquet
-/data/db/
-/data/raw/*.csv
-!/data/raw/.gitkeep
-!/data/db/.gitkeep
+# JetBrains (PyCharm)
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ===========================================
+# 6. OS Generated
+# ===========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ===========================================
+# 7. Testing & Coverage
+# ===========================================
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
 
 # Temp test files
 /tests/temp/
 
-# Temp HTML files
+# ===========================================
+# 8. Logs & Temp Files
+# ===========================================
+*.log
+*.tmp
+*.temp
+/logs/
+
+# Temp HTML files (generated during testing)
 *.html
+!/target_app/templates/*.html
+
+# ===========================================
+# 9. Jupyter Notebooks
+# ===========================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ===========================================
+# 10. Build Artifacts (Deployment)
+# ===========================================
+# Docker
+docker-compose.override.yml
+
+# Render.com local builds
+.render/
+
+# ===========================================
+# 11. Documentation Build
+# ===========================================
+/docs/_build/
+/site/
+
+# ===========================================
+# Summary of What IS Tracked
+# ===========================================
+# - Source code (src/, target_app/, agent_swarm/, scripts/)
+# - Configuration templates (.env.example, secrets.toml.example)
+# - Deployment configs (Dockerfile, render.yaml)
+# - Documentation (docs/, *.md)
+# - Requirements (requirements.txt)
+# - Tests (tests/ - but not temp files)
+# - Directory structure (.gitkeep files)

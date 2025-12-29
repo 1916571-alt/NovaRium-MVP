@@ -80,11 +80,174 @@ DB_PATH = al.DB_PATH
 
 # Import DB write utilities
 from src.data.db import safe_write_batch
+import requests
+import re
 
 # =========================================================
-# GLOBAL SIDEBAR: System Settings (visible on all pages)
+# Authentication Session State
+# =========================================================
+if 'auth_user' not in st.session_state:
+    st.session_state['auth_user'] = None
+if 'auth_token' not in st.session_state:
+    st.session_state['auth_token'] = None
+if 'auth_checked' not in st.session_state:
+    st.session_state['auth_checked'] = False
+
+# =========================================================
+# Authentication Functions
+# =========================================================
+def validate_email_format(email: str) -> bool:
+    """Validate email format on client side."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def validate_password_strength(password: str) -> tuple:
+    """
+    Validate password strength on client side.
+    Returns (is_valid, error_message).
+    """
+    if len(password) < 8:
+        return False, "비밀번호는 8자 이상이어야 합니다"
+    if not re.search(r'[A-Za-z]', password):
+        return False, "비밀번호에 영문자가 포함되어야 합니다"
+    if not re.search(r'[0-9]', password):
+        return False, "비밀번호에 숫자가 포함되어야 합니다"
+    return True, ""
+
+def auth_signup(email: str, password: str, name: str) -> dict:
+    """Register a new user via API. Returns JWT token on success."""
+    try:
+        resp = requests.post(
+            f"{TARGET_APP_URL}/auth/signup",
+            json={"email": email, "password": password, "name": name},
+            timeout=10
+        )
+        return resp.json()
+    except Exception as e:
+        return {"status": "error", "message": f"서버 연결 실패: {str(e)}"}
+
+def auth_login(email: str, password: str) -> dict:
+    """Login user via API. Returns JWT token on success."""
+    try:
+        resp = requests.post(
+            f"{TARGET_APP_URL}/auth/login",
+            json={"email": email, "password": password},
+            timeout=10
+        )
+        return resp.json()
+    except Exception as e:
+        return {"status": "error", "message": f"서버 연결 실패: {str(e)}"}
+
+def auth_verify_token(token: str) -> dict:
+    """Verify JWT token and get user info."""
+    try:
+        resp = requests.get(
+            f"{TARGET_APP_URL}/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10
+        )
+        return resp.json()
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def auth_logout():
+    """Logout current user (clear session state)."""
+    st.session_state['auth_user'] = None
+    st.session_state['auth_token'] = None
+    st.session_state['auth_checked'] = False
+
+# =========================================================
+# Restore Login State from Query Params (for persistence)
+# =========================================================
+# Check if token exists in query params (for page refresh persistence)
+query_params = st.query_params
+if not st.session_state['auth_checked']:
+    stored_token = query_params.get('_auth_token', None)
+    if stored_token and not st.session_state.get('auth_user'):
+        # Verify the stored token
+        result = auth_verify_token(stored_token)
+        if result.get("status") == "success":
+            st.session_state['auth_user'] = result.get("user")
+            st.session_state['auth_token'] = stored_token
+    st.session_state['auth_checked'] = True
+
+# =========================================================
+# GLOBAL SIDEBAR: Authentication & System Settings
 # =========================================================
 with st.sidebar:
+    st.markdown("### 🔐 계정")
+
+    if st.session_state.get('auth_user'):
+        # Logged in state
+        user = st.session_state['auth_user']
+        st.success(f"👋 {user.get('name', 'User')}")
+        st.caption(f"📧 {user.get('email', '')}")
+        st.caption(f"🏷️ {user.get('role', 'analyst').upper()}")
+
+        if st.button("🚪 로그아웃", use_container_width=True):
+            auth_logout()
+            # Clear token from query params
+            st.query_params.clear()
+            st.rerun()
+    else:
+        # Login/Signup tabs
+        auth_tab = st.radio("인증 방식", ["로그인", "회원가입"], horizontal=True, label_visibility="collapsed")
+
+        if auth_tab == "로그인":
+            with st.form("login_form"):
+                login_email = st.text_input("이메일", placeholder="email@example.com")
+                login_password = st.text_input("비밀번호", type="password")
+                login_submit = st.form_submit_button("로그인", use_container_width=True)
+
+                if login_submit:
+                    if login_email and login_password:
+                        result = auth_login(login_email, login_password)
+                        if result.get("status") == "success":
+                            st.session_state['auth_user'] = result.get("user")
+                            st.session_state['auth_token'] = result.get("token")
+                            # Store token in query params for persistence
+                            st.query_params['_auth_token'] = result.get("token")
+                            st.success("로그인 성공!")
+                            st.rerun()
+                        else:
+                            st.error(result.get("message", "로그인 실패"))
+                    else:
+                        st.warning("이메일과 비밀번호를 입력하세요")
+        else:
+            with st.form("signup_form"):
+                signup_name = st.text_input("이름", placeholder="홍길동")
+                signup_email = st.text_input("이메일", placeholder="email@example.com")
+                signup_password = st.text_input("비밀번호", type="password", help="8자 이상, 영문자와 숫자 포함")
+                signup_password2 = st.text_input("비밀번호 확인", type="password")
+                signup_submit = st.form_submit_button("회원가입", use_container_width=True)
+
+                if signup_submit:
+                    # Client-side validation
+                    if not all([signup_name, signup_email, signup_password, signup_password2]):
+                        st.warning("모든 필드를 입력하세요")
+                    elif len(signup_name.strip()) < 2:
+                        st.error("이름은 2자 이상이어야 합니다")
+                    elif not validate_email_format(signup_email):
+                        st.error("올바른 이메일 형식이 아닙니다")
+                    elif signup_password != signup_password2:
+                        st.error("비밀번호가 일치하지 않습니다")
+                    else:
+                        # Password strength validation
+                        is_valid, error_msg = validate_password_strength(signup_password)
+                        if not is_valid:
+                            st.error(error_msg)
+                        else:
+                            result = auth_signup(signup_email, signup_password, signup_name)
+                            if result.get("status") == "success":
+                                # Auto-login after signup (JWT already returned)
+                                st.session_state['auth_user'] = result.get("user")
+                                st.session_state['auth_token'] = result.get("token")
+                                st.query_params['_auth_token'] = result.get("token")
+                                st.success("회원가입 성공! 자동 로그인됩니다.")
+                                st.rerun()
+                            else:
+                                st.error(result.get("message", "회원가입 실패"))
+
     st.markdown("---")
     st.markdown("### ⚙️ 시스템 설정")
 
@@ -1108,12 +1271,12 @@ elif st.session_state['page'] == 'study':
                 st.code("""
 WITH user_metrics AS (
     SELECT
-        u.user_id,
+        c.customer_id,
         COUNT(o.order_id) as order_count,
         COALESCE(SUM(o.amount), 0) as total_spent,
-        DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
-    FROM users u
-    LEFT JOIN orders o ON u.user_id = o.user_id
+        DATE_DIFF('day', MIN(c.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
+    FROM customers c
+    LEFT JOIN orders o ON c.customer_id = o.customer_id
     GROUP BY 1
 ),
 averages AS (
