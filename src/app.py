@@ -71,8 +71,8 @@ if 'use_db_coordination' not in st.session_state: st.session_state['use_db_coord
 # --- APPLY STYLES & HEADER ---
 ui.apply_custom_css()
 
-# STITCH 레이아웃: 사이드바 + 메인 콘텐츠
-ui.render_stitch_sidebar()
+# STITCH 레이아웃: 상단 네비게이션 바
+ui.render_stitch_topnav()
 ui.stitch_content_start()
 
 # con = al.get_connection() # [REMOVED] Global connection causes locking issues
@@ -172,99 +172,8 @@ if not st.session_state['auth_checked']:
             st.session_state['auth_token'] = stored_token
     st.session_state['auth_checked'] = True
 
-# =========================================================
-# GLOBAL SIDEBAR: Authentication & System Settings
-# =========================================================
-with st.sidebar:
-    st.markdown("### 🔐 계정")
-
-    if st.session_state.get('auth_user'):
-        # Logged in state
-        user = st.session_state['auth_user']
-        st.success(f"👋 {user.get('name', 'User')}")
-        st.caption(f"📧 {user.get('email', '')}")
-        st.caption(f"🏷️ {user.get('role', 'analyst').upper()}")
-
-        if st.button("🚪 로그아웃", use_container_width=True):
-            auth_logout()
-            # Clear token from query params
-            st.query_params.clear()
-            st.rerun()
-    else:
-        # Login/Signup tabs
-        auth_tab = st.radio("인증 방식", ["로그인", "회원가입"], horizontal=True, label_visibility="collapsed")
-
-        if auth_tab == "로그인":
-            with st.form("login_form"):
-                login_email = st.text_input("이메일", placeholder="email@example.com")
-                login_password = st.text_input("비밀번호", type="password")
-                login_submit = st.form_submit_button("로그인", use_container_width=True)
-
-                if login_submit:
-                    if login_email and login_password:
-                        result = auth_login(login_email, login_password)
-                        if result.get("status") == "success":
-                            st.session_state['auth_user'] = result.get("user")
-                            st.session_state['auth_token'] = result.get("token")
-                            # Store token in query params for persistence
-                            st.query_params['_auth_token'] = result.get("token")
-                            st.success("로그인 성공!")
-                            st.rerun()
-                        else:
-                            st.error(result.get("message", "로그인 실패"))
-                    else:
-                        st.warning("이메일과 비밀번호를 입력하세요")
-        else:
-            with st.form("signup_form"):
-                signup_name = st.text_input("이름", placeholder="홍길동")
-                signup_email = st.text_input("이메일", placeholder="email@example.com")
-                signup_password = st.text_input("비밀번호", type="password", help="8자 이상, 영문자와 숫자 포함")
-                signup_password2 = st.text_input("비밀번호 확인", type="password")
-                signup_submit = st.form_submit_button("회원가입", use_container_width=True)
-
-                if signup_submit:
-                    # Client-side validation
-                    if not all([signup_name, signup_email, signup_password, signup_password2]):
-                        st.warning("모든 필드를 입력하세요")
-                    elif len(signup_name.strip()) < 2:
-                        st.error("이름은 2자 이상이어야 합니다")
-                    elif not validate_email_format(signup_email):
-                        st.error("올바른 이메일 형식이 아닙니다")
-                    elif signup_password != signup_password2:
-                        st.error("비밀번호가 일치하지 않습니다")
-                    else:
-                        # Password strength validation
-                        is_valid, error_msg = validate_password_strength(signup_password)
-                        if not is_valid:
-                            st.error(error_msg)
-                        else:
-                            result = auth_signup(signup_email, signup_password, signup_name)
-                            if result.get("status") == "success":
-                                # Auto-login after signup (JWT already returned)
-                                st.session_state['auth_user'] = result.get("user")
-                                st.session_state['auth_token'] = result.get("token")
-                                st.query_params['_auth_token'] = result.get("token")
-                                st.success("회원가입 성공! 자동 로그인됩니다.")
-                                st.rerun()
-                            else:
-                                st.error(result.get("message", "회원가입 실패"))
-
-    st.markdown("---")
-    st.markdown("### ⚙️ 시스템 설정")
-
-    # DB Coordination Mode Toggle
-    use_coordination = st.checkbox(
-        "🔄 DB 협조 모드",
-        value=st.session_state.get('use_db_coordination', True),
-        help="Target App과 DB 연결을 조율합니다. 저장 오류 시 체크 해제하여 레거시 모드로 전환 가능."
-    )
-    st.session_state['use_db_coordination'] = use_coordination
-
-    if use_coordination:
-        st.caption("✅ 권장: Target App과 DB 조율")
-    else:
-        st.warning("⚠️ 레거시 모드")
-        st.caption("Target App 미실행 시만 사용")
+# DB Coordination Mode (default enabled, no UI needed)
+st.session_state['use_db_coordination'] = True
 
 # =========================================================
 # PAGE: INTRO (BRAND IDENTITY) - STITCH Layout
@@ -273,37 +182,44 @@ if st.session_state['page'] == 'intro':
     # STITCH Header
     ui.render_stitch_header(breadcrumb=['Home', 'NovaRium'])
 
-    # Hero Section - STITCH Style
-    st.markdown('<div style="text-align:center;padding:3rem 0 2rem 0;"><div style="display:flex;justify-content:center;margin-bottom:1.5rem;"><div style="width:80px;height:80px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:1.25rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(90,137,246,0.5);"><span style="font-size:40px;">🚀</span></div></div><h1 style="font-size:3rem;font-weight:800;background:linear-gradient(135deg,#ffffff 0%,#93c5fd 50%,#c4b5fd 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1rem;letter-spacing:-0.03em;">Where Data Analysts are Born.</h1><p style="font-size:1.25rem;color:rgba(255,255,255,0.5);max-width:600px;margin:0 auto 2rem auto;line-height:1.6;">책으로만 배우는 A/B 테스트는 그만.<br>직접 경험하며 데이터 분석가로 다시 태어나세요.</p></div>', unsafe_allow_html=True)
+    # Hero Section - STITCH Style (Compact)
+    st.markdown('<div style="text-align:center;padding:1.5rem 0 1rem 0;"><div style="display:flex;justify-content:center;margin-bottom:1rem;"><div style="width:56px;height:56px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(90,137,246,0.5);"><span style="font-size:28px;">🚀</span></div></div><h1 style="font-size:2rem;font-weight:800;background:linear-gradient(135deg,#ffffff 0%,#93c5fd 50%,#c4b5fd 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.5rem;letter-spacing:-0.03em;">Where Data Analysts are Born.</h1><p style="font-size:1rem;color:rgba(255,255,255,0.5);max-width:600px;margin:0 auto 1rem auto;line-height:1.5;">책으로만 배우는 A/B 테스트는 그만. 직접 경험하며 데이터 분석가로 다시 태어나세요.</p></div>', unsafe_allow_html=True)
 
-    # Feature Cards - STITCH Grid
-    st.markdown('<div class="stitch-grid-2"><div class="stitch-card" style="border-radius:2rem;"><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;"><div style="width:48px;height:48px;background:rgba(90,137,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:24px;">✨</span></div><h3 style="margin:0;font-size:1.25rem;font-weight:700;color:#93c5fd;">Nova (New)</h3></div><p style="margin:0;font-size:1rem;line-height:1.7;color:rgba(255,255,255,0.6);">라틴어로 <strong style="color:white;">\'새로운\'</strong>이라는 뜻이자, 우주를 밝히는 <strong style="color:white;">초신성(Supernova)</strong>을 의미합니다. 데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.</p></div><div class="stitch-card" style="border-radius:2rem;"><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;"><div style="width:48px;height:48px;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:24px;">🏛️</span></div><h3 style="margin:0;font-size:1.25rem;font-weight:700;color:#c4b5fd;">Arium (Place)</h3></div><p style="margin:0;font-size:1rem;line-height:1.7;color:rgba(255,255,255,0.6);">라틴어 접미사로 <strong style="color:white;">\'~을 위한 공간\'</strong> 또는 \'생태계\'를 뜻합니다. 예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.</p></div></div>', unsafe_allow_html=True)
+    # Feature Cards - STITCH Grid (Compact)
+    st.markdown('<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:1rem;"><div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;"><div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;"><div style="width:36px;height:36px;background:rgba(90,137,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:18px;">✨</span></div><h3 style="margin:0;font-size:1rem;font-weight:700;color:#93c5fd;">Nova (New)</h3></div><p style="margin:0;font-size:0.875rem;line-height:1.5;color:rgba(255,255,255,0.6);">라틴어로 <strong style="color:white;">새로운</strong>이라는 뜻이자, <strong style="color:white;">초신성(Supernova)</strong>을 의미합니다.</p></div><div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;"><div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;"><div style="width:36px;height:36px;background:rgba(139,92,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:18px;">🏛️</span></div><h3 style="margin:0;font-size:1rem;font-weight:700;color:#c4b5fd;">Arium (Place)</h3></div><p style="margin:0;font-size:0.875rem;line-height:1.5;color:rgba(255,255,255,0.6);">라틴어 접미사로 <strong style="color:white;">~을 위한 공간</strong> 또는 생태계를 뜻합니다.</p></div></div>', unsafe_allow_html=True)
 
-    # Mission Statement - STITCH Primary Button Style
-    st.markdown('<div style="text-align:center;margin-top:1rem;"><div style="background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);padding:1rem 2rem;border-radius:9999px;display:inline-flex;align-items:center;gap:0.75rem;font-weight:700;font-size:1rem;box-shadow:0 0 30px rgba(90,137,246,0.4);color:white;"><span style="font-size:20px;">🎯</span><span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span></div></div>', unsafe_allow_html=True)
+    # Mission Statement - STITCH Primary Button Style (Compact)
+    st.markdown('<div style="text-align:center;margin-top:0.5rem;"><div style="background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);padding:0.625rem 1.5rem;border-radius:9999px;display:inline-flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.875rem;box-shadow:0 0 20px rgba(90,137,246,0.4);color:white;"><span style="font-size:16px;">🎯</span><span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span></div></div>', unsafe_allow_html=True)
 
-    # Quick Stats Section - STITCH Cards
-    st.markdown('<div style="height:3rem;"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="stitch-grid-3"><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(34,197,94,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">🔬</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">A/B 테스트</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">가설 수립부터 통계 분석까지</p></div><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(90,137,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">📊</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">실시간 모니터링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">KPI 대시보드 구축 실습</p></div><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">🗃️</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">데이터 엔지니어링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">ETL 파이프라인 학습</p></div></div>', unsafe_allow_html=True)
+    # Quick Stats Section - st.columns로 가로 배열 강제
+    st.markdown('<div style="height:1rem;"></div>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;text-align:center;"><div style="width:36px;height:36px;background:rgba(34,197,94,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem auto;"><span style="font-size:18px;">🔬</span></div><h3 style="margin:0 0 0.25rem 0;font-size:1.25rem;font-weight:800;color:white;">A/B 테스트</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.75rem;">가설 수립부터 통계 분석까지</p></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;text-align:center;"><div style="width:36px;height:36px;background:rgba(90,137,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem auto;"><span style="font-size:18px;">📊</span></div><h3 style="margin:0 0 0.25rem 0;font-size:1.25rem;font-weight:800;color:white;">실시간 모니터링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.75rem;">KPI 대시보드 구축 실습</p></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;text-align:center;"><div style="width:36px;height:36px;background:rgba(139,92,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem auto;"><span style="font-size:18px;">🗃️</span></div><h3 style="margin:0 0 0.25rem 0;font-size:1.25rem;font-weight:800;color:white;">데이터 엔지니어링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.75rem;">ETL 파이프라인 학습</p></div>', unsafe_allow_html=True)
 
 # =========================================================
 # PAGE: DATA ENGINEERING LAB (NEW) - STITCH Design
 # =========================================================
 elif st.session_state['page'] == 'data_lab':
     # --- STITCH HEADER: Page Title with Badge ---
-    st.markdown('<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:2rem;"><div style="display:flex;align-items:center;gap:1rem;"><h2 style="margin:0;font-size:1.875rem;font-weight:900;letter-spacing:-0.025em;color:white;">New Data Mart: A/B Test Results</h2></div><p style="color:rgb(148,163,184);font-size:0.875rem;margin:0;">Build your data mart by selecting metrics and verifying lineage.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:2rem;"><div style="display:flex;align-items:center;gap:1rem;"><h2 style="margin:0;font-size:1.875rem;font-weight:900;letter-spacing:-0.025em;color:white;">데이터 마트 생성: A/B 테스트 결과</h2></div><p style="color:rgb(148,163,184);font-size:0.875rem;margin:0;">지표를 선택하고 데이터 계보를 확인하여 데이터 마트를 구축하세요.</p></div>', unsafe_allow_html=True)
 
     col_setup, col_code, col_lineage = st.columns([3, 6, 3], gap="medium")
     
     # --- STITCH COLUMN 1: Select Metrics Panel ---
     with col_setup:
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;height:100%;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#3b82f6;">⚙️</span> Select Metrics</h3>', unsafe_allow_html=True)
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;height:100%;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#3b82f6;">⚙️</span> 지표 선택</h3>', unsafe_allow_html=True)
 
-        # STITCH style multiselect
+        # STITCH style multiselect - 전체 선택 기본값
+        all_metrics = ['Active Users (DAU)', 'Conversion Rate', 'Avg Order Value', 'Retention 7d', 'Session Duration', 'Revenue', 'CTR']
         metrics = st.multiselect(
             "포함할 핵심 지표",
-            options=['Active Users (DAU)', 'Conversion Rate', 'Avg Order Value', 'Retention 7d', 'Session Duration', 'Revenue', 'CTR'],
-            default=['Conversion Rate', 'Retention 7d'],
+            options=all_metrics,
+            default=all_metrics,
             label_visibility="collapsed"
         )
 
@@ -328,7 +244,7 @@ elif st.session_state['page'] == 'data_lab':
 
     # --- STITCH COLUMN 2: SQL Preview Panel ---
     with col_code:
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;overflow:hidden;height:100%;position:relative;"><div style="position:absolute;inset:-1px;background:linear-gradient(to right,rgba(37,99,244,0.2),transparent,rgba(139,92,246,0.2));border-radius:0.75rem;opacity:0.5;pointer-events:none;"></div><div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(11,14,20,0.3);"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#a78bfa;">💻</span> SQL Preview</h3></div>', unsafe_allow_html=True)
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;overflow:hidden;height:100%;position:relative;"><div style="position:absolute;inset:-1px;background:linear-gradient(to right,rgba(37,99,244,0.2),transparent,rgba(139,92,246,0.2));border-radius:0.75rem;opacity:0.5;pointer-events:none;"></div><div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(11,14,20,0.3);"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#a78bfa;">💻</span> SQL 미리보기</h3></div>', unsafe_allow_html=True)
 
         # Real-time SQL Generation
         generated_sql = mb.generate_mart_sql(clean_metrics)
@@ -339,12 +255,12 @@ elif st.session_state['page'] == 'data_lab':
     # --- STITCH COLUMN 3: Lineage & Action Panel ---
     with col_lineage:
         # Lineage Panel
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;margin-bottom:1rem;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1.5rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#22c55e;">🌳</span> Lineage</h3><div style="position:relative;padding-left:1rem;border-left:2px dashed rgba(100,116,139,0.5);"><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">Source</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">🗃️</span><span style="font-size:0.875rem;color:rgb(226,232,240);">raw.events</span></div></div><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:#3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div><span style="font-size:0.75rem;font-weight:600;color:#3b82f6;text-transform:uppercase;">Transformation</span><div style="background:rgba(37,99,244,0.1);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(37,99,244,0.2);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:#3b82f6;">⚡</span><span style="font-size:0.875rem;color:white;">Aggregates</span></div></div><div style="position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">Destination</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">📊</span><span style="font-size:0.875rem;color:rgb(226,232,240);">dm_daily_kpi</span></div></div></div></div>', unsafe_allow_html=True)
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;margin-bottom:1rem;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1.5rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#22c55e;">🌳</span> 데이터 계보</h3><div style="position:relative;padding-left:1rem;border-left:2px dashed rgba(100,116,139,0.5);"><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">원천</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">🗃️</span><span style="font-size:0.875rem;color:rgb(226,232,240);">raw.events</span></div></div><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:#3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div><span style="font-size:0.75rem;font-weight:600;color:#3b82f6;text-transform:uppercase;">변환</span><div style="background:rgba(37,99,244,0.1);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(37,99,244,0.2);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:#3b82f6;">⚡</span><span style="font-size:0.875rem;color:white;">집계</span></div></div><div style="position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">적재</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">📊</span><span style="font-size:0.875rem;color:rgb(226,232,240);">dm_daily_kpi</span></div></div></div></div>', unsafe_allow_html=True)
 
         # Action Panel
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><span style="font-size:0.75rem;font-weight:500;color:rgb(148,163,184);">Est. Runtime</span><span style="font-size:0.75rem;font-weight:700;color:white;">~45s</span></div>', unsafe_allow_html=True)
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><span style="font-size:0.75rem;font-weight:500;color:rgb(148,163,184);">예상 소요시간</span><span style="font-size:0.75rem;font-weight:700;color:white;">약 45초</span></div>', unsafe_allow_html=True)
 
-        if st.button("🚀 Execute ETL Job", type="primary", use_container_width=True):
+        if st.button("🚀 ETL 실행", type="primary", use_container_width=True):
             with st.spinner("ETL 파이프라인 가동 중..."):
                 try:
                     sql = mb.generate_mart_sql(clean_metrics)
@@ -371,14 +287,14 @@ elif st.session_state['page'] == 'data_lab':
                 except Exception as e:
                     st.error(f"ETL 실패: {str(e)}")
 
-        st.markdown('<div style="margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;"><div style="width:0.5rem;height:0.5rem;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;"></div><span style="font-size:0.75rem;color:#22c55e;font-weight:500;">System Operational</span></div></div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;"><div style="width:0.5rem;height:0.5rem;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;"></div><span style="font-size:0.75rem;color:#22c55e;font-weight:500;">시스템 정상</span></div></div>', unsafe_allow_html=True)
 
 # =========================================================
 # PAGE: SITUATION ROOM (DASHBOARD) - STITCH Design
 # =========================================================
 if st.session_state['page'] == 'monitor':
     # --- STITCH HEADER: Page Title with Live Badge ---
-    st.markdown('<style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style><div style="display:flex;flex-direction:column;gap:1.5rem;margin-bottom:2.5rem;"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:1.5rem;"><div style="display:flex;flex-direction:column;gap:0.5rem;"><div style="display:flex;align-items:center;gap:0.5rem;color:#5a89f6;font-size:0.875rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;"><span style="width:0.5rem;height:0.5rem;border-radius:50%;background:#5a89f6;animation:pulse 2s infinite;"></span>Live Dashboard</div><h2 style="margin:0;font-size:2.5rem;font-weight:700;letter-spacing:-0.025em;color:white;">Simulation Monitor</h2><p style="color:rgb(148,163,184);font-size:1.125rem;margin:0;">Real-time insights for your A/B testing environment.</p></div><div style="display:flex;align-items:center;gap:1rem;"><div style="display:flex;padding:0.25rem;background:rgba(255,255,255,0.05);backdrop-filter:blur(4px);border-radius:9999px;border:1px solid rgba(255,255,255,0.05);"><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">24h</button><button style="padding:0.5rem 1rem;border-radius:9999px;background:rgba(255,255,255,0.1);color:white;font-size:0.875rem;font-weight:500;border:1px solid rgba(255,255,255,0.05);cursor:pointer;">7d</button><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">30d</button></div></div></div></div>', unsafe_allow_html=True)
+    st.markdown('<style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style><div style="display:flex;flex-direction:column;gap:1.5rem;margin-bottom:2.5rem;"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:1.5rem;"><div style="display:flex;flex-direction:column;gap:0.5rem;"><div style="display:flex;align-items:center;gap:0.5rem;color:#5a89f6;font-size:0.875rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;"><span style="width:0.5rem;height:0.5rem;border-radius:50%;background:#5a89f6;animation:pulse 2s infinite;"></span>실시간 대시보드</div><h2 style="margin:0;font-size:2.5rem;font-weight:700;letter-spacing:-0.025em;color:white;">시뮬레이션 모니터</h2><p style="color:rgb(148,163,184);font-size:1.125rem;margin:0;">A/B 테스트 환경의 실시간 인사이트를 확인하세요.</p></div><div style="display:flex;align-items:center;gap:1rem;"><div style="display:flex;padding:0.25rem;background:rgba(255,255,255,0.05);backdrop-filter:blur(4px);border-radius:9999px;border:1px solid rgba(255,255,255,0.05);"><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">24시간</button><button style="padding:0.5rem 1rem;border-radius:9999px;background:rgba(255,255,255,0.1);color:white;font-size:0.875rem;font-weight:500;border:1px solid rgba(255,255,255,0.05);cursor:pointer;">7일</button><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">30일</button></div></div></div></div>', unsafe_allow_html=True)
     
     check_history = al.run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'")
     has_history = not check_history.empty and check_history.iloc[0, 0] > 0

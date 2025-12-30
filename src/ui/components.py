@@ -30,7 +30,18 @@ def apply_custom_css():
     }
 
     /* ============================================
-       2. COSMIC BACKGROUND (강화된 버전)
+       2. GLOBAL SCALE - 전체 UI 95% 스케일
+       ============================================ */
+    html {
+        font-size: 15px !important;  /* 기본 16px에서 약간 축소 */
+    }
+
+    .stApp {
+        zoom: 0.95;  /* 95% 스케일 */
+    }
+
+    /* ============================================
+       2-1. COSMIC BACKGROUND (강화된 버전)
        ============================================ */
     /* 최상위 앱 컨테이너 */
     .stApp, .stApp > header, .stApp > section {
@@ -594,6 +605,37 @@ def apply_custom_css():
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+    }
+
+    /* Sidebar collapse button - hide text, show icon only */
+    button[data-testid="stSidebarCollapseButton"],
+    button[data-testid="stSidebarExpandButton"],
+    [data-testid="stSidebarCollapsedControl"] button {
+        font-size: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+    }
+
+    button[data-testid="stSidebarCollapseButton"]::before,
+    button[data-testid="stSidebarExpandButton"]::before,
+    [data-testid="stSidebarCollapsedControl"] button::before {
+        content: "☰" !important;
+        font-size: 16px !important;
+        color: white !important;
+    }
+
+    button[data-testid="stSidebarCollapseButton"] span,
+    button[data-testid="stSidebarExpandButton"] span,
+    [data-testid="stSidebarCollapsedControl"] button span {
+        display: none !important;
     }
 
     /* ============================================
@@ -1213,11 +1255,21 @@ def glass_container_end():
 # =========================================================
 
 def render_stitch_sidebar():
-    """STITCH 스타일 사이드바 렌더링. 고정 너비 288px, glass-panel-heavy 스타일."""
-    with st.sidebar:
-        st.markdown('<div style="display:flex;align-items:center;gap:1rem;padding:1rem 0;margin-bottom:1rem;"><div style="width:40px;height:40px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(90,137,246,0.4);"><span style="font-size:24px;">🚀</span></div><div><h1 style="margin:0;font-size:1.125rem;font-weight:700;color:white;">NovaRium</h1><p style="margin:0;font-size:0.75rem;color:rgba(255,255,255,0.5);">Analyst Platform</p></div></div>', unsafe_allow_html=True)
-        st.markdown("---")
-        current_page = st.session_state.get('page', 'intro')
+    """STITCH 스타일 사이드바 렌더링 (deprecated - use render_stitch_topnav instead)."""
+    pass  # Now using top navigation
+
+
+def render_stitch_topnav():
+    """STITCH 스타일 상단 네비게이션 바 렌더링. 가로 배치."""
+    current_page = st.session_state.get('page', 'intro')
+
+    # Logo + Navigation in columns
+    logo_col, nav_col, status_col = st.columns([2, 6, 2])
+
+    with logo_col:
+        st.markdown('<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;"><div style="width:36px;height:36px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px rgba(90,137,246,0.4);"><span style="font-size:20px;">🚀</span></div><div><span style="font-size:1rem;font-weight:700;color:white;">NovaRium</span></div></div>', unsafe_allow_html=True)
+
+    with nav_col:
         nav_items = [
             {'id': 'intro', 'icon': '🚀', 'label': 'NovaRium'},
             {'id': 'data_lab', 'icon': '🔬', 'label': '데이터 랩'},
@@ -1225,14 +1277,17 @@ def render_stitch_sidebar():
             {'id': 'study', 'icon': '🧪', 'label': '실험 위저드'},
             {'id': 'portfolio', 'icon': '📁', 'label': '회고록'},
         ]
-        for item in nav_items:
-            is_active = current_page == item['id']
-            btn_type = "primary" if is_active else "secondary"
-            if st.button(f"{item['icon']} {item['label']}", key=f"nav_{item['id']}", use_container_width=True, type=btn_type):
-                st.session_state.page = item['id']
-                st.rerun()
-        st.markdown("---")
-        st.markdown('<div style="background:linear-gradient(135deg,rgba(99,102,241,0.1) 0%,rgba(59,130,246,0.1) 100%);border:1px solid rgba(255,255,255,0.05);border-radius:1rem;padding:1rem;margin-top:1rem;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;"><span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#93c5fd;">시스템 상태</span><div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,0.6);"></div></div><p style="margin:0;font-size:0.75rem;color:rgba(255,255,255,0.5);">모든 시스템 정상 작동 중</p></div>', unsafe_allow_html=True)
+        cols = st.columns(len(nav_items))
+        for i, item in enumerate(nav_items):
+            with cols[i]:
+                is_active = current_page == item['id']
+                btn_type = "primary" if is_active else "secondary"
+                if st.button(f"{item['icon']} {item['label']}", key=f"topnav_{item['id']}", use_container_width=True, type=btn_type):
+                    st.session_state.page = item['id']
+                    st.rerun()
+
+    with status_col:
+        st.markdown('<div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;padding:0.75rem 0;"><div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,0.6);"></div><span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">시스템 정상</span></div>', unsafe_allow_html=True)
 
 
 def render_stitch_header(breadcrumb: list = None, show_search: bool = True):
