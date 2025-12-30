@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 # =========================================================
 # NovaRium UI Components - Cosmic Glass Theme v2.0
@@ -942,6 +943,30 @@ def apply_custom_css():
         height: 1px;
         background: rgba(255, 255, 255, 0.1);
     }
+
+    /* ============================================
+       19. MARKDOWN HTML RENDERING FIX
+       ============================================ */
+    .stMarkdown div[data-testid="stMarkdownContainer"] {
+        overflow: visible !important;
+    }
+    .stMarkdown div[data-testid="stMarkdownContainer"] > div {
+        display: block !important;
+    }
+    .stMarkdown div[data-testid="stMarkdownContainer"] p {
+        margin: 0 !important;
+    }
+
+    /* Z-Index Hierarchy */
+    section[data-testid="stSidebar"] {
+        z-index: 100 !important;
+    }
+    .stitch-header {
+        z-index: 50 !important;
+    }
+    .stitch-card, .glass-panel {
+        z-index: 10 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1169,31 +1194,11 @@ def glass_container_end():
 # =========================================================
 
 def render_stitch_sidebar():
-    """
-    STITCH 스타일 사이드바 렌더링.
-    고정 너비 288px, glass-panel-heavy 스타일.
-    Streamlit의 기본 사이드바를 사용하여 네비게이션 구현.
-    """
-    # Streamlit 기본 사이드바 사용
+    """STITCH 스타일 사이드바 렌더링. 고정 너비 288px, glass-panel-heavy 스타일."""
     with st.sidebar:
-        # 브랜딩 영역
-        st.markdown("""
-        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem 0; margin-bottom: 1rem;">
-            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(90, 137, 246, 0.4);">
-                <span class="material-symbols-outlined" style="color: white; font-size: 24px;">rocket_launch</span>
-            </div>
-            <div>
-                <h1 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: white;">NovaRium</h1>
-                <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">Analyst Platform</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown('<div style="display:flex;align-items:center;gap:1rem;padding:1rem 0;margin-bottom:1rem;"><div style="width:40px;height:40px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(90,137,246,0.4);"><span style="font-size:24px;">🚀</span></div><div><h1 style="margin:0;font-size:1.125rem;font-weight:700;color:white;">NovaRium</h1><p style="margin:0;font-size:0.75rem;color:rgba(255,255,255,0.5);">Analyst Platform</p></div></div>', unsafe_allow_html=True)
         st.markdown("---")
-
-        # 네비게이션 메뉴
         current_page = st.session_state.get('page', 'intro')
-
         nav_items = [
             {'id': 'intro', 'icon': '🚀', 'label': 'NovaRium'},
             {'id': 'data_lab', 'icon': '🔬', 'label': '데이터 랩'},
@@ -1201,188 +1206,73 @@ def render_stitch_sidebar():
             {'id': 'study', 'icon': '🧪', 'label': '실험 위저드'},
             {'id': 'portfolio', 'icon': '📁', 'label': '회고록'},
         ]
-
         for item in nav_items:
             is_active = current_page == item['id']
             btn_type = "primary" if is_active else "secondary"
             if st.button(f"{item['icon']} {item['label']}", key=f"nav_{item['id']}", use_container_width=True, type=btn_type):
                 st.session_state.page = item['id']
                 st.rerun()
-
         st.markdown("---")
-
-        # 시스템 상태
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; padding: 1rem; margin-top: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #93c5fd;">시스템 상태</span>
-                <div style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);"></div>
-            </div>
-            <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">모든 시스템 정상 작동 중</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div style="background:linear-gradient(135deg,rgba(99,102,241,0.1) 0%,rgba(59,130,246,0.1) 100%);border:1px solid rgba(255,255,255,0.05);border-radius:1rem;padding:1rem;margin-top:1rem;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;"><span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#93c5fd;">시스템 상태</span><div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,0.6);"></div></div><p style="margin:0;font-size:0.75rem;color:rgba(255,255,255,0.5);">모든 시스템 정상 작동 중</p></div>', unsafe_allow_html=True)
 
 
 def render_stitch_header(breadcrumb: list = None, show_search: bool = True):
-    """
-    STITCH 스타일 상단 헤더 렌더링.
-    rounded-full glass 스타일.
-
-    Args:
-        breadcrumb: 브레드크럼 리스트 예: ['Home', 'Data Lab']
-        show_search: 검색창 표시 여부
-    """
+    """STITCH 스타일 상단 헤더 렌더링. rounded-full glass 스타일."""
     if breadcrumb is None:
         breadcrumb = ['Home']
 
-    # 브레드크럼 HTML
-    breadcrumb_html = ""
+    breadcrumb_parts = []
     for i, item in enumerate(breadcrumb):
         if i < len(breadcrumb) - 1:
-            breadcrumb_html += f'<span style="color: rgba(255,255,255,0.4);">{item}</span>'
-            breadcrumb_html += '<span class="material-symbols-outlined" style="font-size: 16px; color: rgba(255,255,255,0.2);">chevron_right</span>'
+            breadcrumb_parts.append(f'<span style="color:rgba(255,255,255,0.4);">{item}</span>')
+            breadcrumb_parts.append('<span style="font-size:16px;color:rgba(255,255,255,0.2);">›</span>')
         else:
-            breadcrumb_html += f'<span style="color: white; font-weight: 600;">{item}</span>'
+            breadcrumb_parts.append(f'<span style="color:white;font-weight:600;">{item}</span>')
+    breadcrumb_html = ''.join(breadcrumb_parts)
 
-    search_html = ""
-    if show_search:
-        search_html = '''
-        <div style="position: relative; display: none;" class="md-show">
-            <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 20px; color: rgba(255,255,255,0.4);">search</span>
-            <input type="text" placeholder="실험 검색..." style="height: 40px; width: 200px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 9999px; padding-left: 40px; padding-right: 16px; color: white; font-size: 0.875rem; outline: none;" />
-        </div>
-        '''
-
-    header_html = f'''
-    <div class="stitch-header">
-        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;">
-            {breadcrumb_html}
-        </div>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            {search_html}
-            <button style="width: 40px; height: 40px; background: rgba(255,255,255,0.05); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;">
-                <span class="material-symbols-outlined" style="font-size: 20px; color: rgba(255,255,255,0.7);">notifications</span>
-                <span style="position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; border: 2px solid #0B0E14;"></span>
-            </button>
-            <button style="width: 40px; height: 40px; background: rgba(255,255,255,0.05); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                <span class="material-symbols-outlined" style="font-size: 20px; color: rgba(255,255,255,0.7);">settings</span>
-            </button>
-        </div>
-    </div>
-    '''
+    header_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:9999px;margin:1rem 1.5rem 0.5rem 1.5rem;padding:0.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;">{breadcrumb_html}</div><div style="display:flex;align-items:center;gap:1rem;"><button style="width:40px;height:40px;background:rgba(255,255,255,0.05);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;"><span style="font-size:20px;">🔔</span><span style="position:absolute;top:10px;right:10px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #0B0E14;"></span></button><button style="width:40px;height:40px;background:rgba(255,255,255,0.05);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;"><span style="font-size:20px;">⚙️</span></button></div></div>'
     st.markdown(header_html, unsafe_allow_html=True)
 
 
 def render_stitch_page_title(title: str, subtitle: str = "", badge: str = None):
-    """
-    STITCH 스타일 페이지 타이틀 렌더링.
-
-    Args:
-        title: 페이지 제목
-        subtitle: 부제목
-        badge: 뱃지 텍스트 (예: "Live Dashboard")
-    """
+    """STITCH 스타일 페이지 타이틀 렌더링."""
     badge_html = ""
     if badge:
-        badge_html = f'''
-        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-            <div style="width: 8px; height: 8px; background: #5a89f6; border-radius: 50%; animation: pulse 2s infinite;"></div>
-            <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5a89f6;">{badge}</span>
-        </div>
-        '''
+        badge_html = f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;"><div style="width:8px;height:8px;background:#5a89f6;border-radius:50%;"></div><span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#5a89f6;">{badge}</span></div>'
 
     subtitle_html = ""
     if subtitle:
-        subtitle_html = f'<p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 1.125rem;">{subtitle}</p>'
+        subtitle_html = f'<p style="margin:0;color:rgba(255,255,255,0.5);font-size:1.125rem;">{subtitle}</p>'
 
-    title_html = f'''
-    <div class="stitch-page-title">
-        {badge_html}
-        <h1 style="margin: 0 0 0.5rem 0; font-size: 2.5rem; font-weight: 700; color: white; letter-spacing: -0.02em;">{title}</h1>
-        {subtitle_html}
-    </div>
-    '''
+    title_html = f'<div style="margin-bottom:2rem;">{badge_html}<h1 style="margin:0 0 0.5rem 0;font-size:2.5rem;font-weight:700;color:white;letter-spacing:-0.02em;">{title}</h1>{subtitle_html}</div>'
     st.markdown(title_html, unsafe_allow_html=True)
 
 
-def render_stitch_stat_card(label: str, value: str, delta: str = None, delta_type: str = "positive", icon: str = "analytics", color: str = "primary"):
-    """
-    STITCH 스타일 KPI 스탯 카드.
-
-    Args:
-        label: 지표 라벨
-        value: 지표 값
-        delta: 변화량 (예: "+12%")
-        delta_type: "positive" or "negative"
-        icon: Material Symbols 아이콘명
-        color: "primary", "success", "warning", "error"
-    """
-    color_map = {
-        "primary": "#5a89f6",
-        "success": "#22c55e",
-        "warning": "#f59e0b",
-        "error": "#ef4444",
-        "purple": "#8b5cf6"
-    }
-    accent_color = color_map.get(color, "#5a89f6")
+def render_stitch_stat_card(label: str, value: str, delta: str = None, delta_type: str = "positive", icon: str = "📊", color: str = "primary"):
+    """STITCH 스타일 KPI 스탯 카드."""
+    icon_map = {"analytics": "📊", "science": "🔬", "trending_up": "📈", "speed": "⚡", "check_circle": "✅", "warning": "⚠️", "error": "❌"}
+    display_icon = icon_map.get(icon, icon) if len(icon) > 2 else icon
 
     delta_html = ""
     if delta:
-        delta_bg = "rgba(34, 197, 94, 0.1)" if delta_type == "positive" else "rgba(239, 68, 68, 0.1)"
-        delta_border = "rgba(34, 197, 94, 0.2)" if delta_type == "positive" else "rgba(239, 68, 68, 0.2)"
+        delta_bg = "rgba(34,197,94,0.1)" if delta_type == "positive" else "rgba(239,68,68,0.1)"
+        delta_border = "rgba(34,197,94,0.2)" if delta_type == "positive" else "rgba(239,68,68,0.2)"
         delta_color = "#22c55e" if delta_type == "positive" else "#ef4444"
-        delta_icon = "trending_up" if delta_type == "positive" else "trending_down"
-        delta_html = f'''
-        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
-            <div style="display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: {delta_bg}; border: 1px solid {delta_border}; border-radius: 9999px;">
-                <span class="material-symbols-outlined" style="font-size: 14px; color: {delta_color};">{delta_icon}</span>
-                <span style="font-size: 0.75rem; font-weight: 700; color: {delta_color};">{delta}</span>
-            </div>
-            <span style="font-size: 0.75rem; color: rgba(255,255,255,0.4);">vs. 지난주</span>
-        </div>
-        '''
+        delta_arrow = "↑" if delta_type == "positive" else "↓"
+        delta_html = f'<div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;"><div style="display:flex;align-items:center;gap:0.25rem;padding:0.25rem 0.5rem;background:{delta_bg};border:1px solid {delta_border};border-radius:9999px;"><span style="font-size:14px;color:{delta_color};">{delta_arrow}</span><span style="font-size:0.75rem;font-weight:700;color:{delta_color};">{delta}</span></div><span style="font-size:0.75rem;color:rgba(255,255,255,0.4);">vs. 지난주</span></div>'
 
-    card_html = f'''
-    <div class="stitch-card" style="border-radius: 2rem;">
-        <div style="position: absolute; top: 0; right: 0; padding: 1.5rem; opacity: 0.5;">
-            <span class="material-symbols-outlined" style="font-size: 48px; color: rgba(255,255,255,0.1);">{icon}</span>
-        </div>
-        <div style="position: relative; z-index: 10;">
-            <p style="margin: 0; font-size: 0.875rem; color: rgba(255,255,255,0.5);">{label}</p>
-            <h3 style="margin: 0.25rem 0 0 0; font-size: 2rem; font-weight: 700; color: white;">{value}</h3>
-            {delta_html}
-        </div>
-    </div>
-    '''
+    card_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:2rem;padding:1.5rem;position:relative;overflow:hidden;transition:all 0.3s ease;"><div style="position:absolute;top:0;right:0;padding:1.5rem;opacity:0.5;"><span style="font-size:48px;color:rgba(255,255,255,0.1);">{display_icon}</span></div><div style="position:relative;z-index:10;"><p style="margin:0;font-size:0.875rem;color:rgba(255,255,255,0.5);">{label}</p><h3 style="margin:0.25rem 0 0 0;font-size:2rem;font-weight:700;color:white;">{value}</h3>{delta_html}</div></div>'
     st.markdown(card_html, unsafe_allow_html=True)
 
 
 def render_stitch_card(title: str = None, subtitle: str = None, content: str = "", padding: str = "1.5rem"):
-    """
-    STITCH 스타일 기본 카드.
-
-    Args:
-        title: 카드 제목
-        subtitle: 부제목
-        content: 내부 HTML 콘텐츠
-        padding: 패딩 값
-    """
+    """STITCH 스타일 기본 카드."""
     header_html = ""
     if title:
-        subtitle_html = f'<p style="margin: 0; font-size: 0.875rem; color: rgba(255,255,255,0.5);">{subtitle}</p>' if subtitle else ""
-        header_html = f'''
-        <div style="margin-bottom: 1.5rem;">
-            <h3 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: white;">{title}</h3>
-            {subtitle_html}
-        </div>
-        '''
+        subtitle_html = f'<p style="margin:0;font-size:0.875rem;color:rgba(255,255,255,0.5);">{subtitle}</p>' if subtitle else ""
+        header_html = f'<div style="margin-bottom:1.5rem;"><h3 style="margin:0;font-size:1.125rem;font-weight:700;color:white;">{title}</h3>{subtitle_html}</div>'
 
-    card_html = f'''
-    <div class="stitch-card" style="padding: {padding}; border-radius: 2rem;">
-        {header_html}
-        {content}
-    </div>
-    '''
+    card_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:2rem;padding:{padding};position:relative;overflow:hidden;transition:all 0.3s ease;">{header_html}{content}</div>'
     st.markdown(card_html, unsafe_allow_html=True)
 
 
@@ -1410,5 +1300,10 @@ def stitch_content_start():
 
 def stitch_content_end():
     """STITCH 메인 콘텐츠 영역 종료."""
-    # Streamlit 기본 레이아웃 사용 - 추가 wrapper 불필요
     pass
+
+
+def render_isolated_html(html_content: str, height: int = 100):
+    """Shadow DOM 격리 렌더링을 위한 st.components.v1.html wrapper."""
+    full_html = f'''<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}}body{{background:transparent;}}</style></head><body>{html_content}</body></html>'''
+    components.html(full_html, height=height, scrolling=False)
