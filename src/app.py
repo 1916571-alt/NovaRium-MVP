@@ -269,46 +269,53 @@ with st.sidebar:
 # PAGE: INTRO (BRAND IDENTITY)
 # =========================================================
 if st.session_state['page'] == 'intro':
-    st.markdown("""
-    <div style="text-align: center; padding: 50px 0;">
-        <h1 style="font-size: 3.5rem; background: linear-gradient(to right, #818CF8, #C084FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;">
-            Where Data Analysts are Born.
-        </h1>
-        <p style="font-size: 1.2rem; margin-bottom: 40px; color: rgba(255,255,255,0.7);">
-            "책으로만 배우는 A/B 테스트는 그만. 직접 경험하며 데이터 분석가로 다시 태어나세요."
-        </p>
-    </div>
-    
-    <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 50px;">
-        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; width: 45%; border: 1px solid rgba(255,255,255,0.1);">
-            <h3 style="color: #A78BFA; margin-bottom: 15px;">✨ Nova (New)</h3>
-            <p style="font-size: 1.1rem; line-height: 1.6;">
-                라틴어로 <strong>'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong>초신성(Supernova)</strong>을 의미합니다.<br>
-                데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.
-            </p>
-        </div>
-        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; width: 45%; border: 1px solid rgba(255,255,255,0.1);">
-            <h3 style="color: #A78BFA; margin-bottom: 15px;">🏛️ Arium (Place)</h3>
-            <p style="font-size: 1.1rem; line-height: 1.6;">
-                라틴어 접미사로 <strong>'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다.<br>
-                예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.
-            </p>
-        </div>
-    </div>
-    
-    <div style="text-align: center;">
-        <div style="background: linear-gradient(90deg, #6366F1, #8B5CF6); padding: 15px 30px; border-radius: 50px; display: inline-block; font-weight: bold; font-size: 1.2rem; box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);">
-            🚀 Mission: "데이터로 비즈니스를 움직이는 초신성(Analyst)을 위한 실전 생태계"
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Hero Section
+    st.markdown('''<div style="text-align: center; padding: 4rem 0;">
+<div style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+<div style="width: 4rem; height: 4rem; background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%); border-radius: 1rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 0 30px rgba(59, 25, 230, 0.5);">🚀</div>
+</div>
+<h1 style="font-size: 3.5rem; font-weight: 900; background: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #c084fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; letter-spacing: -0.03em;">Where Data Analysts are Born.</h1>
+<p style="font-size: 1.25rem; margin-bottom: 3rem; color: rgba(255, 255, 255, 0.6); max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.6;">책으로만 배우는 A/B 테스트는 그만.<br>직접 경험하며 데이터 분석가로 다시 태어나세요.</p>
+</div>''', unsafe_allow_html=True)
+
+    # Feature Cards using Streamlit columns for better control
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown('''<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2rem; border-radius: 1.5rem; height: 100%;">
+<div style="width: 3rem; height: 3rem; background: rgba(167, 139, 250, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">✨</div>
+<h3 style="color: #a78bfa; margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 700;">Nova (New)</h3>
+<p style="font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.7);">라틴어로 <strong style="color: white;">'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong style="color: white;">초신성(Supernova)</strong>을 의미합니다. 데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.</p>
+</div>''', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('''<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2rem; border-radius: 1.5rem; height: 100%;">
+<div style="width: 3rem; height: 3rem; background: rgba(167, 139, 250, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">🏛️</div>
+<h3 style="color: #a78bfa; margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 700;">Arium (Place)</h3>
+<p style="font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.7);">라틴어 접미사로 <strong style="color: white;">'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다. 예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.</p>
+</div>''', unsafe_allow_html=True)
+
+    # Mission Statement
+    st.markdown('''<div style="text-align: center; margin-top: 2rem;">
+<div style="background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%); padding: 1.25rem 2.5rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.1rem; box-shadow: 0 0 30px rgba(59, 25, 230, 0.4); color: white;">
+<span>🎯</span>
+<span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span>
+</div>
+</div>''', unsafe_allow_html=True)
 
 # =========================================================
 # PAGE: DATA ENGINEERING LAB (NEW)
 # =========================================================
 elif st.session_state['page'] == 'data_lab':
-    st.markdown("## 🛠️ 데이터 엔지니어링 랩 (Data Mart Builder)")
-    st.caption("비즈니스 대시보드를 구축하기 위해 먼저 Raw Data를 분석 가능한 'Data Mart'로 가공해야 합니다.")
+    # --- HEADER SECTION (Cosmic Glass Style) ---
+    st.markdown('''<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem;">
+<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+<span style="font-size: 2rem;">🛠️</span>
+<h1 style="margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; color: white;">데이터 엔지니어링 랩</h1>
+<span style="background: rgba(59, 25, 230, 0.2); color: #a78bfa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(59, 25, 230, 0.3);">Data Mart Builder</span>
+</div>
+<p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem;">비즈니스 대시보드를 구축하기 위해 먼저 Raw Data를 분석 가능한 'Data Mart'로 가공해야 합니다.</p>
+</div>''', unsafe_allow_html=True)
     
     col_setup, col_code = st.columns([1, 1.2], gap="large")
     
@@ -447,18 +454,22 @@ elif st.session_state['page'] == 'data_lab':
 # PAGE: SITUATION ROOM (DASHBOARD)
 # =========================================================
 if st.session_state['page'] == 'monitor':
-    # --- HEADER SECTION ---
-    st.markdown("""
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-        <div>
-            <h2 style="margin:0;">🛸 종합 상황실 (Operations Center)</h2>
-            <p style="margin:0; opacity:0.7;">NovaEats 서비스의 실시간 매출 및 운영 현황을 모니터링합니다.</p>
-        </div>
-        <div style="text-align:right;">
-            <span style="background:rgba(74, 222, 128, 0.1); color:#4ade80; padding:4px 12px; border-radius:15px; font-size:0.8rem; font-weight:bold;">● Live System Online</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # --- HEADER SECTION (Cosmic Glass Style) ---
+    st.markdown('''<style>@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }</style>
+<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+<div>
+<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+<span style="font-size: 2rem;">📊</span>
+<h1 style="margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; color: white;">종합 상황실</h1>
+<span style="background: rgba(59, 25, 230, 0.2); color: #a78bfa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(59, 25, 230, 0.3);">Operations Center</span>
+</div>
+<p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem;">NovaEats 서비스의 실시간 매출 및 운영 현황을 모니터링합니다.</p>
+</div>
+<div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); padding: 0.5rem 1rem; border-radius: 9999px;">
+<span style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 10px rgba(34, 197, 94, 0.5); animation: pulse 2s infinite;"></span>
+<span style="color: #22c55e; font-size: 0.85rem; font-weight: 600;">시스템 정상</span>
+</div>
+</div>''', unsafe_allow_html=True)
     
     check_history = al.run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'")
     has_history = not check_history.empty and check_history.iloc[0, 0] > 0
@@ -469,7 +480,11 @@ if st.session_state['page'] == 'monitor':
             st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
     else:
         # --- TIER 1: REAL-TIME PULSE (LIVE) ---
-        st.markdown("### 🟢 실시간 운영 현황 (Real-time Pulse)")
+        st.markdown('''<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+<div style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);"></div>
+<h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; color: white;">실시간 운영 현황</h2>
+<span style="background: rgba(34, 197, 94, 0.15); color: #22c55e; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Real-time Pulse</span>
+</div>''', unsafe_allow_html=True)
 
         # Real-time Queries (No Random Simulation)
         # 1. Active Users (Last 30 mins)
@@ -549,7 +564,11 @@ if st.session_state['page'] == 'monitor':
         st.divider()
 
         # --- TIER 2: BUSINESS INTELLIGENCE (FROM MART) ---
-        st.markdown("### 🔵 비즈니스 분석 (Business Intelligence)")
+        st.markdown('''<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+<div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>
+<h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; color: white;">비즈니스 분석</h2>
+<span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Business Intelligence</span>
+</div>''', unsafe_allow_html=True)
         
         # Fetch from Data Mart
         # Using simple SELECT from pre-aggregated table
@@ -636,7 +655,7 @@ if st.session_state['page'] == 'monitor':
         st.divider()
 
         # --- TIER 3: SYSTEM & CRISIS MONITOR ---
-        st.markdown("### 🟠 시스템 및 위기 감지 (System Integrity)")
+        st.markdown('<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;"><div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);"></div><h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">시스템 및 위기 감지</h2><span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">System Integrity</span></div>', unsafe_allow_html=True)
         
         alerts = []
         
@@ -751,16 +770,18 @@ if st.session_state['page'] == 'monitor':
 # PAGE: STUDY (WIZARD)
 # =========================================================
 elif st.session_state['page'] == 'study':
-    
+    # --- HEADER SECTION (Cosmic Glass Style) ---
+    st.markdown('<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem;"><div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;"><span style="font-size: 2rem;">🚀</span><h1 style="margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em;">실험 위저드</h1><span style="background: rgba(59, 25, 230, 0.2); color: #a78bfa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(59, 25, 230, 0.3);">A/B Test Master Class</span></div><p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem;">4단계 가이드를 따라 가설 수립부터 통계 분석까지 체계적으로 실험을 설계하세요.</p></div>', unsafe_allow_html=True)
+
     # --- Progress Indicators (Nebula Style) ---
-    steps = ["1. Hypothesis", "2. Design", "3. Collection", "4. Analysis"]
+    steps = ["1. 가설 수립", "2. 실험 설계", "3. 데이터 수집", "4. 결과 분석"]
     ui.render_step_progress(steps, st.session_state['step'])
-    
+
     curr = st.session_state['step']
 
     # --- STEP 1: HYPOTHESIS ---
     if curr == 1:
-        st.markdown(f"<h2>Step 1. 목표 정의 (Define Your Vision)</h2>", unsafe_allow_html=True)
+        st.markdown('<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;"><div style="width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.25rem; box-shadow: 0 0 15px rgba(59, 25, 230, 0.4);">1</div><h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">목표 정의</h2><span style="background: rgba(59, 25, 230, 0.15); color: #a78bfa; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Define Your Vision</span></div>', unsafe_allow_html=True)
 
         # Show current adoption status banner
         try:
