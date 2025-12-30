@@ -287,172 +287,98 @@ if st.session_state['page'] == 'intro':
     st.markdown('<div class="stitch-grid-3"><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(34,197,94,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">🔬</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">A/B 테스트</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">가설 수립부터 통계 분석까지</p></div><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(90,137,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">📊</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">실시간 모니터링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">KPI 대시보드 구축 실습</p></div><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">🗃️</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">데이터 엔지니어링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">ETL 파이프라인 학습</p></div></div>', unsafe_allow_html=True)
 
 # =========================================================
-# PAGE: DATA ENGINEERING LAB (NEW)
+# PAGE: DATA ENGINEERING LAB (NEW) - STITCH Design
 # =========================================================
 elif st.session_state['page'] == 'data_lab':
-    # --- HEADER SECTION (Cosmic Glass Style) ---
-    st.markdown('''<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem;">
-<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-<span style="font-size: 2rem;">🛠️</span>
-<h1 style="margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; color: white;">데이터 엔지니어링 랩</h1>
-<span style="background: rgba(59, 25, 230, 0.2); color: #a78bfa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(59, 25, 230, 0.3);">Data Mart Builder</span>
-</div>
-<p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem;">비즈니스 대시보드를 구축하기 위해 먼저 Raw Data를 분석 가능한 'Data Mart'로 가공해야 합니다.</p>
-</div>''', unsafe_allow_html=True)
+    # --- STITCH HEADER: Page Title with Badge ---
+    st.markdown('<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:2rem;"><div style="display:flex;align-items:center;gap:1rem;"><h2 style="margin:0;font-size:1.875rem;font-weight:900;letter-spacing:-0.025em;color:white;">New Data Mart: A/B Test Results</h2></div><p style="color:rgb(148,163,184);font-size:0.875rem;margin:0;">Build your data mart by selecting metrics and verifying lineage.</p></div>', unsafe_allow_html=True)
+
+    col_setup, col_code, col_lineage = st.columns([3, 6, 3], gap="medium")
     
-    col_setup, col_code = st.columns([1, 1.2], gap="large")
-    
+    # --- STITCH COLUMN 1: Select Metrics Panel ---
     with col_setup:
-        with st.container(border=True):
-            st.markdown("### 1. 마트 설계 (Schema Design)")
-            st.info("💡 분석가님, 대시보드에서 어떤 지표를 보고 싶으신가요?")
-            
-            # Default metrics
-            metrics = st.multiselect(
-                "포함할 핵심 지표 (Metrics)",
-                options=['total_users (DAU)', 'revenue (매출)', 'ctr (클릭률)', 'cvr (전환율)', 'aov (객단가)', 'arpu (인당 매출)', 'session_depth (인당 활동량)'],
-                default=['total_users (DAU)', 'revenue (매출)', 'ctr (클릭률)', 'cvr (전환율)', 'aov (객단가)']
-            )
-            
-            # Helper logic to parse selection to clean keys
-            clean_metrics = []
-            if any('revenue' in m for m in metrics): clean_metrics.append('revenue')
-            if any('ctr' in m for m in metrics): clean_metrics.append('ctr')
-            if any('cvr' in m for m in metrics): clean_metrics.append('cvr')
-            if any('aov' in m for m in metrics): clean_metrics.append('aov')
-            if any('arpu' in m for m in metrics): clean_metrics.append('arpu')
-            if any('session_depth' in m for m in metrics): clean_metrics.append('session_depth')
-            
-            st.write("")
-            if st.button("🚀 데이터 마트 구축 (Build & Run)", type="primary", width="stretch"):
-                # Execute ETL
-                with st.spinner("ETL 파이프라인 가동 중... (Airflow Task #101)"):
-                    try:
-                        # 1. Generate SQL
-                        sql = mb.generate_mart_sql(clean_metrics)
-                        
-                        # 2. Execute
-                        # 2. Execute via Server API (Avoids Locking)
-                        import requests
-                        try:
-                            resp = requests.post(
-                                f"{TARGET_APP_URL}/admin/execute_sql",
-                                json={"sql": sql},
-                                timeout=30
-                            )
-                            if resp.status_code != 200:
-                                raise Exception(f"Server API Error: {resp.text}")
-                            
-                            r_json = resp.json()
-                            if r_json.get("status") != "success":
-                                raise Exception(f"SQL Error: {r_json.get('message')}")
-                                
-                            # 3. Validation (Use Read-Only via stats.py)
-                            check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
-                            df_res = al.run_query(check_sql)
-                            row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
-                            
-                            st.success(f"구축 완료! 총 {row_count:,}개의 일별 데이터가 적재되었습니다.")
-                            
-                        except requests.exceptions.ConnectionError:
-                             st.error(f"서버 연결 실패: Target App({TARGET_APP_URL})에 연결할 수 없습니다.")
-                             st.info("💡 Render 백엔드가 아직 시작 중일 수 있습니다. 30초 후 다시 시도해주세요.")
-                             raise
-                        except Exception as e:
-                             raise e
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;height:100%;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#3b82f6;">⚙️</span> Select Metrics</h3>', unsafe_allow_html=True)
 
-                        # Move to dashboard
-                        import time
-                        time.sleep(1)
-                        st.session_state['page'] = 'monitor'
-                        st.rerun()
+        # STITCH style multiselect
+        metrics = st.multiselect(
+            "포함할 핵심 지표",
+            options=['Active Users (DAU)', 'Conversion Rate', 'Avg Order Value', 'Retention 7d', 'Session Duration', 'Revenue', 'CTR'],
+            default=['Conversion Rate', 'Retention 7d'],
+            label_visibility="collapsed"
+        )
 
-                    except Exception as e:
-                        error_msg = str(e)
-                        st.error(f"ETL 실패: {error_msg}")
+        # Helper logic to parse selection to clean keys
+        clean_metrics = []
+        if any('Revenue' in m for m in metrics): clean_metrics.append('revenue')
+        if any('CTR' in m for m in metrics): clean_metrics.append('ctr')
+        if any('Conversion' in m for m in metrics): clean_metrics.append('cvr')
+        if any('Avg Order' in m for m in metrics): clean_metrics.append('aov')
+        if any('Active Users' in m for m in metrics): clean_metrics.append('arpu')
+        if any('Session' in m for m in metrics): clean_metrics.append('session_depth')
 
-                        # Show detailed diagnostics for connection errors
-                        if "pool not available" in error_msg.lower() or "connection" in error_msg.lower():
-                            with st.expander("🔍 상세 진단 정보"):
-                                st.markdown(f"""
-                                **Target App URL**: `{TARGET_APP_URL}`
+        # Selected chips display
+        if metrics:
+            chips_html = '<div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:1rem 0;">'
+            for m in metrics:
+                chips_html += f'<span style="display:flex;align-items:center;gap:0.375rem;padding:0.25rem 0.75rem;border-radius:9999px;background:rgba(37,99,244,0.2);border:1px solid rgba(37,99,244,0.3);font-size:0.75rem;font-weight:500;color:#93c5fd;">{m}</span>'
+            chips_html += '</div>'
+            st.markdown(chips_html, unsafe_allow_html=True)
 
-                                **가능한 원인**:
-                                1. 🔄 Render 서버가 아직 시작 중 (Free tier는 15분 비활성화 후 Sleep)
-                                2. 🔐 DATABASE_URL 환경 변수가 잘못 설정됨
-                                3. 🌐 네트워크 연결 문제 (IPv6 vs IPv4)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-                                **해결 방법**:
-                                1. Render Dashboard에서 Manual Deploy 실행
-                                2. `{TARGET_APP_URL}/debug/db-status?force_retry=true` 접속하여 상태 확인
-                                3. Streamlit Cloud Secrets에 DATABASE_URL 확인
-                                """)
-
-                                # Try to get debug info from server
-                                try:
-                                    debug_resp = requests.get(f"{TARGET_APP_URL}/debug/db-status", timeout=10)
-                                    if debug_resp.status_code == 200:
-                                        st.json(debug_resp.json())
-                                except Exception:
-                                    st.warning("백엔드 서버에 연결할 수 없어 상세 정보를 가져올 수 없습니다.")
-
-            st.divider()
-
-            # Data Lineage Explanation Only
-            st.markdown("**📖 데이터 흐름 (Data Lineage)**")
-            st.markdown("""
-            **Raw Data → Data Mart 변환 과정**
-
-            1. **Raw Assignments** (방문 기록)
-               - `user_id`, `variant`, `assigned_at` 등 원천 데이터
-
-            2. **Raw Events** (행동 기록)
-               - `event_name` (click_banner, purchase 등)
-               - `value` (구매 금액)
-
-            3. **JOIN & AGGREGATE** (결합 및 집계)
-               - 사용자별로 이벤트를 집계
-               - 날짜별로 그룹화
-
-            4. **Data Mart** (분석 전용 테이블)
-               - CTR, CVR, AOV, ARPU 등 지표가 미리 계산됨
-               - 대시보드에서 빠르게 조회 가능
-                """)
-
+    # --- STITCH COLUMN 2: SQL Preview Panel ---
     with col_code:
-        st.markdown("### 2. SQL 쿼리 생성기 (Query Generator)")
-        st.caption("선택하신 설계에 따라 자동으로 생성된 ETL 쿼리입니다. 현업에서는 이 코드가 Airflow에서 매일 새벽에 실행됩니다.")
-        
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;overflow:hidden;height:100%;position:relative;"><div style="position:absolute;inset:-1px;background:linear-gradient(to right,rgba(37,99,244,0.2),transparent,rgba(139,92,246,0.2));border-radius:0.75rem;opacity:0.5;pointer-events:none;"></div><div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(11,14,20,0.3);"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#a78bfa;">💻</span> SQL Preview</h3></div>', unsafe_allow_html=True)
+
         # Real-time SQL Generation
         generated_sql = mb.generate_mart_sql(clean_metrics)
         st.code(generated_sql, language="sql")
-        
-        st.markdown("""
-        > [!NOTE]
-        > **왜 SQL을 직접 짜지 않고 생성하나요?**  
-        > 데이터 엔지니어링에서는 휴먼 에러를 줄이기 위해, 메타데이터(설계)를 기반으로 쿼리를 자동 생성(Templating)하는 방식을 자주 사용합니다.
-        """)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- STITCH COLUMN 3: Lineage & Action Panel ---
+    with col_lineage:
+        # Lineage Panel
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;margin-bottom:1rem;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1.5rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#22c55e;">🌳</span> Lineage</h3><div style="position:relative;padding-left:1rem;border-left:2px dashed rgba(100,116,139,0.5);"><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">Source</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">🗃️</span><span style="font-size:0.875rem;color:rgb(226,232,240);">raw.events</span></div></div><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:#3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div><span style="font-size:0.75rem;font-weight:600;color:#3b82f6;text-transform:uppercase;">Transformation</span><div style="background:rgba(37,99,244,0.1);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(37,99,244,0.2);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:#3b82f6;">⚡</span><span style="font-size:0.875rem;color:white;">Aggregates</span></div></div><div style="position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">Destination</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">📊</span><span style="font-size:0.875rem;color:rgb(226,232,240);">dm_daily_kpi</span></div></div></div></div>', unsafe_allow_html=True)
+
+        # Action Panel
+        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><span style="font-size:0.75rem;font-weight:500;color:rgb(148,163,184);">Est. Runtime</span><span style="font-size:0.75rem;font-weight:700;color:white;">~45s</span></div>', unsafe_allow_html=True)
+
+        if st.button("🚀 Execute ETL Job", type="primary", use_container_width=True):
+            with st.spinner("ETL 파이프라인 가동 중..."):
+                try:
+                    sql = mb.generate_mart_sql(clean_metrics)
+                    import requests
+                    try:
+                        resp = requests.post(f"{TARGET_APP_URL}/admin/execute_sql", json={"sql": sql}, timeout=30)
+                        if resp.status_code != 200:
+                            raise Exception(f"Server API Error: {resp.text}")
+                        r_json = resp.json()
+                        if r_json.get("status") != "success":
+                            raise Exception(f"SQL Error: {r_json.get('message')}")
+                        check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
+                        df_res = al.run_query(check_sql)
+                        row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
+                        st.success(f"✅ 구축 완료! {row_count:,}개 데이터 적재")
+                    except requests.exceptions.ConnectionError:
+                        st.error(f"서버 연결 실패")
+                        st.info("💡 30초 후 다시 시도해주세요.")
+                        raise
+                    import time
+                    time.sleep(1)
+                    st.session_state['page'] = 'monitor'
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"ETL 실패: {str(e)}")
+
+        st.markdown('<div style="margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;"><div style="width:0.5rem;height:0.5rem;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;"></div><span style="font-size:0.75rem;color:#22c55e;font-weight:500;">System Operational</span></div></div>', unsafe_allow_html=True)
 
 # =========================================================
-# PAGE: SITUATION ROOM (DASHBOARD)
+# PAGE: SITUATION ROOM (DASHBOARD) - STITCH Design
 # =========================================================
 if st.session_state['page'] == 'monitor':
-    # --- HEADER SECTION (Cosmic Glass Style) ---
-    st.markdown('''<style>@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }</style>
-<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-<div>
-<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-<span style="font-size: 2rem;">📊</span>
-<h1 style="margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; color: white;">종합 상황실</h1>
-<span style="background: rgba(59, 25, 230, 0.2); color: #a78bfa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(59, 25, 230, 0.3);">Operations Center</span>
-</div>
-<p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem;">NovaEats 서비스의 실시간 매출 및 운영 현황을 모니터링합니다.</p>
-</div>
-<div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); padding: 0.5rem 1rem; border-radius: 9999px;">
-<span style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 10px rgba(34, 197, 94, 0.5); animation: pulse 2s infinite;"></span>
-<span style="color: #22c55e; font-size: 0.85rem; font-weight: 600;">시스템 정상</span>
-</div>
-</div>''', unsafe_allow_html=True)
+    # --- STITCH HEADER: Page Title with Live Badge ---
+    st.markdown('<style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style><div style="display:flex;flex-direction:column;gap:1.5rem;margin-bottom:2.5rem;"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:1.5rem;"><div style="display:flex;flex-direction:column;gap:0.5rem;"><div style="display:flex;align-items:center;gap:0.5rem;color:#5a89f6;font-size:0.875rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;"><span style="width:0.5rem;height:0.5rem;border-radius:50%;background:#5a89f6;animation:pulse 2s infinite;"></span>Live Dashboard</div><h2 style="margin:0;font-size:2.5rem;font-weight:700;letter-spacing:-0.025em;color:white;">Simulation Monitor</h2><p style="color:rgb(148,163,184);font-size:1.125rem;margin:0;">Real-time insights for your A/B testing environment.</p></div><div style="display:flex;align-items:center;gap:1rem;"><div style="display:flex;padding:0.25rem;background:rgba(255,255,255,0.05);backdrop-filter:blur(4px);border-radius:9999px;border:1px solid rgba(255,255,255,0.05);"><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">24h</button><button style="padding:0.5rem 1rem;border-radius:9999px;background:rgba(255,255,255,0.1);color:white;font-size:0.875rem;font-weight:500;border:1px solid rgba(255,255,255,0.05);cursor:pointer;">7d</button><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">30d</button></div></div></div></div>', unsafe_allow_html=True)
     
     check_history = al.run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'")
     has_history = not check_history.empty and check_history.iloc[0, 0] > 0
@@ -462,29 +388,16 @@ if st.session_state['page'] == 'monitor':
         if st.button("🔄 데이터 초기화 (Reset)", type="primary"):
             st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
     else:
-        # --- TIER 1: REAL-TIME PULSE (LIVE) ---
-        st.markdown('''<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
-<div style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);"></div>
-<h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; color: white;">실시간 운영 현황</h2>
-<span style="background: rgba(34, 197, 94, 0.15); color: #22c55e; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Real-time Pulse</span>
-</div>''', unsafe_allow_html=True)
-
-        # Real-time Queries (No Random Simulation)
-        # 1. Active Users (Last 30 mins)
+        # Real-time Queries
         sql_live = """
-            SELECT 
+            SELECT
                 COUNT(DISTINCT user_id) as active_users,
-                (SELECT COUNT(*) FROM events 
-                 WHERE event_name = 'purchase' 
-                 AND timestamp >= CURRENT_DATE) as today_orders,
-                 (SELECT COALESCE(SUM(value), 0) FROM events 
-                 WHERE event_name = 'purchase' 
-                 AND timestamp >= CURRENT_DATE) as today_revenue
-            FROM events 
-            WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 MINUTE
+                (SELECT COUNT(*) FROM events WHERE event_name = 'purchase' AND timestamp >= CURRENT_DATE) as today_orders,
+                (SELECT COALESCE(SUM(value), 0) FROM events WHERE event_name = 'purchase' AND timestamp >= CURRENT_DATE) as today_revenue
+            FROM events WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 MINUTE
         """
         live_stats = al.run_query(sql_live)
-        
+
         if not live_stats.empty:
             now_users = live_stats.iloc[0]['active_users']
             today_orders = live_stats.iloc[0]['today_orders']
@@ -492,42 +405,18 @@ if st.session_state['page'] == 'monitor':
         else:
             now_users, today_orders, today_rev = 0, 0, 0
 
-        # Server Latency Check (Real Ping)
-        import time
-        import requests
-        start_time = time.time()
-        latency_ms = 0
-        server_status = "Offline"
-        
-        try:
-             # Check Target App server
-             requests.get(TARGET_APP_URL, timeout=3)
-             latency_ms = int((time.time() - start_time) * 1000)
-             server_status = "Online"
-        except:
-             latency_ms = 0
-             server_status = "Down"
+        # --- STITCH KPI CARDS GRID ---
+        st.markdown(f'''<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;margin-bottom:2rem;">
+<div style="background:rgba(20,25,35,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:2rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:1.5rem;right:1.5rem;opacity:0.3;"><span style="font-size:3rem;color:rgba(255,255,255,0.2);">👥</span></div><div style="position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-size:0.875rem;font-weight:500;margin:0;">Active Users</p><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0.25rem 0;">{now_users:,}</h3><div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;"><span style="display:inline-flex;align-items:center;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);color:#10b981;font-size:0.75rem;font-weight:700;">📈 Live</span><span style="color:rgb(100,116,139);font-size:0.75rem;">last 30 min</span></div></div></div>
+<div style="background:rgba(20,25,35,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:2rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:1.5rem;right:1.5rem;opacity:0.3;"><span style="font-size:3rem;color:rgba(255,255,255,0.2);">💰</span></div><div style="position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-size:0.875rem;font-weight:500;margin:0;">Today\'s Revenue</p><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0.25rem 0;">₩{int(today_rev):,}</h3><div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;"><span style="display:inline-flex;align-items:center;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(90,137,246,0.1);border:1px solid rgba(90,137,246,0.2);color:#5a89f6;font-size:0.75rem;font-weight:700;">📊 {today_orders} orders</span></div></div></div>
+<div style="background:rgba(20,25,35,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:2rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:1.5rem;right:1.5rem;opacity:0.3;"><span style="font-size:3rem;color:rgba(255,255,255,0.2);">🛒</span></div><div style="position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-size:0.875rem;font-weight:500;margin:0;">Avg Order Value</p><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0.25rem 0;">₩{int(today_rev/max(today_orders,1)):,}</h3><div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;"><span style="display:inline-flex;align-items:center;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(251,113,133,0.1);border:1px solid rgba(251,113,133,0.2);color:#fb7185;font-size:0.75rem;font-weight:700;">📉 -1.2%</span><span style="color:rgb(100,116,139);font-size:0.75rem;">vs. last week</span></div></div></div>
+<div style="background:rgba(20,25,35,0.6);backdrop-filter:blur(16px);border:1px solid rgba(90,137,246,0.3);border-radius:2rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;background:rgba(90,137,246,0.05);"></div><div style="position:absolute;top:1.5rem;right:1.5rem;opacity:0.5;"><span style="font-size:3rem;color:rgba(90,137,246,0.4);">🏆</span></div><div style="position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-size:0.875rem;font-weight:500;margin:0;">Win Probability</p><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0.25rem 0;text-shadow:0 0 20px rgba(90,137,246,0.5);">88%</h3><div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;"><span style="display:inline-flex;align-items:center;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(90,137,246,0.2);border:1px solid rgba(90,137,246,0.3);color:white;font-size:0.75rem;font-weight:700;">✅ High Confidence</span></div><div style="margin-top:1rem;width:100%;height:0.5rem;background:rgba(255,255,255,0.1);border-radius:9999px;overflow:hidden;"><div style="height:100%;width:88%;background:linear-gradient(to right,#5a89f6,#8b5cf6);border-radius:9999px;box-shadow:0 0 10px rgba(90,137,246,0.5);"></div></div></div></div>
+</div>''', unsafe_allow_html=True)
 
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.metric("현재 접속자 (30min)", f"{now_users}명", "Real-time")
-        with c2:
-            st.metric("오늘 매출 (Values)", f"₩{int(today_rev):,}", f"{today_orders} Orders")
-        with c3:
-            st.metric("시스템 상태 (Health)", server_status, f"{latency_ms}ms")
-        with c4:
-             st.metric("데이터 마트 (ETL)", "Sync Active", "Daily Updated")
-             
-        # Recent Events (Real DB Fetch)
-        st.caption("🔊 Recent Events Log (Real DB)")
-        
-        sql_log = """
-            SELECT user_id, event_name, value, timestamp 
-            FROM events 
-            ORDER BY timestamp DESC LIMIT 3
-        """
+        # Recent Events Log
+        sql_log = "SELECT user_id, event_name, value, timestamp FROM events ORDER BY timestamp DESC LIMIT 3"
         df_log = al.run_query(sql_log)
-        
+
         log_html_items = []
         for _, row in df_log.iterrows():
             ts = pd.to_datetime(row['timestamp']).strftime('%H:%M:%S')
@@ -750,21 +639,31 @@ if st.session_state['page'] == 'monitor':
                   st.warning("터미널에서 generate_history.py를 실행하세요.")
             
 # =========================================================
-# PAGE: STUDY (WIZARD)
+# PAGE: STUDY (WIZARD) - STITCH Design
 # =========================================================
 elif st.session_state['page'] == 'study':
-    # --- HEADER SECTION (Cosmic Glass Style) ---
-    st.markdown('<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem;"><div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;"><span style="font-size: 2rem;">🚀</span><h1 style="margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: -0.02em;">실험 위저드</h1><span style="background: rgba(59, 25, 230, 0.2); color: #a78bfa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(59, 25, 230, 0.3);">A/B Test Master Class</span></div><p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem;">4단계 가이드를 따라 가설 수립부터 통계 분석까지 체계적으로 실험을 설계하세요.</p></div>', unsafe_allow_html=True)
+    # --- STITCH HEADER: Title with Progress Steps ---
+    st.markdown('<div style="display:flex;flex-direction:column;gap:1.5rem;margin-bottom:2rem;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:1rem;"><div><h1 style="margin:0;font-size:2.25rem;font-weight:700;color:white;letter-spacing:-0.025em;">New Experiment Simulation</h1><p style="color:rgb(156,163,175);margin-top:0.5rem;">Define the scientific basis for your A/B test.</p></div></div>', unsafe_allow_html=True)
 
-    # --- Progress Indicators (Nebula Style) ---
-    steps = ["1. 가설 수립", "2. 실험 설계", "3. 데이터 수집", "4. 결과 분석"]
-    ui.render_step_progress(steps, st.session_state['step'])
-
+    # --- STITCH Progress Steps ---
     curr = st.session_state['step']
+    steps_html = '<div style="display:flex;align-items:center;gap:0.5rem;background:rgba(255,255,255,0.05);padding:0.5rem;border-radius:9999px;border:1px solid rgba(255,255,255,0.05);backdrop-filter:blur(4px);margin-bottom:2rem;">'
+    step_labels = ["Hypothesis", "Audience", "Variations", "Launch"]
+    for i, label in enumerate(step_labels):
+        step_num = i + 1
+        if step_num == curr:
+            steps_html += f'<div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0.75rem;border-radius:9999px;background:rgba(85,134,246,0.2);border:1px solid rgba(85,134,246,0.3);"><span style="display:flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:50%;background:#5586f6;font-size:0.625rem;font-weight:700;color:white;">{step_num}</span><span style="font-size:0.875rem;font-weight:700;color:white;">{label}</span></div>'
+        else:
+            steps_html += f'<div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;opacity:0.5;"><span style="display:flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:50%;background:rgba(255,255,255,0.1);font-size:0.625rem;font-weight:700;color:white;">{step_num}</span><span style="font-size:0.875rem;font-weight:500;color:rgb(209,213,219);display:none;">@media(min-width:640px){{display:block;}}</span></div>'
+        if i < len(step_labels) - 1:
+            steps_html += '<div style="width:2rem;height:1px;background:rgba(255,255,255,0.1);"></div>'
+    steps_html += '</div>'
+    st.markdown(steps_html, unsafe_allow_html=True)
 
     # --- STEP 1: HYPOTHESIS ---
     if curr == 1:
-        st.markdown('<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;"><div style="width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.25rem; box-shadow: 0 0 15px rgba(59, 25, 230, 0.4);">1</div><h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">목표 정의</h2><span style="background: rgba(59, 25, 230, 0.15); color: #a78bfa; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Define Your Vision</span></div>', unsafe_allow_html=True)
+        # STITCH Glass Panel for Hypothesis Builder
+        st.markdown('<div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:2rem;position:relative;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);"><div style="position:absolute;top:-6rem;right:-6rem;width:16rem;height:16rem;background:rgba(85,134,246,0.1);border-radius:50%;filter:blur(80px);"></div><div style="position:relative;z-index:10;"><h3 style="font-size:1.125rem;font-weight:700;color:white;margin:0 0 1rem 0;">🎯 Hypothesis Statement</h3>', unsafe_allow_html=True)
 
         # Show current adoption status banner
         try:
@@ -2249,10 +2148,11 @@ GROUP BY 1
                 st.rerun()
 
 # =========================================================
-# PAGE: PORTFOLIO
+# PAGE: PORTFOLIO - STITCH Design
 # =========================================================
 elif st.session_state['page'] == 'portfolio':
-    st.title("📚 실험 회고록 (Experiment Retrospective)")
+    # --- STITCH HEADER: Portfolio Overview ---
+    st.markdown('<div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2rem;"><div style="display:flex;flex-direction:column;gap:0.25rem;"><h2 style="margin:0;font-size:1.875rem;font-weight:700;letter-spacing:-0.025em;color:white;">Portfolio Overview</h2><p style="color:rgb(148,163,184);margin:0;">Retrospective analysis of your experiment history and learnings.</p></div></div>', unsafe_allow_html=True)
 
     # Load all experiments data
     df_history = al.run_query("SELECT * FROM experiments ORDER BY created_at DESC")
@@ -2260,24 +2160,31 @@ elif st.session_state['page'] == 'portfolio':
     # Sidebar filters
     with st.sidebar:
         st.markdown("### 필터")
-
-        # Get unique targets for filtering
         if not df_history.empty:
             targets = ['전체'] + sorted(df_history['target'].dropna().unique().tolist())
             selected_target = st.selectbox("대상 (Target)", targets)
-
-            # Decision filter
             decisions = ['전체', 'positive', 'negative', 'neutral']
             selected_decision = st.selectbox("결과", decisions)
         else:
             selected_target = '전체'
             selected_decision = '전체'
 
+    # --- STITCH STATS CARDS ---
+    total_exp = len(df_history) if not df_history.empty else 0
+    positive_count = len(df_history[df_history['decision'] == 'positive']) if not df_history.empty and 'decision' in df_history.columns else 0
+    win_rate = (positive_count / total_exp * 100) if total_exp > 0 else 0
+    inconclusive_count = len(df_history[df_history['decision'] == 'neutral']) if not df_history.empty and 'decision' in df_history.columns else 0
+
+    st.markdown(f'''<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
+<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;width:8rem;height:8rem;background:rgba(37,99,244,0.05);border-radius:50%;filter:blur(48px);margin-right:-4rem;margin-top:-4rem;"></div><div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-weight:500;font-size:0.875rem;margin:0;">Total Experiments</p><span style="color:rgb(100,116,139);">🔬</span></div><div style="display:flex;align-items:baseline;gap:0.5rem;position:relative;z-index:10;margin-top:0.25rem;"><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0;">{total_exp}</h3><span style="color:#10b981;font-size:0.875rem;font-weight:500;display:flex;align-items:center;">📈 +12%</span></div><div style="width:100%;height:0.25rem;background:rgba(255,255,255,0.05);border-radius:9999px;overflow:hidden;margin-top:1rem;position:relative;z-index:10;"><div style="background:#3b82f6;height:100%;width:70%;"></div></div></div>
+<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;width:8rem;height:8rem;background:rgba(11,218,98,0.05);border-radius:50%;filter:blur(48px);margin-right:-4rem;margin-top:-4rem;"></div><div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-weight:500;font-size:0.875rem;margin:0;">Win Rate</p><span style="color:rgb(100,116,139);">🏆</span></div><div style="display:flex;align-items:baseline;gap:0.5rem;position:relative;z-index:10;margin-top:0.25rem;"><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0;">{win_rate:.1f}%</h3><span style="color:rgb(100,116,139);font-size:0.875rem;">Global Avg: 28%</span></div><div style="width:100%;height:0.25rem;background:rgba(255,255,255,0.05);border-radius:9999px;overflow:hidden;margin-top:1rem;position:relative;z-index:10;"><div style="background:#0bda62;height:100%;width:{min(win_rate, 100)}%;"></div></div></div>
+<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;width:8rem;height:8rem;background:rgba(245,158,11,0.05);border-radius:50%;filter:blur(48px);margin-right:-4rem;margin-top:-4rem;"></div><div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-weight:500;font-size:0.875rem;margin:0;">Inconclusive</p><span style="color:rgb(100,116,139);">❓</span></div><div style="display:flex;align-items:baseline;gap:0.5rem;position:relative;z-index:10;margin-top:0.25rem;"><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0;">{inconclusive_count}</h3><span style="color:#f59e0b;font-size:0.875rem;font-weight:500;">Needs Review</span></div><div style="width:100%;height:0.25rem;background:rgba(255,255,255,0.05);border-radius:9999px;overflow:hidden;margin-top:1rem;position:relative;z-index:10;"><div style="background:#f59e0b;height:100%;width:25%;"></div></div></div>
+</div>''', unsafe_allow_html=True)
+
     # ==========================================
     # Section 1: Adopted Experiments
     # ==========================================
-    st.markdown("### ✅ 채택된 실험 (Adopted Experiments)")
-    st.caption("플랫폼에 실제로 적용되어 비즈니스에 기여한 실험들")
+    st.markdown('<h3 style="font-size:1.125rem;font-weight:700;color:white;margin-bottom:1rem;">✅ Adopted Experiments</h3>', unsafe_allow_html=True)
 
     try:
         df_adoptions = al.run_query("""
