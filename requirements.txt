@@ -18,6 +18,10 @@ python-multipart
 psycopg2-binary
 python-dotenv
 
+# Authentication
+PyJWT
+bcrypt
+
 # HTTP Client
 requests
 httpx
