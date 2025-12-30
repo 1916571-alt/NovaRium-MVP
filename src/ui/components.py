@@ -8,37 +8,62 @@ import streamlit as st
 def apply_custom_css():
     """
     Apply global Cosmic Glass CSS styling to the Streamlit app.
-    Based on STITCH Design System v2.0
+    Based on STITCH Design System v2.0 + v3.0
     """
     st.markdown("""
 <style>
     /* ============================================
-       1. FONTS & GLOBAL RESET
+       1. FONTS & GLOBAL RESET (강화된 버전)
        ============================================ */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    /* 모든 요소에 폰트 강제 적용 */
+    *, *::before, *::after {
+        font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+
+    html, body, [class*="css"], .stApp, .main, section[data-testid="stSidebar"] {
+        font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
 
     /* ============================================
-       2. COSMIC BACKGROUND
+       2. COSMIC BACKGROUND (강화된 버전)
        ============================================ */
-    .stApp {
-        background-color: #141121 !important;
+    /* 최상위 앱 컨테이너 */
+    .stApp, .stApp > header, .stApp > section {
+        background-color: #0B0E14 !important;
         background-image:
-            radial-gradient(circle at 15% 50%, rgba(59, 25, 230, 0.08), transparent 25%),
-            radial-gradient(circle at 85% 30%, rgba(120, 50, 255, 0.05), transparent 25%);
+            radial-gradient(at 0% 0%, rgba(90, 137, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.1) 0px, transparent 50%) !important;
         color: #ffffff !important;
+    }
+
+    /* Main 컨테이너 배경 */
+    .main .block-container {
+        background: transparent !important;
+        padding-top: 2rem !important;
+    }
+
+    /* 모든 section 요소 */
+    section[data-testid="stMain"],
+    div[data-testid="stAppViewContainer"],
+    .stApp > div:first-child {
+        background-color: #0B0E14 !important;
+        background-image:
+            radial-gradient(at 0% 0%, rgba(90, 137, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.1) 0px, transparent 50%) !important;
     }
 
     /* Hide Streamlit default header/footer */
     header[data-testid="stHeader"] {
         background: transparent !important;
+        backdrop-filter: none !important;
     }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    #MainMenu {visibility: hidden !important; display: none !important;}
+    footer {visibility: hidden !important; display: none !important;}
+    .stDeployButton {display: none !important;}
 
     /* ============================================
        3. GLASS PANEL EFFECT
@@ -122,50 +147,57 @@ def apply_custom_css():
     }
 
     /* ============================================
-       6. BUTTON STYLES
+       6. BUTTON STYLES (STITCH v3 강화)
        ============================================ */
-    /* Secondary/Ghost Button */
-    .stButton > button {
-        background: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    /* 모든 버튼 기본 스타일 */
+    button, .stButton > button, [data-testid="baseButton-secondary"] {
+        background: rgba(20, 25, 34, 0.4) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
         color: white !important;
-        border-radius: 0.75rem !important;
+        border-radius: 9999px !important;
         padding: 0.75rem 1.5rem !important;
-        font-weight: 500 !important;
-        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-family: 'Inter', 'Plus Jakarta Sans', sans-serif !important;
         transition: all 0.3s ease !important;
+        cursor: pointer !important;
     }
 
-    .stButton > button:hover {
+    .stButton > button:hover, [data-testid="baseButton-secondary"]:hover {
         background: rgba(255, 255, 255, 0.1) !important;
         border-color: rgba(255, 255, 255, 0.2) !important;
-        transform: translateY(-2px);
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
     }
 
     .stButton > button:active {
-        transform: translateY(0) scale(0.98);
+        transform: translateY(0) scale(0.98) !important;
     }
 
-    /* Primary Button */
+    /* Primary Button - 보라색 그라데이션 + 글로우 */
+    [data-testid="baseButton-primary"],
     div[data-testid="stButton"] button[kind="primary"],
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%) !important;
+    .stButton > button[kind="primary"],
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%) !important;
         border: none !important;
-        box-shadow: 0 0 20px rgba(59, 25, 230, 0.5) !important;
+        box-shadow: 0 0 20px rgba(90, 137, 246, 0.4) !important;
         color: white !important;
     }
 
+    [data-testid="baseButton-primary"]:hover,
     div[data-testid="stButton"] button[kind="primary"]:hover,
     .stButton > button[kind="primary"]:hover {
-        box-shadow: 0 0 30px rgba(59, 25, 230, 0.7) !important;
-        transform: translateY(-2px);
+        box-shadow: 0 0 30px rgba(90, 137, 246, 0.6) !important;
+        transform: translateY(-2px) scale(1.02) !important;
     }
 
-    /* Nav button active state */
-    .nav-btn-active {
-        background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%) !important;
-        border: none !important;
-        box-shadow: 0 0 15px rgba(59, 25, 230, 0.4) !important;
+    /* Nav button active state - Cosmic Glow */
+    .nav-active {
+        background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%) !important;
+        border: 1px solid rgba(90, 137, 246, 0.3) !important;
+        box-shadow: 0 0 15px rgba(90, 137, 246, 0.15) !important;
     }
 
     /* ============================================
