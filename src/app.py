@@ -274,79 +274,17 @@ if st.session_state['page'] == 'intro':
     ui.render_stitch_header(breadcrumb=['Home', 'NovaRium'])
 
     # Hero Section - STITCH Style
-    st.markdown('''
-    <div style="text-align: center; padding: 3rem 0 2rem 0;">
-        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
-            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); border-radius: 1.25rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 40px rgba(90, 137, 246, 0.5);">
-                <span class="material-symbols-outlined" style="font-size: 40px; color: white; font-variation-settings: 'FILL' 1;">rocket_launch</span>
-            </div>
-        </div>
-        <h1 style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, #ffffff 0%, #93c5fd 50%, #c4b5fd 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; letter-spacing: -0.03em;">Where Data Analysts are Born.</h1>
-        <p style="font-size: 1.25rem; color: rgba(255, 255, 255, 0.5); max-width: 600px; margin: 0 auto 2rem auto; line-height: 1.6;">책으로만 배우는 A/B 테스트는 그만.<br>직접 경험하며 데이터 분석가로 다시 태어나세요.</p>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;padding:3rem 0 2rem 0;"><div style="display:flex;justify-content:center;margin-bottom:1.5rem;"><div style="width:80px;height:80px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:1.25rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(90,137,246,0.5);"><span style="font-size:40px;">🚀</span></div></div><h1 style="font-size:3rem;font-weight:800;background:linear-gradient(135deg,#ffffff 0%,#93c5fd 50%,#c4b5fd 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1rem;letter-spacing:-0.03em;">Where Data Analysts are Born.</h1><p style="font-size:1.25rem;color:rgba(255,255,255,0.5);max-width:600px;margin:0 auto 2rem auto;line-height:1.6;">책으로만 배우는 A/B 테스트는 그만.<br>직접 경험하며 데이터 분석가로 다시 태어나세요.</p></div>', unsafe_allow_html=True)
 
     # Feature Cards - STITCH Grid
-    st.markdown('''
-    <div class="stitch-grid-2">
-        <div class="stitch-card" style="border-radius: 2rem;">
-            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
-                <div style="width: 48px; height: 48px; background: rgba(90, 137, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
-                    <span class="material-symbols-outlined" style="font-size: 24px; color: #5a89f6;">auto_awesome</span>
-                </div>
-                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #93c5fd;">Nova (New)</h3>
-            </div>
-            <p style="margin: 0; font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.6);">라틴어로 <strong style="color: white;">'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong style="color: white;">초신성(Supernova)</strong>을 의미합니다. 데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.</p>
-        </div>
-        <div class="stitch-card" style="border-radius: 2rem;">
-            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
-                <div style="width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
-                    <span class="material-symbols-outlined" style="font-size: 24px; color: #a78bfa;">account_balance</span>
-                </div>
-                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #c4b5fd;">Arium (Place)</h3>
-            </div>
-            <p style="margin: 0; font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.6);">라틴어 접미사로 <strong style="color: white;">'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다. 예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.</p>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown('<div class="stitch-grid-2"><div class="stitch-card" style="border-radius:2rem;"><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;"><div style="width:48px;height:48px;background:rgba(90,137,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:24px;">✨</span></div><h3 style="margin:0;font-size:1.25rem;font-weight:700;color:#93c5fd;">Nova (New)</h3></div><p style="margin:0;font-size:1rem;line-height:1.7;color:rgba(255,255,255,0.6);">라틴어로 <strong style="color:white;">\'새로운\'</strong>이라는 뜻이자, 우주를 밝히는 <strong style="color:white;">초신성(Supernova)</strong>을 의미합니다. 데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.</p></div><div class="stitch-card" style="border-radius:2rem;"><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;"><div style="width:48px;height:48px;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:24px;">🏛️</span></div><h3 style="margin:0;font-size:1.25rem;font-weight:700;color:#c4b5fd;">Arium (Place)</h3></div><p style="margin:0;font-size:1rem;line-height:1.7;color:rgba(255,255,255,0.6);">라틴어 접미사로 <strong style="color:white;">\'~을 위한 공간\'</strong> 또는 \'생태계\'를 뜻합니다. 예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.</p></div></div>', unsafe_allow_html=True)
 
     # Mission Statement - STITCH Primary Button Style
-    st.markdown('''
-    <div style="text-align: center; margin-top: 1rem;">
-        <div style="background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); padding: 1rem 2rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; box-shadow: 0 0 30px rgba(90, 137, 246, 0.4); color: white;">
-            <span class="material-symbols-outlined" style="font-size: 20px;">target</span>
-            <span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;margin-top:1rem;"><div style="background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);padding:1rem 2rem;border-radius:9999px;display:inline-flex;align-items:center;gap:0.75rem;font-weight:700;font-size:1rem;box-shadow:0 0 30px rgba(90,137,246,0.4);color:white;"><span style="font-size:20px;">🎯</span><span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span></div></div>', unsafe_allow_html=True)
 
     # Quick Stats Section - STITCH Cards
-    st.markdown('<div style="height: 3rem;"></div>', unsafe_allow_html=True)
-    st.markdown('''
-    <div class="stitch-grid-3">
-        <div class="stitch-card" style="border-radius: 2rem; text-align: center;">
-            <div style="width: 48px; height: 48px; background: rgba(34, 197, 94, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
-                <span class="material-symbols-outlined" style="font-size: 24px; color: #22c55e;">science</span>
-            </div>
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 800; color: white;">A/B 테스트</h3>
-            <p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 0.875rem;">가설 수립부터 통계 분석까지</p>
-        </div>
-        <div class="stitch-card" style="border-radius: 2rem; text-align: center;">
-            <div style="width: 48px; height: 48px; background: rgba(90, 137, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
-                <span class="material-symbols-outlined" style="font-size: 24px; color: #5a89f6;">monitoring</span>
-            </div>
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 800; color: white;">실시간 모니터링</h3>
-            <p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 0.875rem;">KPI 대시보드 구축 실습</p>
-        </div>
-        <div class="stitch-card" style="border-radius: 2rem; text-align: center;">
-            <div style="width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
-                <span class="material-symbols-outlined" style="font-size: 24px; color: #a78bfa;">database</span>
-            </div>
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 800; color: white;">데이터 엔지니어링</h3>
-            <p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 0.875rem;">ETL 파이프라인 학습</p>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown('<div style="height:3rem;"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="stitch-grid-3"><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(34,197,94,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">🔬</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">A/B 테스트</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">가설 수립부터 통계 분석까지</p></div><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(90,137,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">📊</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">실시간 모니터링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">KPI 대시보드 구축 실습</p></div><div class="stitch-card" style="border-radius:2rem;text-align:center;"><div style="width:48px;height:48px;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem auto;"><span style="font-size:24px;">🗃️</span></div><h3 style="margin:0 0 0.5rem 0;font-size:2rem;font-weight:800;color:white;">데이터 엔지니어링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.875rem;">ETL 파이프라인 학습</p></div></div>', unsafe_allow_html=True)
 
 # =========================================================
 # PAGE: DATA ENGINEERING LAB (NEW)

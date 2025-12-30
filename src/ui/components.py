@@ -567,6 +567,13 @@ def apply_custom_css():
     section[data-testid="stSidebar"] {
         background: rgba(20, 17, 33, 0.95) !important;
         border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        min-width: 280px !important;
+        width: 280px !important;
+    }
+
+    section[data-testid="stSidebar"] > div {
+        min-width: 260px !important;
+        width: 100% !important;
     }
 
     section[data-testid="stSidebar"] .stMarkdown h3 {
@@ -575,6 +582,18 @@ def apply_custom_css():
         text-transform: uppercase !important;
         letter-spacing: 0.1em !important;
         margin-bottom: 1rem !important;
+    }
+
+    section[data-testid="stSidebar"] h1 {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    section[data-testid="stSidebar"] button {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     /* ============================================
