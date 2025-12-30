@@ -40,10 +40,174 @@ def apply_custom_css():
         color: #ffffff !important;
     }
 
-    /* Main 컨테이너 배경 */
+    /* Main 컨테이너 - STITCH 레이아웃을 위해 여백 제거 */
     .main .block-container {
         background: transparent !important;
-        padding-top: 2rem !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Streamlit 기본 여백 완전 제거 */
+    .stApp > header + div {
+        padding: 0 !important;
+    }
+
+    div[data-testid="stAppViewBlockContainer"] {
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* STITCH 레이아웃 컨테이너 */
+    .stitch-layout {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+    }
+
+    /* STITCH 사이드바 - 고정 너비 288px (w-72) */
+    .stitch-sidebar {
+        width: 288px;
+        min-width: 288px;
+        background: rgba(17, 20, 28, 0.75);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 100;
+    }
+
+    /* STITCH 메인 콘텐츠 영역 */
+    .stitch-main {
+        flex: 1;
+        margin-left: 288px;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        overflow: hidden;
+    }
+
+    /* STITCH 상단 헤더 - rounded-full glass */
+    .stitch-header {
+        background: rgba(20, 25, 34, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 9999px;
+        margin: 1rem 1.5rem 0.5rem 1.5rem;
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+
+    /* STITCH 스크롤 콘텐츠 */
+    .stitch-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+    }
+
+    .stitch-content-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+    }
+
+    /* STITCH 그리드 시스템 */
+    .stitch-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stitch-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 1024px) {
+        .stitch-grid-3 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+        .stitch-grid-3, .stitch-grid-2 { grid-template-columns: 1fr; }
+        .stitch-sidebar { display: none; }
+        .stitch-main { margin-left: 0; }
+    }
+
+    /* STITCH 카드 - rounded-3xl (1.5rem) */
+    .stitch-card {
+        background: rgba(20, 25, 34, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .stitch-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* STITCH 네비게이션 링크 */
+    .stitch-nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 9999px;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: 1px solid transparent;
+    }
+
+    .stitch-nav-link:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+
+    .stitch-nav-link.active {
+        background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%);
+        border: 1px solid rgba(90, 137, 246, 0.3);
+        box-shadow: 0 0 15px rgba(90, 137, 246, 0.15);
+        color: white;
+    }
+
+    /* STITCH 페이지 타이틀 */
+    .stitch-page-title {
+        margin-bottom: 2rem;
+    }
+
+    .stitch-page-title h1 {
+        font-size: 1.875rem !important;
+        font-weight: 700 !important;
+        color: white !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .stitch-page-title p {
+        color: rgba(255, 255, 255, 0.6) !important;
+        font-size: 1rem !important;
     }
 
     /* 모든 section 요소 */
@@ -198,6 +362,171 @@ def apply_custom_css():
         background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%) !important;
         border: 1px solid rgba(90, 137, 246, 0.3) !important;
         box-shadow: 0 0 15px rgba(90, 137, 246, 0.15) !important;
+    }
+
+    /* STITCH 버튼 클래스 - Primary (그라데이션 + 글로우) */
+    .stitch-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #3b19e6 0%, #6d4aff 100%);
+        border: none;
+        border-radius: 9999px;
+        color: white;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .stitch-btn-primary:hover {
+        background: linear-gradient(135deg, #4c2af5 0%, #7e5bff 100%);
+        box-shadow: 0 0 20px rgba(59, 25, 230, 0.5);
+        transform: translateY(-2px);
+    }
+
+    .stitch-btn-primary:active {
+        background: linear-gradient(135deg, #2a0ab6 0%, #5230e5 100%);
+        transform: scale(0.98);
+    }
+
+    /* STITCH 버튼 클래스 - Secondary (Ghost 스타일) */
+    .stitch-btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 9999px;
+        color: white;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .stitch-btn-secondary:hover {
+        background: rgba(59, 25, 230, 0.1);
+        border-color: #6d4aff;
+        box-shadow: 0 0 15px rgba(59, 25, 230, 0.15);
+    }
+
+    .stitch-btn-secondary:active {
+        background: rgba(59, 25, 230, 0.2);
+        border-color: #3b19e6;
+        transform: scale(0.98);
+    }
+
+    /* STITCH 버튼 클래스 - Tertiary (텍스트 링크) */
+    .stitch-btn-tertiary {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: color 0.2s ease;
+    }
+
+    .stitch-btn-tertiary:hover {
+        color: white;
+        text-decoration: underline;
+        text-decoration-color: #6d4aff;
+        text-underline-offset: 4px;
+    }
+
+    /* STITCH 아이콘 버튼 */
+    .stitch-btn-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 9999px;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .stitch-btn-icon:hover {
+        background: #3b19e6;
+        border-color: transparent;
+        box-shadow: 0 0 15px rgba(59, 25, 230, 0.4);
+        transform: scale(1.1);
+    }
+
+    /* STITCH 스탯 카드 추가 스타일 */
+    .stitch-stat-card {
+        background: rgba(20, 25, 34, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .stitch-stat-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .stitch-stat-card .icon-container {
+        width: 3rem;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .stitch-stat-card .icon-container.primary {
+        background: linear-gradient(135deg, rgba(90, 137, 246, 0.2), rgba(90, 137, 246, 0.05));
+    }
+
+    .stitch-stat-card .icon-container.success {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.05));
+    }
+
+    .stitch-stat-card .icon-container.warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
+    }
+
+    .stitch-stat-card .icon-container.error {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
+    }
+
+    .stitch-stat-card .value {
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 0.25rem;
+    }
+
+    .stitch-stat-card .label {
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .stitch-stat-card .delta {
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-top: 0.5rem;
+    }
+
+    .stitch-stat-card .delta.positive {
+        color: #22c55e;
+    }
+
+    .stitch-stat-card .delta.negative {
+        color: #ef4444;
     }
 
     /* ============================================
@@ -833,3 +1162,264 @@ def glass_container_end():
     End a glass container div.
     """
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# STITCH Global Layout Components
+# =========================================================
+
+def render_stitch_sidebar():
+    """
+    STITCH 스타일 사이드바 렌더링.
+    고정 너비 288px, glass-panel-heavy 스타일.
+    """
+    current_page = st.session_state.get('page', 'intro')
+
+    # 네비게이션 아이템 정의
+    nav_items = [
+        {'id': 'intro', 'icon': 'rocket_launch', 'label': 'NovaRium', 'filled': True},
+        {'id': 'data_lab', 'icon': 'science', 'label': '데이터 랩', 'filled': False},
+        {'id': 'monitor', 'icon': 'monitoring', 'label': '모니터', 'filled': False},
+        {'id': 'study', 'icon': 'school', 'label': '실험 위저드', 'filled': False},
+        {'id': 'portfolio', 'icon': 'folder_open', 'label': '회고록', 'filled': False},
+    ]
+
+    # 사이드바 HTML 생성
+    nav_links_html = ""
+    for item in nav_items:
+        is_active = current_page == item['id']
+        active_class = "active" if is_active else ""
+        fill_style = "font-variation-settings: 'FILL' 1;" if (is_active or item['filled']) else ""
+        icon_color = "#5a89f6" if is_active else "inherit"
+
+        nav_links_html += f'''
+        <div class="stitch-nav-link {active_class}" data-page="{item['id']}" style="margin-bottom: 0.5rem;">
+            <span class="material-symbols-outlined" style="font-size: 20px; color: {icon_color}; {fill_style}">{item['icon']}</span>
+            <span>{item['label']}</span>
+        </div>
+        '''
+
+    sidebar_html = f'''
+    <div class="stitch-sidebar">
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            <!-- 브랜딩 -->
+            <div style="display: flex; align-items: center; gap: 1rem; padding: 0 0.5rem;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(90, 137, 246, 0.4);">
+                    <span class="material-symbols-outlined" style="color: white; font-size: 24px;">rocket_launch</span>
+                </div>
+                <div>
+                    <h1 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: white;">NovaRium</h1>
+                    <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">Analyst Platform</p>
+                </div>
+            </div>
+            <!-- 네비게이션 -->
+            <nav style="display: flex; flex-direction: column; gap: 0.25rem;">
+                {nav_links_html}
+            </nav>
+        </div>
+        <!-- 하단 시스템 상태 -->
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; padding: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #93c5fd;">시스템 상태</span>
+                    <div style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);"></div>
+                </div>
+                <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">모든 시스템 정상 작동 중</p>
+            </div>
+        </div>
+    </div>
+    '''
+    st.markdown(sidebar_html, unsafe_allow_html=True)
+
+
+def render_stitch_header(breadcrumb: list = None, show_search: bool = True):
+    """
+    STITCH 스타일 상단 헤더 렌더링.
+    rounded-full glass 스타일.
+
+    Args:
+        breadcrumb: 브레드크럼 리스트 예: ['Home', 'Data Lab']
+        show_search: 검색창 표시 여부
+    """
+    if breadcrumb is None:
+        breadcrumb = ['Home']
+
+    # 브레드크럼 HTML
+    breadcrumb_html = ""
+    for i, item in enumerate(breadcrumb):
+        if i < len(breadcrumb) - 1:
+            breadcrumb_html += f'<span style="color: rgba(255,255,255,0.4);">{item}</span>'
+            breadcrumb_html += '<span class="material-symbols-outlined" style="font-size: 16px; color: rgba(255,255,255,0.2);">chevron_right</span>'
+        else:
+            breadcrumb_html += f'<span style="color: white; font-weight: 600;">{item}</span>'
+
+    search_html = ""
+    if show_search:
+        search_html = '''
+        <div style="position: relative; display: none;" class="md-show">
+            <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 20px; color: rgba(255,255,255,0.4);">search</span>
+            <input type="text" placeholder="실험 검색..." style="height: 40px; width: 200px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 9999px; padding-left: 40px; padding-right: 16px; color: white; font-size: 0.875rem; outline: none;" />
+        </div>
+        '''
+
+    header_html = f'''
+    <div class="stitch-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;">
+            {breadcrumb_html}
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            {search_html}
+            <button style="width: 40px; height: 40px; background: rgba(255,255,255,0.05); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative;">
+                <span class="material-symbols-outlined" style="font-size: 20px; color: rgba(255,255,255,0.7);">notifications</span>
+                <span style="position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; border: 2px solid #0B0E14;"></span>
+            </button>
+            <button style="width: 40px; height: 40px; background: rgba(255,255,255,0.05); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                <span class="material-symbols-outlined" style="font-size: 20px; color: rgba(255,255,255,0.7);">settings</span>
+            </button>
+        </div>
+    </div>
+    '''
+    st.markdown(header_html, unsafe_allow_html=True)
+
+
+def render_stitch_page_title(title: str, subtitle: str = "", badge: str = None):
+    """
+    STITCH 스타일 페이지 타이틀 렌더링.
+
+    Args:
+        title: 페이지 제목
+        subtitle: 부제목
+        badge: 뱃지 텍스트 (예: "Live Dashboard")
+    """
+    badge_html = ""
+    if badge:
+        badge_html = f'''
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div style="width: 8px; height: 8px; background: #5a89f6; border-radius: 50%; animation: pulse 2s infinite;"></div>
+            <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5a89f6;">{badge}</span>
+        </div>
+        '''
+
+    subtitle_html = ""
+    if subtitle:
+        subtitle_html = f'<p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 1.125rem;">{subtitle}</p>'
+
+    title_html = f'''
+    <div class="stitch-page-title">
+        {badge_html}
+        <h1 style="margin: 0 0 0.5rem 0; font-size: 2.5rem; font-weight: 700; color: white; letter-spacing: -0.02em;">{title}</h1>
+        {subtitle_html}
+    </div>
+    '''
+    st.markdown(title_html, unsafe_allow_html=True)
+
+
+def render_stitch_stat_card(label: str, value: str, delta: str = None, delta_type: str = "positive", icon: str = "analytics", color: str = "primary"):
+    """
+    STITCH 스타일 KPI 스탯 카드.
+
+    Args:
+        label: 지표 라벨
+        value: 지표 값
+        delta: 변화량 (예: "+12%")
+        delta_type: "positive" or "negative"
+        icon: Material Symbols 아이콘명
+        color: "primary", "success", "warning", "error"
+    """
+    color_map = {
+        "primary": "#5a89f6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "purple": "#8b5cf6"
+    }
+    accent_color = color_map.get(color, "#5a89f6")
+
+    delta_html = ""
+    if delta:
+        delta_bg = "rgba(34, 197, 94, 0.1)" if delta_type == "positive" else "rgba(239, 68, 68, 0.1)"
+        delta_border = "rgba(34, 197, 94, 0.2)" if delta_type == "positive" else "rgba(239, 68, 68, 0.2)"
+        delta_color = "#22c55e" if delta_type == "positive" else "#ef4444"
+        delta_icon = "trending_up" if delta_type == "positive" else "trending_down"
+        delta_html = f'''
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: {delta_bg}; border: 1px solid {delta_border}; border-radius: 9999px;">
+                <span class="material-symbols-outlined" style="font-size: 14px; color: {delta_color};">{delta_icon}</span>
+                <span style="font-size: 0.75rem; font-weight: 700; color: {delta_color};">{delta}</span>
+            </div>
+            <span style="font-size: 0.75rem; color: rgba(255,255,255,0.4);">vs. 지난주</span>
+        </div>
+        '''
+
+    card_html = f'''
+    <div class="stitch-card" style="border-radius: 2rem;">
+        <div style="position: absolute; top: 0; right: 0; padding: 1.5rem; opacity: 0.5;">
+            <span class="material-symbols-outlined" style="font-size: 48px; color: rgba(255,255,255,0.1);">{icon}</span>
+        </div>
+        <div style="position: relative; z-index: 10;">
+            <p style="margin: 0; font-size: 0.875rem; color: rgba(255,255,255,0.5);">{label}</p>
+            <h3 style="margin: 0.25rem 0 0 0; font-size: 2rem; font-weight: 700; color: white;">{value}</h3>
+            {delta_html}
+        </div>
+    </div>
+    '''
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
+def render_stitch_card(title: str = None, subtitle: str = None, content: str = "", padding: str = "1.5rem"):
+    """
+    STITCH 스타일 기본 카드.
+
+    Args:
+        title: 카드 제목
+        subtitle: 부제목
+        content: 내부 HTML 콘텐츠
+        padding: 패딩 값
+    """
+    header_html = ""
+    if title:
+        subtitle_html = f'<p style="margin: 0; font-size: 0.875rem; color: rgba(255,255,255,0.5);">{subtitle}</p>' if subtitle else ""
+        header_html = f'''
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: white;">{title}</h3>
+            {subtitle_html}
+        </div>
+        '''
+
+    card_html = f'''
+    <div class="stitch-card" style="padding: {padding}; border-radius: 2rem;">
+        {header_html}
+        {content}
+    </div>
+    '''
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
+def stitch_grid_start(columns: int = 3):
+    """
+    STITCH 그리드 시작. stitch_grid_end()와 함께 사용.
+
+    Args:
+        columns: 컬럼 수 (2 또는 3)
+    """
+    grid_class = f"stitch-grid-{columns}"
+    st.markdown(f'<div class="{grid_class}">', unsafe_allow_html=True)
+
+
+def stitch_grid_end():
+    """STITCH 그리드 종료."""
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def stitch_content_start():
+    """STITCH 메인 콘텐츠 영역 시작."""
+    st.markdown('''
+    <div class="stitch-main">
+        <div class="stitch-content">
+            <div class="stitch-content-inner">
+    ''', unsafe_allow_html=True)
+
+
+def stitch_content_end():
+    """STITCH 메인 콘텐츠 영역 종료."""
+    st.markdown('</div></div></div>', unsafe_allow_html=True)

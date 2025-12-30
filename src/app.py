@@ -70,9 +70,10 @@ if 'use_db_coordination' not in st.session_state: st.session_state['use_db_coord
 
 # --- APPLY STYLES & HEADER ---
 ui.apply_custom_css()
-ui.render_navbar()
 
-st.write("") # Spacer
+# STITCH 레이아웃: 사이드바 + 메인 콘텐츠
+ui.render_stitch_sidebar()
+ui.stitch_content_start()
 
 # con = al.get_connection() # [REMOVED] Global connection causes locking issues
 # DB_PATH will be used for specific query connections
@@ -266,42 +267,86 @@ with st.sidebar:
         st.caption("Target App 미실행 시만 사용")
 
 # =========================================================
-# PAGE: INTRO (BRAND IDENTITY)
+# PAGE: INTRO (BRAND IDENTITY) - STITCH Layout
 # =========================================================
 if st.session_state['page'] == 'intro':
-    # Hero Section
-    st.markdown('''<div style="text-align: center; padding: 4rem 0;">
-<div style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
-<div style="width: 4rem; height: 4rem; background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%); border-radius: 1rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 0 30px rgba(59, 25, 230, 0.5);">🚀</div>
-</div>
-<h1 style="font-size: 3.5rem; font-weight: 900; background: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #c084fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; letter-spacing: -0.03em;">Where Data Analysts are Born.</h1>
-<p style="font-size: 1.25rem; margin-bottom: 3rem; color: rgba(255, 255, 255, 0.6); max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.6;">책으로만 배우는 A/B 테스트는 그만.<br>직접 경험하며 데이터 분석가로 다시 태어나세요.</p>
-</div>''', unsafe_allow_html=True)
+    # STITCH Header
+    ui.render_stitch_header(breadcrumb=['Home', 'NovaRium'])
 
-    # Feature Cards using Streamlit columns for better control
-    col1, col2 = st.columns(2)
+    # Hero Section - STITCH Style
+    st.markdown('''
+    <div style="text-align: center; padding: 3rem 0 2rem 0;">
+        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); border-radius: 1.25rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 40px rgba(90, 137, 246, 0.5);">
+                <span class="material-symbols-outlined" style="font-size: 40px; color: white; font-variation-settings: 'FILL' 1;">rocket_launch</span>
+            </div>
+        </div>
+        <h1 style="font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, #ffffff 0%, #93c5fd 50%, #c4b5fd 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; letter-spacing: -0.03em;">Where Data Analysts are Born.</h1>
+        <p style="font-size: 1.25rem; color: rgba(255, 255, 255, 0.5); max-width: 600px; margin: 0 auto 2rem auto; line-height: 1.6;">책으로만 배우는 A/B 테스트는 그만.<br>직접 경험하며 데이터 분석가로 다시 태어나세요.</p>
+    </div>
+    ''', unsafe_allow_html=True)
 
-    with col1:
-        st.markdown('''<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2rem; border-radius: 1.5rem; height: 100%;">
-<div style="width: 3rem; height: 3rem; background: rgba(167, 139, 250, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">✨</div>
-<h3 style="color: #a78bfa; margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 700;">Nova (New)</h3>
-<p style="font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.7);">라틴어로 <strong style="color: white;">'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong style="color: white;">초신성(Supernova)</strong>을 의미합니다. 데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.</p>
-</div>''', unsafe_allow_html=True)
+    # Feature Cards - STITCH Grid
+    st.markdown('''
+    <div class="stitch-grid-2">
+        <div class="stitch-card" style="border-radius: 2rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
+                <div style="width: 48px; height: 48px; background: rgba(90, 137, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-symbols-outlined" style="font-size: 24px; color: #5a89f6;">auto_awesome</span>
+                </div>
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #93c5fd;">Nova (New)</h3>
+            </div>
+            <p style="margin: 0; font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.6);">라틴어로 <strong style="color: white;">'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong style="color: white;">초신성(Supernova)</strong>을 의미합니다. 데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.</p>
+        </div>
+        <div class="stitch-card" style="border-radius: 2rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
+                <div style="width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-symbols-outlined" style="font-size: 24px; color: #a78bfa;">account_balance</span>
+                </div>
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #c4b5fd;">Arium (Place)</h3>
+            </div>
+            <p style="margin: 0; font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.6);">라틴어 접미사로 <strong style="color: white;">'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다. 예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
-    with col2:
-        st.markdown('''<div style="background: rgba(30, 27, 46, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2rem; border-radius: 1.5rem; height: 100%;">
-<div style="width: 3rem; height: 3rem; background: rgba(167, 139, 250, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">🏛️</div>
-<h3 style="color: #a78bfa; margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 700;">Arium (Place)</h3>
-<p style="font-size: 1rem; line-height: 1.7; color: rgba(255, 255, 255, 0.7);">라틴어 접미사로 <strong style="color: white;">'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다. 예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.</p>
-</div>''', unsafe_allow_html=True)
+    # Mission Statement - STITCH Primary Button Style
+    st.markdown('''
+    <div style="text-align: center; margin-top: 1rem;">
+        <div style="background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); padding: 1rem 2rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; box-shadow: 0 0 30px rgba(90, 137, 246, 0.4); color: white;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">target</span>
+            <span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
-    # Mission Statement
-    st.markdown('''<div style="text-align: center; margin-top: 2rem;">
-<div style="background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%); padding: 1.25rem 2.5rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.1rem; box-shadow: 0 0 30px rgba(59, 25, 230, 0.4); color: white;">
-<span>🎯</span>
-<span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span>
-</div>
-</div>''', unsafe_allow_html=True)
+    # Quick Stats Section - STITCH Cards
+    st.markdown('<div style="height: 3rem;"></div>', unsafe_allow_html=True)
+    st.markdown('''
+    <div class="stitch-grid-3">
+        <div class="stitch-card" style="border-radius: 2rem; text-align: center;">
+            <div style="width: 48px; height: 48px; background: rgba(34, 197, 94, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <span class="material-symbols-outlined" style="font-size: 24px; color: #22c55e;">science</span>
+            </div>
+            <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 800; color: white;">A/B 테스트</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 0.875rem;">가설 수립부터 통계 분석까지</p>
+        </div>
+        <div class="stitch-card" style="border-radius: 2rem; text-align: center;">
+            <div style="width: 48px; height: 48px; background: rgba(90, 137, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <span class="material-symbols-outlined" style="font-size: 24px; color: #5a89f6;">monitoring</span>
+            </div>
+            <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 800; color: white;">실시간 모니터링</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 0.875rem;">KPI 대시보드 구축 실습</p>
+        </div>
+        <div class="stitch-card" style="border-radius: 2rem; text-align: center;">
+            <div style="width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <span class="material-symbols-outlined" style="font-size: 24px; color: #a78bfa;">database</span>
+            </div>
+            <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 800; color: white;">데이터 엔지니어링</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.5); font-size: 0.875rem;">ETL 파이프라인 학습</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
 # =========================================================
 # PAGE: DATA ENGINEERING LAB (NEW)
@@ -2517,3 +2562,6 @@ elif st.session_state['page'] == 'portfolio':
         with col4:
             adoption_rate = (adopted_count / len(df_history) * 100) if len(df_history) > 0 else 0
             st.metric("채택률", f"{adoption_rate:.1f}%")
+
+# STITCH 레이아웃 종료
+ui.stitch_content_end()
