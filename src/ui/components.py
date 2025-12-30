@@ -2,48 +2,57 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # =========================================================
-# NovaRium UI Components - Cosmic Glass Theme v2.0
-# STITCH Design System Integration
+# NovaRium UI Components - STITCH Design System v3.0
+# Atomic Design 기반 Cosmic Glass Theme
 # =========================================================
 
+# =========================================================
+# DESIGN TOKENS - STITCH v3 Color System (Navigation Update)
+# =========================================================
+STITCH_COLORS = {
+    'primary': '#5a89f6',           # STITCH v3 navigation primary
+    'primary_light': '#6d4aff',
+    'primary_glow': '#5a89f6',
+    'background_dark': '#0B0E14',   # Deep cosmic background
+    'surface_dark': '#181C25',
+    'glass_bg': 'rgba(20, 25, 34, 0.4)',
+    'glass_bg_heavy': 'rgba(17, 20, 28, 0.75)',
+    'glass_border': 'rgba(255, 255, 255, 0.08)',
+    'success': '#10B981',           # Emerald-500
+    'warning': '#F59E0B',
+    'error': '#EF4444',
+    'text_primary': '#ffffff',
+    'text_secondary': 'rgba(255, 255, 255, 0.6)',
+    'text_muted': 'rgba(148, 163, 184, 1)',  # slate-400
+}
+
 def apply_custom_css():
-    """
-    Apply global Cosmic Glass CSS styling to the Streamlit app.
-    Based on STITCH Design System v2.0 + v3.0
-    """
+    """STITCH v3 전역 CSS 스타일 적용. Atomic Design 기반."""
     st.markdown("""
 <style>
     /* ============================================
-       1. FONTS & GLOBAL RESET (강화된 버전)
+       STITCH v3 DESIGN SYSTEM - ATOMIC CSS
        ============================================ */
+
+    /* 1. FONTS & GLOBAL RESET */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
-    /* 모든 요소에 폰트 강제 적용 */
     *, *::before, *::after {
-        font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        box-sizing: border-box;
     }
 
-    html, body, [class*="css"], .stApp, .main, section[data-testid="stSidebar"] {
-        font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    html, body, [class*="css"], .stApp, .main {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
 
-    /* ============================================
-       2. GLOBAL SCALE - 전체 UI 95% 스케일
-       ============================================ */
-    html {
-        font-size: 15px !important;  /* 기본 16px에서 약간 축소 */
-    }
-
-    .stApp {
-        zoom: 0.95;  /* 95% 스케일 */
-    }
+    /* 2. GLOBAL SCALE */
+    html { font-size: 15px !important; }
+    .stApp { zoom: 0.95; }
 
     /* ============================================
-       2-1. COSMIC BACKGROUND (강화된 버전)
+       3. COSMIC BACKGROUND - STITCH v3 Navigation
        ============================================ */
-    /* 최상위 앱 컨테이너 */
     .stApp, .stApp > header, .stApp > section {
         background-color: #0B0E14 !important;
         background-image:
@@ -52,224 +61,111 @@ def apply_custom_css():
         color: #ffffff !important;
     }
 
-    /* Main 컨테이너 - STITCH 레이아웃을 위해 여백 제거 */
-    .main .block-container {
-        background: transparent !important;
-        padding: 0 !important;
-        max-width: 100% !important;
+    /* Decorative Background Glows - STITCH v3 Cosmic */
+    .stApp::before {
+        content: "";
+        position: fixed;
+        top: -10%;
+        left: 20%;
+        width: 500px;
+        height: 500px;
+        background: rgba(90, 137, 246, 0.2);
+        border-radius: 50%;
+        filter: blur(120px);
+        mix-blend-mode: screen;
+        opacity: 0.4;
+        pointer-events: none;
+        z-index: 0;
     }
 
-    /* Streamlit 기본 여백 완전 제거 */
-    .stApp > header + div {
-        padding: 0 !important;
+    .stApp::after {
+        content: "";
+        position: fixed;
+        bottom: -10%;
+        right: 10%;
+        width: 400px;
+        height: 400px;
+        background: rgba(139, 92, 246, 0.2);
+        border-radius: 50%;
+        filter: blur(100px);
+        mix-blend-mode: screen;
+        opacity: 0.3;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .main .block-container {
+        background: transparent !important;
+        padding: 1rem 2rem !important;
+        max-width: 1200px !important;
+        position: relative;
+        z-index: 1;
     }
 
     div[data-testid="stAppViewBlockContainer"] {
-        padding: 0 !important;
-        max-width: 100% !important;
-    }
-
-    /* STITCH 레이아웃 컨테이너 */
-    .stitch-layout {
-        display: flex;
-        min-height: 100vh;
-        width: 100%;
-    }
-
-    /* STITCH 사이드바 - 고정 너비 288px (w-72) */
-    .stitch-sidebar {
-        width: 288px;
-        min-width: 288px;
-        background: rgba(17, 20, 28, 0.75);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 1.5rem;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        position: fixed;
-        left: 0;
-        top: 0;
-        height: 100vh;
-        z-index: 100;
-    }
-
-    /* STITCH 메인 콘텐츠 영역 */
-    .stitch-main {
-        flex: 1;
-        margin-left: 288px;
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-        overflow: hidden;
-    }
-
-    /* STITCH 상단 헤더 - rounded-full glass */
-    .stitch-header {
-        background: rgba(20, 25, 34, 0.4);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 9999px;
-        margin: 1rem 1.5rem 0.5rem 1.5rem;
-        padding: 0.75rem 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        position: sticky;
-        top: 0;
-        z-index: 50;
-    }
-
-    /* STITCH 스크롤 콘텐츠 */
-    .stitch-content {
-        flex: 1;
-        overflow-y: auto;
-        padding: 1.5rem;
-    }
-
-    .stitch-content-inner {
-        max-width: 1280px;
+        padding: 1rem 2rem !important;
+        max-width: 1200px !important;
         margin: 0 auto;
     }
 
-    /* STITCH 그리드 시스템 */
-    .stitch-grid-3 {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .stitch-grid-2 {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    @media (max-width: 1024px) {
-        .stitch-grid-3 { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 768px) {
-        .stitch-grid-3, .stitch-grid-2 { grid-template-columns: 1fr; }
-        .stitch-sidebar { display: none; }
-        .stitch-main { margin-left: 0; }
-    }
-
-    /* STITCH 카드 - rounded-3xl (1.5rem) */
-    .stitch-card {
-        background: rgba(20, 25, 34, 0.4);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 1.5rem;
-        padding: 1.5rem;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .stitch-card:hover {
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    /* STITCH 네비게이션 링크 */
-    .stitch-nav-link {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 1rem;
-        border-radius: 9999px;
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 0.875rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all 0.2s ease;
-        cursor: pointer;
-        border: 1px solid transparent;
-    }
-
-    .stitch-nav-link:hover {
-        background: rgba(255, 255, 255, 0.05);
-        color: white;
-    }
-
-    .stitch-nav-link.active {
-        background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%);
-        border: 1px solid rgba(90, 137, 246, 0.3);
-        box-shadow: 0 0 15px rgba(90, 137, 246, 0.15);
-        color: white;
-    }
-
-    /* STITCH 페이지 타이틀 */
-    .stitch-page-title {
-        margin-bottom: 2rem;
-    }
-
-    .stitch-page-title h1 {
-        font-size: 1.875rem !important;
-        font-weight: 700 !important;
-        color: white !important;
-        margin-bottom: 0.5rem !important;
-    }
-
-    .stitch-page-title p {
-        color: rgba(255, 255, 255, 0.6) !important;
-        font-size: 1rem !important;
-    }
-
-    /* 모든 section 요소 */
-    section[data-testid="stMain"],
-    div[data-testid="stAppViewContainer"],
-    .stApp > div:first-child {
+    section[data-testid="stMain"], div[data-testid="stAppViewContainer"] {
         background-color: #0B0E14 !important;
         background-image:
             radial-gradient(at 0% 0%, rgba(90, 137, 246, 0.15) 0px, transparent 50%),
             radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.1) 0px, transparent 50%) !important;
     }
 
-    /* Hide Streamlit default header/footer */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        backdrop-filter: none !important;
-    }
-    #MainMenu {visibility: hidden !important; display: none !important;}
-    footer {visibility: hidden !important; display: none !important;}
-    .stDeployButton {display: none !important;}
+    /* Hide Streamlit defaults */
+    header[data-testid="stHeader"] { background: transparent !important; }
+    #MainMenu, footer, .stDeployButton { display: none !important; }
 
     /* ============================================
-       3. GLASS PANEL EFFECT
+       4. GLASS PANEL - STITCH v3 (Blur 16px)
        ============================================ */
     .glass-panel {
-        background: rgba(30, 27, 46, 0.6) !important;
-        backdrop-filter: blur(12px) !important;
-        -webkit-backdrop-filter: blur(12px) !important;
+        background: rgba(30, 28, 38, 0.4) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 1rem !important;
+        border-radius: 1.25rem !important;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
     }
 
-    /* Streamlit containers with glass effect */
-    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: rgba(30, 27, 46, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+    /* Interactive Glass Card with Hover Glow */
+    .glass-card-interactive {
+        background: rgba(30, 28, 38, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 1.5rem;
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        position: relative;
+    }
+
+    .glass-card-interactive:hover {
+        box-shadow: 0 0 25px rgba(59, 25, 230, 0.15), 0 4px 30px rgba(0, 0, 0, 0.2);
+        transform: translateY(-2px);
+        border-color: rgba(93, 62, 255, 0.5);
+    }
+
+    /* Streamlit containers */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: rgba(30, 28, 38, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.25rem;
         padding: 1.5rem;
         transition: all 0.3s ease;
     }
 
     div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        border-color: rgba(255, 255, 255, 0.15);
-        box-shadow: 0 0 30px rgba(59, 25, 230, 0.1);
+        border-color: rgba(93, 62, 255, 0.3);
+        box-shadow: 0 0 20px rgba(59, 25, 230, 0.1);
     }
 
     /* ============================================
-       4. TYPOGRAPHY
+       5. TYPOGRAPHY - STITCH v3
        ============================================ */
     h1, h2, h3, h4, h5, h6 {
         color: #ffffff !important;
@@ -277,309 +173,307 @@ def apply_custom_css():
         letter-spacing: -0.02em !important;
     }
 
-    h1 { font-size: 2.5rem !important; font-weight: 900 !important; }
-    h2 { font-size: 1.75rem !important; }
-    h3 { font-size: 1.25rem !important; }
+    h1 { font-size: 3rem !important; font-weight: 900 !important; }
+    h2 { font-size: 1.5rem !important; }
+    h3 { font-size: 1.125rem !important; }
 
-    p, li, label, span, .stMarkdown {
-        color: rgba(255, 255, 255, 0.7) !important;
+    p, li, label, span, .stMarkdown { color: rgba(255, 255, 255, 0.6) !important; }
+
+    /* Gradient Text */
+    .gradient-text {
+        background: linear-gradient(135deg, #ffffff 0%, #a5a5ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
 
     /* ============================================
-       5. NAVBAR STYLES
+       6. BUTTONS - STITCH v3 Button Kit
        ============================================ */
-    .navbar-container {
-        background: rgba(30, 27, 46, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 1rem;
-        padding: 0.75rem 1.5rem;
-        margin-bottom: 2rem;
-    }
 
-    .navbar-brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .navbar-logo {
-        width: 2.5rem;
-        height: 2.5rem;
-        background: linear-gradient(135deg, #3b19e6 0%, #7c3aed 100%);
-        border-radius: 0.75rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 15px rgba(59, 25, 230, 0.4);
-    }
-
-    .navbar-title {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #ffffff !important;
-        letter-spacing: -0.02em;
-    }
-
-    /* ============================================
-       6. BUTTON STYLES (STITCH v3 강화)
-       ============================================ */
-    /* 모든 버튼 기본 스타일 */
-    button, .stButton > button, [data-testid="baseButton-secondary"] {
-        background: rgba(20, 25, 34, 0.4) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        color: white !important;
+    /* 6.1 Primary Button - STITCH v3 Navigation Style */
+    .stitch-btn-primary, [data-testid="baseButton-primary"], button[kind="primary"] {
+        background: #5a89f6 !important;
+        border: none !important;
         border-radius: 9999px !important;
+        color: white !important;
+        font-weight: 700 !important;
         padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease !important;
+        cursor: pointer !important;
+        box-shadow: 0 0 20px rgba(90, 137, 246, 0.4) !important;
+    }
+
+    .stitch-btn-primary:hover, [data-testid="baseButton-primary"]:hover, button[kind="primary"]:hover {
+        background: #6b96f7 !important;
+        box-shadow: 0 0 25px rgba(90, 137, 246, 0.6) !important;
+        transform: scale(1.02) translateY(-2px) !important;
+    }
+
+    .stitch-btn-primary:active, [data-testid="baseButton-primary"]:active, button[kind="primary"]:active {
+        background: #4a79e6 !important;
+        transform: scale(0.98) !important;
+    }
+
+    /* 6.2 Secondary Button - Ghost Style STITCH v3 */
+    .stitch-btn-secondary, [data-testid="baseButton-secondary"], button:not([kind="primary"]) {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 9999px !important;
+        color: rgba(148, 163, 184, 1) !important;
         font-weight: 600 !important;
-        font-family: 'Inter', 'Plus Jakarta Sans', sans-serif !important;
+        padding: 0.75rem 1.5rem !important;
         transition: all 0.3s ease !important;
         cursor: pointer !important;
     }
 
-    .stButton > button:hover, [data-testid="baseButton-secondary"]:hover {
+    .stitch-btn-secondary:hover, [data-testid="baseButton-secondary"]:hover {
         background: rgba(255, 255, 255, 0.1) !important;
         border-color: rgba(255, 255, 255, 0.2) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-    }
-
-    .stButton > button:active {
-        transform: translateY(0) scale(0.98) !important;
-    }
-
-    /* Primary Button - 보라색 그라데이션 + 글로우 */
-    [data-testid="baseButton-primary"],
-    div[data-testid="stButton"] button[kind="primary"],
-    .stButton > button[kind="primary"],
-    button[kind="primary"] {
-        background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%) !important;
-        border: none !important;
-        box-shadow: 0 0 20px rgba(90, 137, 246, 0.4) !important;
         color: white !important;
     }
 
-    [data-testid="baseButton-primary"]:hover,
-    div[data-testid="stButton"] button[kind="primary"]:hover,
-    .stButton > button[kind="primary"]:hover {
-        box-shadow: 0 0 30px rgba(90, 137, 246, 0.6) !important;
-        transform: translateY(-2px) scale(1.02) !important;
+    .stitch-btn-secondary:active, [data-testid="baseButton-secondary"]:active {
+        background: rgba(90, 137, 246, 0.1) !important;
+        border-color: rgba(90, 137, 246, 0.3) !important;
+        transform: scale(0.98) !important;
     }
 
-    /* Nav button active state - Cosmic Glow */
-    .nav-active {
-        background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%) !important;
-        border: 1px solid rgba(90, 137, 246, 0.3) !important;
-        box-shadow: 0 0 15px rgba(90, 137, 246, 0.15) !important;
-    }
-
-    /* STITCH 버튼 클래스 - Primary (그라데이션 + 글로우) */
-    .stitch-btn-primary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
-        background: linear-gradient(135deg, #3b19e6 0%, #6d4aff 100%);
-        border: none;
-        border-radius: 9999px;
-        color: white;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .stitch-btn-primary:hover {
-        background: linear-gradient(135deg, #4c2af5 0%, #7e5bff 100%);
-        box-shadow: 0 0 20px rgba(59, 25, 230, 0.5);
-        transform: translateY(-2px);
-    }
-
-    .stitch-btn-primary:active {
-        background: linear-gradient(135deg, #2a0ab6 0%, #5230e5 100%);
-        transform: scale(0.98);
-    }
-
-    /* STITCH 버튼 클래스 - Secondary (Ghost 스타일) */
-    .stitch-btn-secondary {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 9999px;
-        color: white;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .stitch-btn-secondary:hover {
-        background: rgba(59, 25, 230, 0.1);
-        border-color: #6d4aff;
-        box-shadow: 0 0 15px rgba(59, 25, 230, 0.15);
-    }
-
-    .stitch-btn-secondary:active {
-        background: rgba(59, 25, 230, 0.2);
-        border-color: #3b19e6;
-        transform: scale(0.98);
-    }
-
-    /* STITCH 버튼 클래스 - Tertiary (텍스트 링크) */
+    /* 6.3 Tertiary Button - Text Link */
     .stitch-btn-tertiary {
-        background: none;
-        border: none;
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 0.875rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: color 0.2s ease;
+        background: none !important;
+        border: none !important;
+        color: rgba(255, 255, 255, 0.7) !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: color 0.2s ease !important;
     }
 
     .stitch-btn-tertiary:hover {
-        color: white;
-        text-decoration: underline;
-        text-decoration-color: #6d4aff;
-        text-underline-offset: 4px;
+        color: white !important;
+        text-decoration: underline !important;
+        text-decoration-color: #3b19e6 !important;
+        text-underline-offset: 4px !important;
     }
 
-    /* STITCH 아이콘 버튼 */
+    /* 6.4 Icon Button */
     .stitch-btn-icon {
-        width: 2.5rem;
-        height: 2.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 9999px;
-        color: white;
-        cursor: pointer;
-        transition: all 0.2s ease;
+        width: 3rem !important;
+        height: 3rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 9999px !important;
+        color: white !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
     }
 
     .stitch-btn-icon:hover {
-        background: #3b19e6;
-        border-color: transparent;
-        box-shadow: 0 0 15px rgba(59, 25, 230, 0.4);
-        transform: scale(1.1);
+        background: #3b19e6 !important;
+        border-color: transparent !important;
+        box-shadow: 0 0 15px rgba(59, 25, 230, 0.4) !important;
+        transform: scale(1.1) !important;
     }
 
-    /* STITCH 스탯 카드 추가 스타일 */
-    .stitch-stat-card {
-        background: rgba(20, 25, 34, 0.4);
+    /* ============================================
+       7. CARDS - STITCH v3 Card Kit
+       ============================================ */
+
+    /* 7.1 Default Card */
+    .stitch-card, .stitch-card-default {
+        background: rgba(30, 28, 38, 0.4);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 1.5rem;
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .stitch-card:hover, .stitch-card-default:hover {
+        border-color: rgba(93, 62, 255, 0.5);
+        box-shadow: 0 0 20px rgba(59, 25, 230, 0.15), 0 4px 30px rgba(0, 0, 0, 0.2);
+        transform: translateY(-2px);
+    }
+
+    /* 7.2 Success Card - Left Border Accent */
+    .stitch-card-success {
+        background: rgba(30, 28, 38, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stitch-card-success::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 6px;
+        height: 100%;
+        background: #4ADE80;
+        box-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+    }
+
+    /* 7.3 Warning Card - Bottom Border Accent */
+    .stitch-card-warning {
+        background: rgba(30, 28, 38, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 3px solid rgba(245, 158, 11, 0.8);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+    }
+
+    /* 7.4 Error Card - Full Border + Tint */
+    .stitch-card-error {
+        background: rgba(239, 68, 68, 0.02);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+    }
+
+    /* 7.5 Stat Card */
+    .stitch-stat-card {
+        background: rgba(30, 28, 38, 0.4);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.25rem;
         padding: 1.5rem;
         transition: all 0.3s ease;
     }
 
     .stitch-stat-card:hover {
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .stitch-stat-card .icon-container {
-        width: 3rem;
-        height: 3rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.75rem;
-        margin-bottom: 1rem;
-    }
-
-    .stitch-stat-card .icon-container.primary {
-        background: linear-gradient(135deg, rgba(90, 137, 246, 0.2), rgba(90, 137, 246, 0.05));
-    }
-
-    .stitch-stat-card .icon-container.success {
-        background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.05));
-    }
-
-    .stitch-stat-card .icon-container.warning {
-        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
-    }
-
-    .stitch-stat-card .icon-container.error {
-        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
+        border-color: rgba(93, 62, 255, 0.3);
+        box-shadow: 0 0 15px rgba(59, 25, 230, 0.1);
     }
 
     .stitch-stat-card .value {
-        font-size: 1.875rem;
+        font-size: 2rem;
         font-weight: 700;
         color: white;
-        margin-bottom: 0.25rem;
     }
 
     .stitch-stat-card .label {
         font-size: 0.875rem;
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(255, 255, 255, 0.5);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
     .stitch-stat-card .delta {
         font-size: 0.75rem;
-        font-weight: 500;
+        font-weight: 600;
         margin-top: 0.5rem;
     }
 
-    .stitch-stat-card .delta.positive {
-        color: #22c55e;
-    }
-
-    .stitch-stat-card .delta.negative {
-        color: #ef4444;
-    }
+    .stitch-stat-card .delta.positive { color: #4ADE80; }
+    .stitch-stat-card .delta.negative { color: #EF4444; }
 
     /* ============================================
-       7. INPUT FIELDS
+       8. FORM FIELDS - STITCH v3 Form Kit
        ============================================ */
-    .stTextInput > div > div,
-    .stNumberInput > div > div,
-    .stSelectbox > div > div,
-    .stTextArea > div > div,
-    .stMultiSelect > div > div {
-        background-color: rgba(18, 17, 24, 0.5) !important;
+
+    /* 8.1 Text Input */
+    .stTextInput > div > div, .stNumberInput > div > div, .stTextArea > div > div {
+        background-color: rgba(22, 21, 33, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.75rem !important;
         color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .stTextInput > div > div:focus-within, .stNumberInput > div > div:focus-within {
+        border-color: #3b19e6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 25, 230, 0.2), 0 0 15px rgba(59, 25, 230, 0.1) !important;
+        background-color: rgba(22, 21, 33, 0.8) !important;
+    }
+
+    .stTextInput input, .stTextArea textarea, .stNumberInput input {
+        color: white !important;
+    }
+
+    .stTextInput input::placeholder { color: rgba(255, 255, 255, 0.4) !important; }
+
+    /* 8.2 Select/Dropdown */
+    .stSelectbox > div > div, .stMultiSelect > div > div {
+        background-color: rgba(22, 21, 33, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 0.75rem !important;
     }
 
-    .stTextInput > div > div:focus-within,
     .stSelectbox > div > div:focus-within {
         border-color: #3b19e6 !important;
-        box-shadow: 0 0 0 2px rgba(59, 25, 230, 0.2) !important;
-        background-color: rgba(18, 17, 24, 0.8) !important;
+        box-shadow: 0 0 15px rgba(59, 25, 230, 0.2) !important;
     }
 
-    /* Input text color */
-    .stTextInput input, .stTextArea textarea {
-        color: white !important;
-    }
-
-    /* Placeholder */
-    .stTextInput input::placeholder {
-        color: rgba(255, 255, 255, 0.4) !important;
-    }
+    /* 8.3 Validation States */
+    .stitch-input-success { border-color: rgba(74, 222, 128, 0.5) !important; }
+    .stitch-input-warning { border-color: rgba(245, 158, 11, 0.5) !important; }
+    .stitch-input-error { border-color: rgba(239, 68, 68, 0.5) !important; background: rgba(239, 68, 68, 0.05) !important; }
 
     /* ============================================
-       8. SIDEBAR
+       9. SIDEBAR - STITCH v3 (w-72 = 288px)
        ============================================ */
     section[data-testid="stSidebar"] {
-        background: rgba(20, 17, 33, 0.95) !important;
+        background: rgba(17, 20, 28, 0.75) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
         border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-        min-width: 280px !important;
-        width: 280px !important;
+        min-width: 288px !important;
+        width: 288px !important;
+    }
+
+    /* STITCH v3 Nav Active Style - Cosmic Glow */
+    .nav-active {
+        background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%) !important;
+        border: 1px solid rgba(90, 137, 246, 0.3) !important;
+        box-shadow: 0 0 15px rgba(90, 137, 246, 0.15) !important;
+        border-radius: 9999px !important;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 9999px;
+        color: rgba(148, 163, 184, 1);
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+
+    .nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+
+    .nav-item.active {
+        background: linear-gradient(90deg, rgba(90, 137, 246, 0.2) 0%, rgba(90, 137, 246, 0.05) 100%);
+        border: 1px solid rgba(90, 137, 246, 0.3);
+        box-shadow: 0 0 15px rgba(90, 137, 246, 0.15);
+        color: white;
+    }
+
+    .nav-item .icon {
+        font-size: 20px;
+        transition: transform 0.2s ease;
+    }
+
+    .nav-item:hover .icon {
+        transform: scale(1.1);
+    }
+
+    .nav-item.active .icon {
+        color: #5a89f6;
     }
 
     section[data-testid="stSidebar"] > div {
@@ -694,20 +588,42 @@ def apply_custom_css():
     }
 
     /* ============================================
-       11. EXPANDER
+       11. EXPANDER (Updated for Streamlit 1.x)
        ============================================ */
-    .streamlit-expanderHeader {
+    .streamlit-expanderHeader,
+    [data-testid="stExpander"] summary {
         background: rgba(30, 27, 46, 0.6) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-radius: 0.75rem !important;
         color: white !important;
     }
 
-    .streamlit-expanderContent {
+    .streamlit-expanderContent,
+    [data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
         background: rgba(30, 27, 46, 0.4) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-top: none !important;
         border-radius: 0 0 0.75rem 0.75rem !important;
+    }
+
+    /* Hide Material Icon text in expander (keyboard_arrow_right 등) */
+    [data-testid="stIconMaterial"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    /* Expander summary arrow replacement */
+    [data-testid="stExpander"] summary {
+        list-style: none !important;
+    }
+    [data-testid="stExpander"] summary::-webkit-details-marker {
+        display: none !important;
+    }
+    [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
+        display: none !important;
     }
 
     /* ============================================
@@ -736,27 +652,50 @@ def apply_custom_css():
     }
 
     /* ============================================
-       14. CODE BLOCKS
+       14. CODE BLOCKS - SQL Syntax Highlighting
        ============================================ */
     code, pre, .stCode, .stCodeBlock {
-        background-color: #1a1a2e !important;
-        color: #e2e8f0 !important;
-        font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+        background-color: #0d1117 !important;
+        color: #e6edf3 !important;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+        font-size: 0.875rem !important;
+        line-height: 1.6 !important;
     }
 
     pre {
-        background-color: #1a1a2e !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background-color: #0d1117 !important;
+        border: 1px solid rgba(90, 137, 246, 0.2) !important;
         border-radius: 0.75rem !important;
-        padding: 1rem !important;
+        padding: 1.25rem !important;
+        overflow-x: auto !important;
     }
 
-    /* Syntax highlighting */
-    .hljs-keyword { color: #c792ea !important; }
-    .hljs-string { color: #c3e88d !important; }
-    .hljs-number { color: #f78c6c !important; }
-    .hljs-function { color: #82aaff !important; }
-    .hljs-comment { color: #676e95 !important; }
+    /* Streamlit Code Block Container */
+    [data-testid="stCodeBlock"] {
+        background-color: #0d1117 !important;
+        border-radius: 0.75rem !important;
+    }
+
+    [data-testid="stCodeBlock"] pre {
+        background-color: #0d1117 !important;
+    }
+
+    /* SQL Syntax Highlighting - GitHub Dark Theme */
+    .hljs-keyword, .token.keyword { color: #ff7b72 !important; font-weight: 600 !important; }
+    .hljs-string, .token.string { color: #a5d6ff !important; }
+    .hljs-number, .token.number { color: #79c0ff !important; }
+    .hljs-function, .token.function { color: #d2a8ff !important; }
+    .hljs-comment, .token.comment { color: #8b949e !important; font-style: italic !important; }
+    .hljs-operator, .token.operator { color: #ff7b72 !important; }
+    .hljs-punctuation, .token.punctuation { color: #c9d1d9 !important; }
+    .hljs-builtin, .token.builtin { color: #79c0ff !important; }
+    .hljs-variable, .token.variable { color: #ffa657 !important; }
+    .hljs-type, .token.class-name { color: #7ee787 !important; }
+
+    /* SQL specific keywords */
+    .language-sql .hljs-keyword { color: #ff7b72 !important; text-transform: uppercase; }
+    .language-sql .hljs-built_in { color: #d2a8ff !important; }
+    .language-sql .hljs-title { color: #79c0ff !important; }
 
     /* ============================================
        15. ALERTS & TOASTS
@@ -1260,37 +1199,32 @@ def render_stitch_sidebar():
 
 
 def render_stitch_topnav():
-    """STITCH v3 스타일 상단 네비게이션 바 렌더링."""
+    """STITCH v3 스타일 상단 네비게이션 바 렌더링. 좌측 로고 없이 네비게이션 + 시스템 상태 + Login."""
     current_page = st.session_state.get('page', 'intro')
 
-    # Top navigation bar with border
-    st.markdown('''
-    <style>
-    div[data-testid="stHorizontalBlock"]:first-of-type {
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        background: rgba(17,17,24,0.5);
-        backdrop-filter: blur(4px);
-        padding: 0.5rem 0;
-        margin-bottom: 1rem;
+    # 상단 네비게이션 스타일 (CSS minified) + Login 버튼 스타일
+    st.markdown('''<style>
+    .stitch-status{display:flex;align-items:center;gap:0.5rem;justify-content:flex-end;}
+    .stitch-status-dot{width:8px;height:8px;background:#10B981;border-radius:50%;box-shadow:0 0 8px rgba(16,185,129,0.6);animation:stitch-pulse 2s infinite;}
+    @keyframes stitch-pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+    .topnav-login-btn button {
+        background: rgba(255,255,255,0.08) !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        color: white !important;
+        font-size: 12px !important;
+        padding: 0.35rem 0.8rem !important;
+        border-radius: 6px !important;
+        height: auto !important;
+        min-height: auto !important;
+        font-weight: 500 !important;
     }
-    </style>
-    ''', unsafe_allow_html=True)
+    .topnav-login-btn button:hover {
+        background: rgba(255,255,255,0.15) !important;
+    }
+    </style>''', unsafe_allow_html=True)
 
-    # Logo + Navigation in columns
-    logo_col, nav_col, status_col = st.columns([2, 6, 2])
-
-    with logo_col:
-        # 로고 크기 증가: 44px -> 48px, 폰트 1.125rem
-        st.markdown('''
-        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.25rem 0;">
-            <div style="width:44px;height:44px;background:linear-gradient(135deg,#1313ec 0%,#9333ea 100%);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(19,19,236,0.4);">
-                <span style="font-size:24px;">🚀</span>
-            </div>
-            <div>
-                <span style="font-size:1.25rem;font-weight:800;color:white;letter-spacing:-0.02em;">NovaRium</span>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
+    # Navigation + Status + Login
+    nav_col, status_col, login_col = st.columns([8, 1, 1])
 
     with nav_col:
         nav_items = [
@@ -1305,36 +1239,45 @@ def render_stitch_topnav():
             with cols[i]:
                 is_active = current_page == item['id']
                 btn_type = "primary" if is_active else "secondary"
-                if st.button(f"{item['icon']} {item['label']}", key=f"topnav_{item['id']}", use_container_width=True, type=btn_type):
+                if st.button(f"{item['label']}", key=f"topnav_{item['id']}", use_container_width=True, type=btn_type):
                     st.session_state.page = item['id']
                     st.rerun()
 
     with status_col:
-        # 시스템 정상을 우측 정렬
-        st.markdown('''
-        <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;padding:0.5rem 0;height:100%;">
-            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,0.6);animation:pulse 2s infinite;"></div>
-            <span style="font-size:0.8125rem;color:rgba(255,255,255,0.6);font-weight:500;">시스템 정상</span>
-        </div>
-        <style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}</style>
-        ''', unsafe_allow_html=True)
+        st.markdown('<div class="stitch-status"><div class="stitch-status-dot"></div><span style="font-size:0.8125rem;color:rgba(148,163,184,1);font-weight:500;white-space:nowrap;">시스템 정상</span></div>', unsafe_allow_html=True)
+
+    with login_col:
+        st.markdown('<div class="topnav-login-btn">', unsafe_allow_html=True)
+        if st.button("Login", key="topnav_login"):
+            st.session_state['show_auth_modal'] = True
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_stitch_header(breadcrumb: list = None, show_search: bool = True):
-    """STITCH 스타일 상단 헤더 렌더링. rounded-full glass 스타일."""
+    """STITCH v3 스타일 상단 헤더 렌더링. rounded-full glass + 프로필 영역."""
     if breadcrumb is None:
-        breadcrumb = ['Home']
+        breadcrumb = ['홈']
 
+    # Breadcrumb HTML 생성 (이모지 사용)
     breadcrumb_parts = []
     for i, item in enumerate(breadcrumb):
         if i < len(breadcrumb) - 1:
-            breadcrumb_parts.append(f'<span style="color:rgba(255,255,255,0.4);">{item}</span>')
-            breadcrumb_parts.append('<span style="font-size:16px;color:rgba(255,255,255,0.2);">›</span>')
+            breadcrumb_parts.append(f'<span style="color:rgba(148,163,184,1);font-weight:500;">{item}</span>')
+            breadcrumb_parts.append('<span style="font-size:14px;color:rgba(100,116,139,1);margin:0 4px;">›</span>')
         else:
-            breadcrumb_parts.append(f'<span style="color:white;font-weight:600;">{item}</span>')
+            breadcrumb_parts.append(f'<span style="color:white;font-weight:700;">{item}</span>')
     breadcrumb_html = ''.join(breadcrumb_parts)
 
-    header_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:9999px;margin:1rem 1.5rem 0.5rem 1.5rem;padding:0.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;">{breadcrumb_html}</div><div style="display:flex;align-items:center;gap:1rem;"><button style="width:40px;height:40px;background:rgba(255,255,255,0.05);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;"><span style="font-size:20px;">🔔</span><span style="position:absolute;top:10px;right:10px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #0B0E14;"></span></button><button style="width:40px;height:40px;background:rgba(255,255,255,0.05);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;"><span style="font-size:20px;">⚙️</span></button></div></div>'
+    # Search bar HTML (optional) - 이모지 사용
+    search_html = ''
+    if show_search:
+        search_html = '<div style="position:relative;"><div style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;">🔍</div><input type="text" placeholder="실험 검색..." style="height:40px;width:200px;border-radius:9999px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);padding-left:36px;padding-right:16px;font-size:0.875rem;color:white;outline:none;"></div><div style="height:24px;width:1px;background:rgba(255,255,255,0.1);margin:0 8px;"></div>'
+
+    # 알림/설정 버튼 + 프로필 트리거 (이모지 사용)
+    actions_html = '<button style="width:36px;height:36px;background:rgba(255,255,255,0.05);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;font-size:16px;">🔔<span style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #0B0E14;"></span></button><button style="width:36px;height:36px;background:rgba(255,255,255,0.05);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;">⚙️</button><button style="margin-left:8px;display:flex;align-items:center;gap:8px;border-radius:9999px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);padding:4px 12px 4px 4px;cursor:pointer;"><div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#5a89f6,#8b5cf6);display:flex;align-items:center;justify-content:center;"><span style="font-size:12px;color:white;font-weight:700;">SJ</span></div><div style="display:flex;flex-direction:column;align-items:flex-start;"><span style="font-size:0.7rem;font-weight:700;color:white;line-height:1.2;">사용자</span><span style="font-size:0.6rem;font-weight:500;color:rgba(148,163,184,1);line-height:1.2;">분석가</span></div><span style="font-size:12px;color:rgba(148,163,184,1);">▼</span></button>'
+
+    header_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:9999px;margin:0 0 1.5rem 0;padding:0.5rem 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 24px rgba(0,0,0,0.2);"><div style="display:flex;align-items:center;font-size:0.875rem;">{breadcrumb_html}</div><div style="display:flex;align-items:center;gap:8px;">{search_html}{actions_html}</div></div>'
     st.markdown(header_html, unsafe_allow_html=True)
 
 
@@ -1353,19 +1296,25 @@ def render_stitch_page_title(title: str, subtitle: str = "", badge: str = None):
 
 
 def render_stitch_stat_card(label: str, value: str, delta: str = None, delta_type: str = "positive", icon: str = "📊", color: str = "primary"):
-    """STITCH 스타일 KPI 스탯 카드."""
-    icon_map = {"analytics": "📊", "science": "🔬", "trending_up": "📈", "speed": "⚡", "check_circle": "✅", "warning": "⚠️", "error": "❌"}
-    display_icon = icon_map.get(icon, icon) if len(icon) > 2 else icon
+    """STITCH v3 스타일 KPI 스탯 카드. 이모지 아이콘 지원."""
+    # Color mapping for icon backgrounds
+    color_map = {
+        "primary": {"bg": "rgba(90,137,246,0.2)", "text": "#5a89f6"},
+        "purple": {"bg": "rgba(139,92,246,0.2)", "text": "#a78bfa"},
+        "success": {"bg": "rgba(16,185,129,0.2)", "text": "#10B981"},
+        "warning": {"bg": "rgba(245,158,11,0.2)", "text": "#F59E0B"},
+        "error": {"bg": "rgba(239,68,68,0.2)", "text": "#EF4444"},
+    }
+    icon_color = color_map.get(color, color_map["primary"])
 
+    # Delta HTML (이모지 사용)
     delta_html = ""
     if delta:
-        delta_bg = "rgba(34,197,94,0.1)" if delta_type == "positive" else "rgba(239,68,68,0.1)"
-        delta_border = "rgba(34,197,94,0.2)" if delta_type == "positive" else "rgba(239,68,68,0.2)"
-        delta_color = "#22c55e" if delta_type == "positive" else "#ef4444"
         delta_arrow = "↑" if delta_type == "positive" else "↓"
-        delta_html = f'<div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;"><div style="display:flex;align-items:center;gap:0.25rem;padding:0.25rem 0.5rem;background:{delta_bg};border:1px solid {delta_border};border-radius:9999px;"><span style="font-size:14px;color:{delta_color};">{delta_arrow}</span><span style="font-size:0.75rem;font-weight:700;color:{delta_color};">{delta}</span></div><span style="font-size:0.75rem;color:rgba(255,255,255,0.4);">vs. 지난주</span></div>'
+        delta_color = "#10B981" if delta_type == "positive" else "#EF4444"
+        delta_html = f'<div style="font-size:0.75rem;color:{delta_color};display:flex;align-items:center;gap:4px;"><span>{delta_arrow}</span><span>{delta}</span></div>'
 
-    card_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:2rem;padding:1.5rem;position:relative;overflow:hidden;transition:all 0.3s ease;"><div style="position:absolute;top:0;right:0;padding:1.5rem;opacity:0.5;"><span style="font-size:48px;color:rgba(255,255,255,0.1);">{display_icon}</span></div><div style="position:relative;z-index:10;"><p style="margin:0;font-size:0.875rem;color:rgba(255,255,255,0.5);">{label}</p><h3 style="margin:0.25rem 0 0 0;font-size:2rem;font-weight:700;color:white;">{value}</h3>{delta_html}</div></div>'
+    card_html = f'<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1.5rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;padding:1rem;opacity:0.15;font-size:48px;">{icon}</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;"><div style="padding:8px;border-radius:8px;background:{icon_color["bg"]};font-size:20px;">{icon}</div><span style="font-size:0.875rem;font-weight:500;color:rgba(203,213,225,1);">{label}</span></div><div style="font-size:2.25rem;font-weight:700;color:white;margin-bottom:4px;">{value}</div>{delta_html}</div>'
     st.markdown(card_html, unsafe_allow_html=True)
 
 
