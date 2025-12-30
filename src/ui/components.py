@@ -1172,64 +1172,55 @@ def render_stitch_sidebar():
     """
     STITCH 스타일 사이드바 렌더링.
     고정 너비 288px, glass-panel-heavy 스타일.
+    Streamlit의 기본 사이드바를 사용하여 네비게이션 구현.
     """
-    current_page = st.session_state.get('page', 'intro')
-
-    # 네비게이션 아이템 정의
-    nav_items = [
-        {'id': 'intro', 'icon': 'rocket_launch', 'label': 'NovaRium', 'filled': True},
-        {'id': 'data_lab', 'icon': 'science', 'label': '데이터 랩', 'filled': False},
-        {'id': 'monitor', 'icon': 'monitoring', 'label': '모니터', 'filled': False},
-        {'id': 'study', 'icon': 'school', 'label': '실험 위저드', 'filled': False},
-        {'id': 'portfolio', 'icon': 'folder_open', 'label': '회고록', 'filled': False},
-    ]
-
-    # 사이드바 HTML 생성
-    nav_links_html = ""
-    for item in nav_items:
-        is_active = current_page == item['id']
-        active_class = "active" if is_active else ""
-        fill_style = "font-variation-settings: 'FILL' 1;" if (is_active or item['filled']) else ""
-        icon_color = "#5a89f6" if is_active else "inherit"
-
-        nav_links_html += f'''
-        <div class="stitch-nav-link {active_class}" data-page="{item['id']}" style="margin-bottom: 0.5rem;">
-            <span class="material-symbols-outlined" style="font-size: 20px; color: {icon_color}; {fill_style}">{item['icon']}</span>
-            <span>{item['label']}</span>
-        </div>
-        '''
-
-    sidebar_html = f'''
-    <div class="stitch-sidebar">
-        <div style="display: flex; flex-direction: column; gap: 2rem;">
-            <!-- 브랜딩 -->
-            <div style="display: flex; align-items: center; gap: 1rem; padding: 0 0.5rem;">
-                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(90, 137, 246, 0.4);">
-                    <span class="material-symbols-outlined" style="color: white; font-size: 24px;">rocket_launch</span>
-                </div>
-                <div>
-                    <h1 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: white;">NovaRium</h1>
-                    <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">Analyst Platform</p>
-                </div>
+    # Streamlit 기본 사이드바 사용
+    with st.sidebar:
+        # 브랜딩 영역
+        st.markdown("""
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem 0; margin-bottom: 1rem;">
+            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #5a89f6 0%, #7c3aed 100%); border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(90, 137, 246, 0.4);">
+                <span class="material-symbols-outlined" style="color: white; font-size: 24px;">rocket_launch</span>
             </div>
-            <!-- 네비게이션 -->
-            <nav style="display: flex; flex-direction: column; gap: 0.25rem;">
-                {nav_links_html}
-            </nav>
-        </div>
-        <!-- 하단 시스템 상태 -->
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; padding: 1rem;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #93c5fd;">시스템 상태</span>
-                    <div style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);"></div>
-                </div>
-                <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">모든 시스템 정상 작동 중</p>
+            <div>
+                <h1 style="margin: 0; font-size: 1.125rem; font-weight: 700; color: white;">NovaRium</h1>
+                <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">Analyst Platform</p>
             </div>
         </div>
-    </div>
-    '''
-    st.markdown(sidebar_html, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # 네비게이션 메뉴
+        current_page = st.session_state.get('page', 'intro')
+
+        nav_items = [
+            {'id': 'intro', 'icon': '🚀', 'label': 'NovaRium'},
+            {'id': 'data_lab', 'icon': '🔬', 'label': '데이터 랩'},
+            {'id': 'monitor', 'icon': '📊', 'label': '모니터'},
+            {'id': 'study', 'icon': '🧪', 'label': '실험 위저드'},
+            {'id': 'portfolio', 'icon': '📁', 'label': '회고록'},
+        ]
+
+        for item in nav_items:
+            is_active = current_page == item['id']
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(f"{item['icon']} {item['label']}", key=f"nav_{item['id']}", use_container_width=True, type=btn_type):
+                st.session_state.page = item['id']
+                st.rerun()
+
+        st.markdown("---")
+
+        # 시스템 상태
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255,255,255,0.05); border-radius: 1rem; padding: 1rem; margin-top: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #93c5fd;">시스템 상태</span>
+                <div style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);"></div>
+            </div>
+            <p style="margin: 0; font-size: 0.75rem; color: rgba(255,255,255,0.5);">모든 시스템 정상 작동 중</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_stitch_header(breadcrumb: list = None, show_search: bool = True):
@@ -1412,14 +1403,12 @@ def stitch_grid_end():
 
 
 def stitch_content_start():
-    """STITCH 메인 콘텐츠 영역 시작."""
-    st.markdown('''
-    <div class="stitch-main">
-        <div class="stitch-content">
-            <div class="stitch-content-inner">
-    ''', unsafe_allow_html=True)
+    """STITCH 메인 콘텐츠 영역 시작. Streamlit 사이드바와 함께 사용."""
+    # Streamlit 기본 레이아웃 사용 - 추가 wrapper 불필요
+    pass
 
 
 def stitch_content_end():
     """STITCH 메인 콘텐츠 영역 종료."""
-    st.markdown('</div></div></div>', unsafe_allow_html=True)
+    # Streamlit 기본 레이아웃 사용 - 추가 wrapper 불필요
+    pass
