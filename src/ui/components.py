@@ -1260,14 +1260,37 @@ def render_stitch_sidebar():
 
 
 def render_stitch_topnav():
-    """STITCH 스타일 상단 네비게이션 바 렌더링. 가로 배치."""
+    """STITCH v3 스타일 상단 네비게이션 바 렌더링."""
     current_page = st.session_state.get('page', 'intro')
+
+    # Top navigation bar with border
+    st.markdown('''
+    <style>
+    div[data-testid="stHorizontalBlock"]:first-of-type {
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        background: rgba(17,17,24,0.5);
+        backdrop-filter: blur(4px);
+        padding: 0.5rem 0;
+        margin-bottom: 1rem;
+    }
+    </style>
+    ''', unsafe_allow_html=True)
 
     # Logo + Navigation in columns
     logo_col, nav_col, status_col = st.columns([2, 6, 2])
 
     with logo_col:
-        st.markdown('<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;"><div style="width:36px;height:36px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 15px rgba(90,137,246,0.4);"><span style="font-size:20px;">🚀</span></div><div><span style="font-size:1rem;font-weight:700;color:white;">NovaRium</span></div></div>', unsafe_allow_html=True)
+        # 로고 크기 증가: 44px -> 48px, 폰트 1.125rem
+        st.markdown('''
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.25rem 0;">
+            <div style="width:44px;height:44px;background:linear-gradient(135deg,#1313ec 0%,#9333ea 100%);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(19,19,236,0.4);">
+                <span style="font-size:24px;">🚀</span>
+            </div>
+            <div>
+                <span style="font-size:1.25rem;font-weight:800;color:white;letter-spacing:-0.02em;">NovaRium</span>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
     with nav_col:
         nav_items = [
@@ -1287,7 +1310,14 @@ def render_stitch_topnav():
                     st.rerun()
 
     with status_col:
-        st.markdown('<div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;padding:0.75rem 0;"><div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,0.6);"></div><span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">시스템 정상</span></div>', unsafe_allow_html=True)
+        # 시스템 정상을 우측 정렬
+        st.markdown('''
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;padding:0.5rem 0;height:100%;">
+            <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px rgba(34,197,94,0.6);animation:pulse 2s infinite;"></div>
+            <span style="font-size:0.8125rem;color:rgba(255,255,255,0.6);font-weight:500;">시스템 정상</span>
+        </div>
+        <style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}</style>
+        ''', unsafe_allow_html=True)
 
 
 def render_stitch_header(breadcrumb: list = None, show_search: bool = True):

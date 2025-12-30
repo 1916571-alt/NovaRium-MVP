@@ -176,30 +176,150 @@ if not st.session_state['auth_checked']:
 st.session_state['use_db_coordination'] = True
 
 # =========================================================
-# PAGE: INTRO (BRAND IDENTITY) - STITCH Layout
+# PAGE: INTRO (BRAND IDENTITY) - STITCH v3 Welcome Screen
 # =========================================================
 if st.session_state['page'] == 'intro':
-    # STITCH Header
-    ui.render_stitch_header(breadcrumb=['Home', 'NovaRium'])
+    # Hero Section - 2 Column Layout (Text Left, Visual Right)
+    col_hero_left, col_hero_right = st.columns([7, 5], gap="large")
 
-    # Hero Section - STITCH Style (Compact)
-    st.markdown('<div style="text-align:center;padding:1.5rem 0 1rem 0;"><div style="display:flex;justify-content:center;margin-bottom:1rem;"><div style="width:56px;height:56px;background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);border-radius:1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(90,137,246,0.5);"><span style="font-size:28px;">🚀</span></div></div><h1 style="font-size:2rem;font-weight:800;background:linear-gradient(135deg,#ffffff 0%,#93c5fd 50%,#c4b5fd 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.5rem;letter-spacing:-0.03em;">Where Data Analysts are Born.</h1><p style="font-size:1rem;color:rgba(255,255,255,0.5);max-width:600px;margin:0 auto 1rem auto;line-height:1.5;">책으로만 배우는 A/B 테스트는 그만. 직접 경험하며 데이터 분석가로 다시 태어나세요.</p></div>', unsafe_allow_html=True)
+    with col_hero_left:
+        # Welcome Badge
+        st.markdown('''
+        <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.375rem 0.875rem;border-radius:9999px;background:rgba(19,19,236,0.1);border:1px solid rgba(19,19,236,0.3);margin-bottom:1.5rem;">
+            <span style="width:0.5rem;height:0.5rem;border-radius:50%;background:#1313ec;animation:pulse 2s infinite;"></span>
+            <span style="font-size:0.75rem;font-weight:700;color:#1313ec;text-transform:uppercase;letter-spacing:0.05em;">Welcome to NovaRium</span>
+        </div>
+        <style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style>
+        ''', unsafe_allow_html=True)
 
-    # Feature Cards - STITCH Grid (Compact)
-    st.markdown('<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:1rem;"><div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;"><div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;"><div style="width:36px;height:36px;background:rgba(90,137,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:18px;">✨</span></div><h3 style="margin:0;font-size:1rem;font-weight:700;color:#93c5fd;">Nova (New)</h3></div><p style="margin:0;font-size:0.875rem;line-height:1.5;color:rgba(255,255,255,0.6);">라틴어로 <strong style="color:white;">새로운</strong>이라는 뜻이자, <strong style="color:white;">초신성(Supernova)</strong>을 의미합니다.</p></div><div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;"><div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;"><div style="width:36px;height:36px;background:rgba(139,92,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;"><span style="font-size:18px;">🏛️</span></div><h3 style="margin:0;font-size:1rem;font-weight:700;color:#c4b5fd;">Arium (Place)</h3></div><p style="margin:0;font-size:0.875rem;line-height:1.5;color:rgba(255,255,255,0.6);">라틴어 접미사로 <strong style="color:white;">~을 위한 공간</strong> 또는 생태계를 뜻합니다.</p></div></div>', unsafe_allow_html=True)
+        # Main Headline
+        st.markdown('''
+        <h1 style="font-size:3.5rem;font-weight:700;line-height:1.1;letter-spacing:-0.025em;margin:0 0 1.5rem 0;">
+            <span style="display:block;background:linear-gradient(135deg,#ffffff 0%,#a5a5ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Where Data Analysts</span>
+            <span style="color:white;">are Born</span>
+        </h1>
+        ''', unsafe_allow_html=True)
 
-    # Mission Statement - STITCH Primary Button Style (Compact)
-    st.markdown('<div style="text-align:center;margin-top:0.5rem;"><div style="background:linear-gradient(135deg,#5a89f6 0%,#7c3aed 100%);padding:0.625rem 1.5rem;border-radius:9999px;display:inline-flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.875rem;box-shadow:0 0 20px rgba(90,137,246,0.4);color:white;"><span style="font-size:16px;">🎯</span><span>Mission: 데이터로 비즈니스를 움직이는 초신성을 위한 실전 생태계</span></div></div>', unsafe_allow_html=True)
+        # Subheadline
+        st.markdown('''
+        <p style="font-size:1.125rem;color:rgb(203,213,225);line-height:1.7;margin:0 0 2rem 0;max-width:560px;">
+            시뮬레이션에 참여하세요. 실험을 설계하고, 결과를 분석하며, 위험 부담 없는 우주적 샌드박스에서 A/B 테스트의 기술을 마스터하세요.
+        </p>
+        ''', unsafe_allow_html=True)
 
-    # Quick Stats Section - st.columns로 가로 배열 강제
-    st.markdown('<div style="height:1rem;"></div>', unsafe_allow_html=True)
+        # CTA Buttons
+        cta_col1, cta_col2, _ = st.columns([2, 2, 3])
+        with cta_col1:
+            if st.button("🚀 여정 시작하기", type="primary", use_container_width=True):
+                st.session_state['page'] = 'data_lab'
+                st.rerun()
+        with cta_col2:
+            if st.button("데모 둘러보기", use_container_width=True):
+                st.session_state['page'] = 'monitor'
+                st.rerun()
+
+        # Trust Indicators
+        st.markdown('''
+        <div style="display:flex;align-items:center;gap:2rem;margin-top:2.5rem;color:rgb(148,163,184);font-size:0.875rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="color:#1313ec;">🔬</span>
+                <span>10,000+ 시뮬레이션 실행</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="color:#1313ec;">👥</span>
+                <span>5,000+ 분석가 참여</span>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    with col_hero_right:
+        # Glass Card Visualization
+        st.markdown('''
+        <div style="position:relative;">
+            <!-- Decorative glow -->
+            <div style="position:absolute;inset:0;background:rgba(19,19,236,0.2);filter:blur(60px);border-radius:50%;transform:scale(0.9);"></div>
+
+            <!-- Glass Panel -->
+            <div style="position:relative;background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;box-shadow:0 4px 30px rgba(0,0,0,0.5);">
+                <!-- Header -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                    <div style="display:flex;gap:0.5rem;">
+                        <div style="width:0.75rem;height:0.75rem;border-radius:50%;background:rgba(239,68,68,0.8);"></div>
+                        <div style="width:0.75rem;height:0.75rem;border-radius:50%;background:rgba(234,179,8,0.8);"></div>
+                        <div style="width:0.75rem;height:0.75rem;border-radius:50%;background:rgba(34,197,94,0.8);"></div>
+                    </div>
+                    <span style="font-size:0.75rem;color:rgb(148,163,184);font-family:monospace;">SIMULATION_v4.2</span>
+                </div>
+
+                <!-- Center Element -->
+                <div style="display:flex;justify-content:center;align-items:center;padding:2rem 0;position:relative;">
+                    <div style="position:relative;width:8rem;height:8rem;border-radius:50%;border:2px solid rgba(19,19,236,0.3);display:flex;align-items:center;justify-content:center;">
+                        <div style="position:absolute;inset:0;background:rgba(19,19,236,0.1);border-radius:50%;animation:ping 2s infinite;opacity:0.2;"></div>
+                        <div style="width:6rem;height:6rem;border-radius:50%;background:linear-gradient(135deg,#1313ec 0%,#9333ea 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(19,19,236,0.5);">
+                            <span style="font-size:2.5rem;">📊</span>
+                        </div>
+
+                        <!-- Floating badges -->
+                        <div style="position:absolute;right:-3rem;top:0;background:rgba(16,16,34,0.8);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.375rem;">
+                            <span style="color:#22c55e;font-size:0.875rem;">📈</span>
+                            <span style="font-size:0.75rem;font-weight:700;color:white;">+24% Lift</span>
+                        </div>
+                        <div style="position:absolute;left:-3rem;bottom:0;background:rgba(16,16,34,0.8);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.375rem;">
+                            <span style="color:#3b82f6;font-size:0.875rem;">👥</span>
+                            <span style="font-size:0.75rem;font-weight:700;color:white;">Control: A</span>
+                        </div>
+                    </div>
+                </div>
+                <style>@keyframes ping{0%{transform:scale(1);opacity:0.2;}100%{transform:scale(1.5);opacity:0;}}</style>
+
+                <!-- Footer -->
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.05);font-size:0.75rem;font-family:monospace;color:rgb(148,163,184);">
+                    <span>Status: <span style="color:#22c55e;">Active</span></span>
+                    <span>Confidence: <span style="color:white;">98%</span></span>
+                </div>
+
+                <!-- Grid background -->
+                <div style="position:absolute;inset:0;opacity:0.05;background-image:linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px);background-size:20px 20px;pointer-events:none;border-radius:1rem;"></div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    # Feature Cards Section - 3 Column Layout
+    st.markdown('<div style="height:3rem;"></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
+
     with col1:
-        st.markdown('<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;text-align:center;"><div style="width:36px;height:36px;background:rgba(34,197,94,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem auto;"><span style="font-size:18px;">🔬</span></div><h3 style="margin:0 0 0.25rem 0;font-size:1.25rem;font-weight:800;color:white;">A/B 테스트</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.75rem;">가설 수립부터 통계 분석까지</p></div>', unsafe_allow_html=True)
+        st.markdown('''
+        <div style="background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;height:100%;transition:all 0.3s;">
+            <div style="width:3rem;height:3rem;background:rgba(34,197,94,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
+                <span style="font-size:1.5rem;">🔬</span>
+            </div>
+            <h3 style="margin:0 0 0.5rem 0;font-size:1.25rem;font-weight:700;color:white;">A/B 테스트</h3>
+            <p style="margin:0;color:rgb(148,163,184);font-size:0.875rem;line-height:1.6;">가설 수립부터 통계 분석까지 전 과정을 실습합니다.</p>
+        </div>
+        ''', unsafe_allow_html=True)
+
     with col2:
-        st.markdown('<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;text-align:center;"><div style="width:36px;height:36px;background:rgba(90,137,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem auto;"><span style="font-size:18px;">📊</span></div><h3 style="margin:0 0 0.25rem 0;font-size:1.25rem;font-weight:800;color:white;">실시간 모니터링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.75rem;">KPI 대시보드 구축 실습</p></div>', unsafe_allow_html=True)
+        st.markdown('''
+        <div style="background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;height:100%;transition:all 0.3s;">
+            <div style="width:3rem;height:3rem;background:rgba(59,130,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
+                <span style="font-size:1.5rem;">📊</span>
+            </div>
+            <h3 style="margin:0 0 0.5rem 0;font-size:1.25rem;font-weight:700;color:white;">실시간 모니터링</h3>
+            <p style="margin:0;color:rgb(148,163,184);font-size:0.875rem;line-height:1.6;">KPI 대시보드 구축 및 실시간 데이터 분석을 경험합니다.</p>
+        </div>
+        ''', unsafe_allow_html=True)
+
     with col3:
-        st.markdown('<div style="background:rgba(20,25,34,0.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1rem;text-align:center;"><div style="width:36px;height:36px;background:rgba(139,92,246,0.15);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem auto;"><span style="font-size:18px;">🗃️</span></div><h3 style="margin:0 0 0.25rem 0;font-size:1.25rem;font-weight:800;color:white;">데이터 엔지니어링</h3><p style="margin:0;color:rgba(255,255,255,0.5);font-size:0.75rem;">ETL 파이프라인 학습</p></div>', unsafe_allow_html=True)
+        st.markdown('''
+        <div style="background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;height:100%;transition:all 0.3s;">
+            <div style="width:3rem;height:3rem;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
+                <span style="font-size:1.5rem;">🗃️</span>
+            </div>
+            <h3 style="margin:0 0 0.5rem 0;font-size:1.25rem;font-weight:700;color:white;">데이터 엔지니어링</h3>
+            <p style="margin:0;color:rgb(148,163,184);font-size:0.875rem;line-height:1.6;">ETL 파이프라인 설계 및 데이터 마트 구축을 학습합니다.</p>
+        </div>
+        ''', unsafe_allow_html=True)
 
 # =========================================================
 # PAGE: DATA ENGINEERING LAB (NEW) - STITCH Design
