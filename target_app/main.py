@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -7,14 +7,12 @@ import uvicorn
 import duckdb
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import hashlib
 import uuid
 import threading
 import logging
 from typing import Optional
-import re
-import jwt
 
 # Try to load environment variables
 try:
@@ -70,59 +68,6 @@ def _ensure_ssl(url: str) -> str:
 
 DATABASE_URL = _ensure_ssl(_raw_database_url)
 logger.info(f"DB_MODE: {DB_MODE}, DATABASE_URL set: {bool(DATABASE_URL)}")
-
-# =========================================================
-# JWT Configuration
-# =========================================================
-JWT_SECRET = os.getenv('JWT_SECRET', 'novarium-secret-key-change-in-production')
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '168'))  # 7 days default
-
-def create_jwt_token(user_id: str, email: str, name: str, role: str) -> str:
-    """Create a JWT token for authenticated user."""
-    payload = {
-        'sub': user_id,
-        'email': email,
-        'name': name,
-        'role': role,
-        'iat': datetime.utcnow(),
-        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def verify_jwt_token(token: str) -> Optional[dict]:
-    """Verify and decode a JWT token. Returns payload or None if invalid."""
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        logger.warning("JWT token expired")
-        return None
-    except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid JWT token: {e}")
-        return None
-
-# =========================================================
-# Email Validation
-# =========================================================
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-
-def validate_email(email: str) -> bool:
-    """Validate email format."""
-    return bool(EMAIL_REGEX.match(email))
-
-def validate_password(password: str) -> tuple[bool, str]:
-    """
-    Validate password strength.
-    Returns (is_valid, error_message).
-    """
-    if len(password) < 8:
-        return False, "비밀번호는 8자 이상이어야 합니다"
-    if not re.search(r'[A-Za-z]', password):
-        return False, "비밀번호에 영문자가 포함되어야 합니다"
-    if not re.search(r'[0-9]', password):
-        return False, "비밀번호에 숫자가 포함되어야 합니다"
-    return True, ""
 
 # Singleton DB Connection (DuckDB for local, PostgreSQL pool for cloud)
 db_con = None
@@ -698,246 +643,10 @@ async def track_order(uid: str = Form(...), amount: float = Form(...), run_id: s
     log_event(uid, group, 'purchase', amount, run_id)
     return {"status": "success", "event": "order", "uid": uid}
 
-from pydantic import BaseModel, EmailStr
-import bcrypt
+from pydantic import BaseModel
 
 class SqlRequest(BaseModel):
     sql: str
-
-class SignupRequest(BaseModel):
-    email: str
-    password: str
-    name: str
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-# =========================================================
-# Auth Endpoints
-# =========================================================
-
-@app.post("/auth/signup")
-async def signup(body: SignupRequest):
-    """
-    Register a new platform user (analyst/admin).
-    - Validates email format and password strength
-    - Validates email uniqueness
-    - Hashes password with bcrypt
-    - Returns JWT token on success
-    """
-    try:
-        # Validate email format
-        if not validate_email(body.email):
-            return {"status": "error", "message": "올바른 이메일 형식이 아닙니다"}
-
-        # Validate password strength
-        is_valid, error_msg = validate_password(body.password)
-        if not is_valid:
-            return {"status": "error", "message": error_msg}
-
-        # Validate name
-        if not body.name or len(body.name.strip()) < 2:
-            return {"status": "error", "message": "이름은 2자 이상이어야 합니다"}
-
-        # Hash password
-        password_hash = bcrypt.hashpw(body.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        user_id = str(uuid.uuid4())
-
-        if is_cloud_mode():
-            pool = get_pg_pool()
-            if not pool:
-                return {"status": "error", "message": "Database connection unavailable"}
-
-            conn = pool.getconn()
-            try:
-                with conn.cursor() as cur:
-                    # Check if email already exists
-                    cur.execute("SELECT id FROM auth_users WHERE email = %s", (body.email,))
-                    if cur.fetchone():
-                        return {"status": "error", "message": "이미 등록된 이메일입니다"}
-
-                    # Insert new user
-                    cur.execute("""
-                        INSERT INTO auth_users (id, email, password_hash, name, role, created_at)
-                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                    """, (user_id, body.email, password_hash, body.name.strip(), 'analyst'))
-                conn.commit()
-                logger.info(f"New user registered: {body.email}")
-
-                # Create JWT token for immediate login
-                token = create_jwt_token(user_id, body.email, body.name.strip(), 'analyst')
-                return {
-                    "status": "success",
-                    "token": token,
-                    "user": {"id": user_id, "email": body.email, "name": body.name.strip(), "role": "analyst"}
-                }
-            finally:
-                pool.putconn(conn)
-        else:
-            # DuckDB mode
-            global db_con
-            if not db_con:
-                return {"status": "error", "message": "Database not connected"}
-
-            with db_lock:
-                # Check if email already exists
-                exists = db_con.execute("SELECT id FROM auth_users WHERE email = ?", [body.email]).fetchone()
-                if exists:
-                    return {"status": "error", "message": "이미 등록된 이메일입니다"}
-
-                # Insert new user
-                db_con.execute("""
-                    INSERT INTO auth_users (id, email, password_hash, name, role, created_at)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, [user_id, body.email, password_hash, body.name.strip(), 'analyst'])
-
-            logger.info(f"New user registered: {body.email}")
-
-            # Create JWT token for immediate login
-            token = create_jwt_token(user_id, body.email, body.name.strip(), 'analyst')
-            return {
-                "status": "success",
-                "token": token,
-                "user": {"id": user_id, "email": body.email, "name": body.name.strip(), "role": "analyst"}
-            }
-
-    except Exception as e:
-        logger.error(f"Signup error: {e}")
-        return {"status": "error", "message": str(e)}
-
-@app.post("/auth/login")
-async def login(body: LoginRequest):
-    """
-    Authenticate a platform user.
-    - Verifies email and password
-    - Returns JWT token on success
-    """
-    try:
-        if is_cloud_mode():
-            pool = get_pg_pool()
-            if not pool:
-                return {"status": "error", "message": "Database connection unavailable"}
-
-            conn = pool.getconn()
-            try:
-                with conn.cursor() as cur:
-                    # Find user by email
-                    cur.execute("""
-                        SELECT id, email, password_hash, name, role
-                        FROM auth_users WHERE email = %s
-                    """, (body.email,))
-                    user = cur.fetchone()
-
-                    if not user:
-                        return {"status": "error", "message": "이메일 또는 비밀번호가 올바르지 않습니다"}
-
-                    user_id, email, password_hash, name, role = user
-
-                    # Verify password
-                    if not bcrypt.checkpw(body.password.encode('utf-8'), password_hash.encode('utf-8')):
-                        return {"status": "error", "message": "이메일 또는 비밀번호가 올바르지 않습니다"}
-
-                    # Update last login time
-                    cur.execute("UPDATE auth_users SET last_login_at = CURRENT_TIMESTAMP WHERE id = %s", (user_id,))
-                conn.commit()
-
-                # Create JWT token
-                token = create_jwt_token(str(user_id), email, name, role)
-                logger.info(f"User logged in: {email}")
-                return {
-                    "status": "success",
-                    "token": token,
-                    "user": {"id": str(user_id), "email": email, "name": name, "role": role}
-                }
-            finally:
-                pool.putconn(conn)
-        else:
-            # DuckDB mode
-            global db_con
-            if not db_con:
-                return {"status": "error", "message": "Database not connected"}
-
-            with db_lock:
-                # Find user by email
-                result = db_con.execute("""
-                    SELECT id, email, password_hash, name, role
-                    FROM auth_users WHERE email = ?
-                """, [body.email]).fetchone()
-
-                if not result:
-                    return {"status": "error", "message": "이메일 또는 비밀번호가 올바르지 않습니다"}
-
-                user_id, email, password_hash, name, role = result
-
-                # Verify password
-                if not bcrypt.checkpw(body.password.encode('utf-8'), password_hash.encode('utf-8')):
-                    return {"status": "error", "message": "이메일 또는 비밀번호가 올바르지 않습니다"}
-
-                # Update last login time
-                db_con.execute("UPDATE auth_users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [user_id])
-
-            # Create JWT token
-            token = create_jwt_token(user_id, email, name, role)
-            logger.info(f"User logged in: {email}")
-            return {
-                "status": "success",
-                "token": token,
-                "user": {"id": user_id, "email": email, "name": name, "role": role}
-            }
-
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        return {"status": "error", "message": str(e)}
-
-@app.get("/auth/me")
-async def get_current_user(request: Request):
-    """
-    Get current user info from JWT token (in Authorization header or cookie).
-    JWT is stateless - no database lookup required for validation.
-    """
-    try:
-        # Get token from header or cookie
-        auth_header = request.headers.get("Authorization", "")
-        token = None
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-        else:
-            token = request.cookies.get("auth_token")
-
-        if not token:
-            return {"status": "error", "message": "인증 토큰이 없습니다"}
-
-        # Verify JWT token (stateless - no DB lookup needed)
-        payload = verify_jwt_token(token)
-        if not payload:
-            return {"status": "error", "message": "유효하지 않거나 만료된 토큰입니다"}
-
-        # Return user info from JWT payload (stateless)
-        return {
-            "status": "success",
-            "user": {
-                "id": payload.get('sub'),
-                "email": payload.get('email'),
-                "name": payload.get('name'),
-                "role": payload.get('role')
-            }
-        }
-
-    except Exception as e:
-        logger.error(f"Get user error: {e}")
-        return {"status": "error", "message": str(e)}
-
-@app.post("/auth/logout")
-async def logout(request: Request):
-    """
-    Logout endpoint.
-    With JWT, logout is handled client-side by removing the token.
-    This endpoint exists for API consistency.
-    """
-    # JWT is stateless - client just needs to delete the token
-    logger.info("User logged out (client should delete token)")
-    return {"status": "success", "message": "로그아웃 되었습니다"}
 
 @app.get("/admin/debug")
 async def debug_status():

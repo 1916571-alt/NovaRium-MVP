@@ -1019,3 +1019,142 @@ def render_stat_card(title: str, value: str, change: Optional[str] = None,
 def render_progress_steps(steps: list, current_step: int = 0, height: int = 80):
     """편의 함수: 진행 단계 렌더링"""
     get_factory().render_progress_steps(steps, current_step, height)
+
+
+# =============================================================================
+# MONITOR PAGE COMPONENTS - Stitch 스타일 모니터 대시보드 컴포넌트
+# =============================================================================
+
+def render_monitor_header(title: str = "실험 모니터", subtitle: str = "실시간 실험 현황을 모니터링하세요"):
+    """모니터 페이지 헤더 렌더링 - Stitch Glassmorphism 스타일"""
+    st.markdown(f'''
+    <div style="
+        background: rgba(20, 25, 35, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.5rem;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    ">
+        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(90, 137, 246, 0.1); border-radius: 50%; filter: blur(60px);"></div>
+        <div style="position: relative; z-index: 1;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="width: 8px; height: 8px; background: #5a89f6; border-radius: 50%;"></div>
+                <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5a89f6;">Dashboard</span>
+            </div>
+            <h1 style="margin: 0 0 0.5rem 0; font-size: 2rem; font-weight: 700; color: white; letter-spacing: -0.02em;">{title}</h1>
+            <p style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 1rem;">{subtitle}</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+
+def render_kpi_card(label: str, value: str, delta: str = None, delta_type: str = "positive", icon: str = "📊"):
+    """KPI 카드 렌더링 - Stitch Glassmorphism 스타일"""
+    delta_html = ""
+    if delta:
+        delta_color = "#10B981" if delta_type == "positive" else "#EF4444"
+        delta_arrow = "↑" if delta_type == "positive" else "↓"
+        delta_html = f'<div style="font-size: 0.75rem; color: {delta_color}; display: flex; align-items: center; gap: 4px;"><span>{delta_arrow}</span><span>{delta}</span></div>'
+
+    st.markdown(f'''
+    <div style="
+        background: rgba(20, 25, 35, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    ">
+        <div style="position: absolute; top: 0; right: 0; padding: 1rem; opacity: 0.15; font-size: 48px;">{icon}</div>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
+            <div style="padding: 8px; border-radius: 8px; background: rgba(90, 137, 246, 0.2); font-size: 20px;">{icon}</div>
+            <span style="font-size: 0.875rem; font-weight: 500; color: rgba(203, 213, 225, 1);">{label}</span>
+        </div>
+        <div style="font-size: 2rem; font-weight: 700; color: white; margin-bottom: 4px;">{value}</div>
+        {delta_html}
+    </div>
+    ''', unsafe_allow_html=True)
+
+
+def render_section_header(title: str, subtitle: str = None):
+    """섹션 헤더 렌더링 - Stitch 스타일"""
+    subtitle_html = ""
+    if subtitle:
+        subtitle_html = f'<p style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 0.875rem;">{subtitle}</p>'
+
+    st.markdown(f'''
+    <div style="margin: 2rem 0 1rem 0;">
+        <h2 style="margin: 0 0 0.25rem 0; font-size: 1.25rem; font-weight: 700; color: white; letter-spacing: -0.01em;">{title}</h2>
+        {subtitle_html}
+    </div>
+    ''', unsafe_allow_html=True)
+
+
+def render_alert_card(title: str, message: str, alert_type: str = "info"):
+    """알림 카드 렌더링 - Stitch Glassmorphism 스타일"""
+    colors = {
+        "success": {"border": "#10B981", "bg": "rgba(16, 185, 129, 0.1)", "icon": "✓"},
+        "warning": {"border": "#F59E0B", "bg": "rgba(245, 158, 11, 0.1)", "icon": "⚠"},
+        "error": {"border": "#EF4444", "bg": "rgba(239, 68, 68, 0.1)", "icon": "✕"},
+        "info": {"border": "#5a89f6", "bg": "rgba(90, 137, 246, 0.1)", "icon": "ℹ"},
+    }
+    style = colors.get(alert_type, colors["info"])
+
+    st.markdown(f'''
+    <div style="
+        background: {style["bg"]};
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 4px solid {style["border"]};
+        border-radius: 1rem;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    ">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="font-size: 1.25rem;">{style["icon"]}</span>
+            <div>
+                <div style="font-size: 0.875rem; font-weight: 600; color: white; margin-bottom: 0.25rem;">{title}</div>
+                <div style="font-size: 0.8125rem; color: rgba(255, 255, 255, 0.6);">{message}</div>
+            </div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+
+def render_auth_page_header(title: str = "NovaRium", subtitle: str = "계정에 로그인하여 실험을 계속하세요"):
+    """인증 페이지 헤더 렌더링 - Stitch Glassmorphism 스타일"""
+    st.markdown(f'''
+    <div style="
+        background: rgba(20, 25, 35, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1.5rem;
+        padding: 2.5rem 2rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    ">
+        <div style="position: absolute; top: -80px; left: 50%; transform: translateX(-50%); width: 300px; height: 200px; background: rgba(90, 137, 246, 0.15); border-radius: 50%; filter: blur(80px);"></div>
+        <div style="position: relative; z-index: 1;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1rem;">
+                <span style="font-size: 2.5rem;">🚀</span>
+                <h1 style="margin: 0; font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #ffffff 0%, #a5a5ff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">{title}</h1>
+            </div>
+            <p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 1.125rem; line-height: 1.5;">{subtitle}</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)

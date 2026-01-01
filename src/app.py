@@ -12,9 +12,6 @@ import os
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# STITCH Wizard Components
-from src.ui.stitch_wizard import render_hypothesis_wizard, render_design_builder, render_analysis_dashboard
-
 # Kill old Streamlit instances on different ports (Windows only)
 if os.name == 'nt':  # Windows
     import subprocess
@@ -73,10 +70,9 @@ if 'use_db_coordination' not in st.session_state: st.session_state['use_db_coord
 
 # --- APPLY STYLES & HEADER ---
 ui.apply_custom_css()
+ui.render_navbar()
 
-# STITCH 레이아웃: 상단 네비게이션 바
-ui.render_stitch_topnav()
-ui.stitch_content_start()
+st.write("") # Spacer
 
 # con = al.get_connection() # [REMOVED] Global connection causes locking issues
 # DB_PATH will be used for specific query connections
@@ -84,332 +80,222 @@ DB_PATH = al.DB_PATH
 
 # Import DB write utilities
 from src.data.db import safe_write_batch
-import requests
-import re
 
 # =========================================================
-# Authentication Session State
+# GLOBAL SIDEBAR: System Settings (visible on all pages)
 # =========================================================
-if 'auth_user' not in st.session_state:
-    st.session_state['auth_user'] = None
-if 'auth_token' not in st.session_state:
-    st.session_state['auth_token'] = None
-if 'auth_checked' not in st.session_state:
-    st.session_state['auth_checked'] = False
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### ⚙️ 시스템 설정")
 
-# =========================================================
-# Authentication Functions
-# =========================================================
-def validate_email_format(email: str) -> bool:
-    """Validate email format on client side."""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
+    # DB Coordination Mode Toggle
+    use_coordination = st.checkbox(
+        "🔄 DB 협조 모드",
+        value=st.session_state.get('use_db_coordination', True),
+        help="Target App과 DB 연결을 조율합니다. 저장 오류 시 체크 해제하여 레거시 모드로 전환 가능."
+    )
+    st.session_state['use_db_coordination'] = use_coordination
 
-def validate_password_strength(password: str) -> tuple:
-    """
-    Validate password strength on client side.
-    Returns (is_valid, error_message).
-    """
-    if len(password) < 8:
-        return False, "비밀번호는 8자 이상이어야 합니다"
-    if not re.search(r'[A-Za-z]', password):
-        return False, "비밀번호에 영문자가 포함되어야 합니다"
-    if not re.search(r'[0-9]', password):
-        return False, "비밀번호에 숫자가 포함되어야 합니다"
-    return True, ""
-
-def auth_signup(email: str, password: str, name: str) -> dict:
-    """Register a new user via API. Returns JWT token on success."""
-    try:
-        resp = requests.post(
-            f"{TARGET_APP_URL}/auth/signup",
-            json={"email": email, "password": password, "name": name},
-            timeout=10
-        )
-        return resp.json()
-    except Exception as e:
-        return {"status": "error", "message": f"서버 연결 실패: {str(e)}"}
-
-def auth_login(email: str, password: str) -> dict:
-    """Login user via API. Returns JWT token on success."""
-    try:
-        resp = requests.post(
-            f"{TARGET_APP_URL}/auth/login",
-            json={"email": email, "password": password},
-            timeout=10
-        )
-        return resp.json()
-    except Exception as e:
-        return {"status": "error", "message": f"서버 연결 실패: {str(e)}"}
-
-def auth_verify_token(token: str) -> dict:
-    """Verify JWT token and get user info."""
-    try:
-        resp = requests.get(
-            f"{TARGET_APP_URL}/auth/me",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10
-        )
-        return resp.json()
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-def auth_logout():
-    """Logout current user (clear session state)."""
-    st.session_state['auth_user'] = None
-    st.session_state['auth_token'] = None
-    st.session_state['auth_checked'] = False
+    if use_coordination:
+        st.caption("✅ 권장: Target App과 DB 조율")
+    else:
+        st.warning("⚠️ 레거시 모드")
+        st.caption("Target App 미실행 시만 사용")
 
 # =========================================================
-# Restore Login State from Query Params (for persistence)
-# =========================================================
-# Check if token exists in query params (for page refresh persistence)
-query_params = st.query_params
-if not st.session_state['auth_checked']:
-    stored_token = query_params.get('_auth_token', None)
-    if stored_token and not st.session_state.get('auth_user'):
-        # Verify the stored token
-        result = auth_verify_token(stored_token)
-        if result.get("status") == "success":
-            st.session_state['auth_user'] = result.get("user")
-            st.session_state['auth_token'] = stored_token
-    st.session_state['auth_checked'] = True
-
-# DB Coordination Mode (default enabled, no UI needed)
-st.session_state['use_db_coordination'] = True
-
-# =========================================================
-# PAGE: INTRO (BRAND IDENTITY) - STITCH v3 Welcome Screen
+# PAGE: INTRO (BRAND IDENTITY)
 # =========================================================
 if st.session_state['page'] == 'intro':
-    # Hero Section - 2 Column Layout (Text Left, Visual Right)
-    col_hero_left, col_hero_right = st.columns([7, 5], gap="large")
-
-    with col_hero_left:
-        # Welcome Badge
-        st.markdown('''
-        <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.375rem 0.875rem;border-radius:9999px;background:rgba(19,19,236,0.1);border:1px solid rgba(19,19,236,0.3);margin-bottom:1.5rem;">
-            <span style="width:0.5rem;height:0.5rem;border-radius:50%;background:#1313ec;animation:pulse 2s infinite;"></span>
-            <span style="font-size:0.75rem;font-weight:700;color:#1313ec;text-transform:uppercase;letter-spacing:0.05em;">Welcome to NovaRium</span>
-        </div>
-        <style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style>
-        ''', unsafe_allow_html=True)
-
-        # Main Headline
-        st.markdown('''
-        <h1 style="font-size:3.5rem;font-weight:700;line-height:1.1;letter-spacing:-0.025em;margin:0 0 1.5rem 0;">
-            <span style="display:block;background:linear-gradient(135deg,#ffffff 0%,#a5a5ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Where Data Analysts</span>
-            <span style="color:white;">are Born</span>
+    st.markdown("""
+    <div style="text-align: center; padding: 50px 0;">
+        <h1 style="font-size: 3.5rem; background: linear-gradient(to right, #818CF8, #C084FC); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;">
+            Where Data Analysts are Born.
         </h1>
-        ''', unsafe_allow_html=True)
-
-        # Subheadline
-        st.markdown('''
-        <p style="font-size:1.125rem;color:rgb(203,213,225);line-height:1.7;margin:0 0 2rem 0;max-width:560px;">
-            시뮬레이션에 참여하세요. 실험을 설계하고, 결과를 분석하며, 위험 부담 없는 우주적 샌드박스에서 A/B 테스트의 기술을 마스터하세요.
+        <p style="font-size: 1.2rem; margin-bottom: 40px; color: rgba(255,255,255,0.7);">
+            "책으로만 배우는 A/B 테스트는 그만. 직접 경험하며 데이터 분석가로 다시 태어나세요."
         </p>
-        ''', unsafe_allow_html=True)
-
-        # CTA Buttons
-        cta_col1, cta_col2, _ = st.columns([2, 2, 3])
-        with cta_col1:
-            if st.button("🚀 여정 시작하기", type="primary", use_container_width=True):
-                st.session_state['page'] = 'data_lab'
-                st.rerun()
-        with cta_col2:
-            if st.button("데모 둘러보기", use_container_width=True):
-                st.session_state['page'] = 'monitor'
-                st.rerun()
-
-        # Trust Indicators
-        st.markdown('''
-        <div style="display:flex;align-items:center;gap:2rem;margin-top:2.5rem;color:rgb(148,163,184);font-size:0.875rem;">
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-                <span style="color:#1313ec;">🔬</span>
-                <span>10,000+ 시뮬레이션 실행</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-                <span style="color:#1313ec;">👥</span>
-                <span>5,000+ 분석가 참여</span>
-            </div>
+    </div>
+    
+    <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 50px;">
+        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; width: 45%; border: 1px solid rgba(255,255,255,0.1);">
+            <h3 style="color: #A78BFA; margin-bottom: 15px;">✨ Nova (New)</h3>
+            <p style="font-size: 1.1rem; line-height: 1.6;">
+                라틴어로 <strong>'새로운'</strong>이라는 뜻이자, 우주를 밝히는 <strong>초신성(Supernova)</strong>을 의미합니다.<br>
+                데이터의 홍수 속에서 인사이트를 발견하고 비즈니스를 밝히는 여러분을 상징합니다.
+            </p>
         </div>
-        ''', unsafe_allow_html=True)
-
-    with col_hero_right:
-        # Glass Card Visualization (주석 제거)
-        st.markdown('''
-        <div style="position:relative;">
-            <div style="position:absolute;inset:0;background:rgba(19,19,236,0.2);filter:blur(60px);border-radius:50%;transform:scale(0.9);"></div>
-            <div style="position:relative;background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;box-shadow:0 4px 30px rgba(0,0,0,0.5);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-                    <div style="display:flex;gap:0.5rem;">
-                        <div style="width:0.75rem;height:0.75rem;border-radius:50%;background:rgba(239,68,68,0.8);"></div>
-                        <div style="width:0.75rem;height:0.75rem;border-radius:50%;background:rgba(234,179,8,0.8);"></div>
-                        <div style="width:0.75rem;height:0.75rem;border-radius:50%;background:rgba(34,197,94,0.8);"></div>
-                    </div>
-                    <span style="font-size:0.75rem;color:rgb(148,163,184);font-family:monospace;">SIMULATION_v4.2</span>
-                </div>
-                <div style="display:flex;justify-content:center;align-items:center;padding:2rem 0;position:relative;">
-                    <div style="position:relative;width:8rem;height:8rem;border-radius:50%;border:2px solid rgba(19,19,236,0.3);display:flex;align-items:center;justify-content:center;">
-                        <div style="position:absolute;inset:0;background:rgba(19,19,236,0.1);border-radius:50%;animation:ping 2s infinite;opacity:0.2;"></div>
-                        <div style="width:6rem;height:6rem;border-radius:50%;background:linear-gradient(135deg,#1313ec 0%,#9333ea 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(19,19,236,0.5);">
-                            <span style="font-size:2.5rem;">📊</span>
-                        </div>
-                        <div style="position:absolute;right:-3rem;top:0;background:rgba(16,16,34,0.8);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.375rem;">
-                            <span style="color:#22c55e;font-size:0.875rem;">📈</span>
-                            <span style="font-size:0.75rem;font-weight:700;color:white;">+24% Lift</span>
-                        </div>
-                        <div style="position:absolute;left:-3rem;bottom:0;background:rgba(16,16,34,0.8);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;align-items:center;gap:0.375rem;">
-                            <span style="color:#3b82f6;font-size:0.875rem;">👥</span>
-                            <span style="font-size:0.75rem;font-weight:700;color:white;">Control: A</span>
-                        </div>
-                    </div>
-                </div>
-                <style>@keyframes ping{0%{transform:scale(1);opacity:0.2;}100%{transform:scale(1.5);opacity:0;}}</style>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.05);font-size:0.75rem;font-family:monospace;color:rgb(148,163,184);">
-                    <span>Status: <span style="color:#22c55e;">Active</span></span>
-                    <span>Confidence: <span style="color:white;">98%</span></span>
-                </div>
-                <div style="position:absolute;inset:0;opacity:0.05;background-image:linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px);background-size:20px 20px;pointer-events:none;border-radius:1rem;"></div>
-            </div>
+        <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; width: 45%; border: 1px solid rgba(255,255,255,0.1);">
+            <h3 style="color: #A78BFA; margin-bottom: 15px;">🏛️ Arium (Place)</h3>
+            <p style="font-size: 1.1rem; line-height: 1.6;">
+                라틴어 접미사로 <strong>'~을 위한 공간'</strong> 또는 '생태계'를 뜻합니다.<br>
+                예비 분석가들이 마음껏 가설을 세우고, 실패하고, 성장할 수 있는 안전한 훈련소입니다.
+            </p>
         </div>
-        ''', unsafe_allow_html=True)
-
-    # Feature Cards Section - 3 Column Layout
-    st.markdown('<div style="height:3rem;"></div>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown('''
-        <div style="background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;height:100%;transition:all 0.3s;">
-            <div style="width:3rem;height:3rem;background:rgba(34,197,94,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
-                <span style="font-size:1.5rem;">🔬</span>
-            </div>
-            <h3 style="margin:0 0 0.5rem 0;font-size:1.25rem;font-weight:700;color:white;">A/B 테스트</h3>
-            <p style="margin:0;color:rgb(148,163,184);font-size:0.875rem;line-height:1.6;">가설 수립부터 통계 분석까지 전 과정을 실습합니다.</p>
+    </div>
+    
+    <div style="text-align: center;">
+        <div style="background: linear-gradient(90deg, #6366F1, #8B5CF6); padding: 15px 30px; border-radius: 50px; display: inline-block; font-weight: bold; font-size: 1.2rem; box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);">
+            🚀 Mission: "데이터로 비즈니스를 움직이는 초신성(Analyst)을 위한 실전 생태계"
         </div>
-        ''', unsafe_allow_html=True)
-
-    with col2:
-        st.markdown('''
-        <div style="background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;height:100%;transition:all 0.3s;">
-            <div style="width:3rem;height:3rem;background:rgba(59,130,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
-                <span style="font-size:1.5rem;">📊</span>
-            </div>
-            <h3 style="margin:0 0 0.5rem 0;font-size:1.25rem;font-weight:700;color:white;">실시간 모니터링</h3>
-            <p style="margin:0;color:rgb(148,163,184);font-size:0.875rem;line-height:1.6;">KPI 대시보드 구축 및 실시간 데이터 분석을 경험합니다.</p>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col3:
-        st.markdown('''
-        <div style="background:rgba(16,16,34,0.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:1rem;padding:1.5rem;height:100%;transition:all 0.3s;">
-            <div style="width:3rem;height:3rem;background:rgba(139,92,246,0.15);border-radius:0.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
-                <span style="font-size:1.5rem;">🗃️</span>
-            </div>
-            <h3 style="margin:0 0 0.5rem 0;font-size:1.25rem;font-weight:700;color:white;">데이터 엔지니어링</h3>
-            <p style="margin:0;color:rgb(148,163,184);font-size:0.875rem;line-height:1.6;">ETL 파이프라인 설계 및 데이터 마트 구축을 학습합니다.</p>
-        </div>
-        ''', unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
 # =========================================================
-# PAGE: DATA ENGINEERING LAB (NEW) - STITCH Design
+# PAGE: DATA ENGINEERING LAB (NEW)
 # =========================================================
 elif st.session_state['page'] == 'data_lab':
-    # --- STITCH HEADER: Page Title with Badge ---
-    st.markdown('<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:2rem;"><div style="display:flex;align-items:center;gap:1rem;"><h2 style="margin:0;font-size:1.875rem;font-weight:900;letter-spacing:-0.025em;color:white;">데이터 마트 생성: A/B 테스트 결과</h2></div><p style="color:rgb(148,163,184);font-size:0.875rem;margin:0;">지표를 선택하고 데이터 계보를 확인하여 데이터 마트를 구축하세요.</p></div>', unsafe_allow_html=True)
-
-    col_setup, col_code, col_lineage = st.columns([3, 6, 3], gap="medium")
+    st.markdown("## 🛠️ 데이터 엔지니어링 랩 (Data Mart Builder)")
+    st.caption("비즈니스 대시보드를 구축하기 위해 먼저 Raw Data를 분석 가능한 'Data Mart'로 가공해야 합니다.")
     
-    # --- STITCH COLUMN 1: Select Metrics Panel ---
+    col_setup, col_code = st.columns([1, 1.2], gap="large")
+    
     with col_setup:
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;height:100%;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#3b82f6;">⚙️</span> 지표 선택</h3>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("### 1. 마트 설계 (Schema Design)")
+            st.info("💡 분석가님, 대시보드에서 어떤 지표를 보고 싶으신가요?")
+            
+            # Default metrics
+            metrics = st.multiselect(
+                "포함할 핵심 지표 (Metrics)",
+                options=['total_users (DAU)', 'revenue (매출)', 'ctr (클릭률)', 'cvr (전환율)', 'aov (객단가)', 'arpu (인당 매출)', 'session_depth (인당 활동량)'],
+                default=['total_users (DAU)', 'revenue (매출)', 'ctr (클릭률)', 'cvr (전환율)', 'aov (객단가)']
+            )
+            
+            # Helper logic to parse selection to clean keys
+            clean_metrics = []
+            if any('revenue' in m for m in metrics): clean_metrics.append('revenue')
+            if any('ctr' in m for m in metrics): clean_metrics.append('ctr')
+            if any('cvr' in m for m in metrics): clean_metrics.append('cvr')
+            if any('aov' in m for m in metrics): clean_metrics.append('aov')
+            if any('arpu' in m for m in metrics): clean_metrics.append('arpu')
+            if any('session_depth' in m for m in metrics): clean_metrics.append('session_depth')
+            
+            st.write("")
+            if st.button("🚀 데이터 마트 구축 (Build & Run)", type="primary", width="stretch"):
+                # Execute ETL
+                with st.spinner("ETL 파이프라인 가동 중... (Airflow Task #101)"):
+                    try:
+                        # 1. Generate SQL
+                        sql = mb.generate_mart_sql(clean_metrics)
+                        
+                        # 2. Execute
+                        # 2. Execute via Server API (Avoids Locking)
+                        import requests
+                        try:
+                            resp = requests.post(
+                                f"{TARGET_APP_URL}/admin/execute_sql",
+                                json={"sql": sql},
+                                timeout=30
+                            )
+                            if resp.status_code != 200:
+                                raise Exception(f"Server API Error: {resp.text}")
+                            
+                            r_json = resp.json()
+                            if r_json.get("status") != "success":
+                                raise Exception(f"SQL Error: {r_json.get('message')}")
+                                
+                            # 3. Validation (Use Read-Only via stats.py)
+                            check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
+                            df_res = al.run_query(check_sql)
+                            row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
+                            
+                            st.success(f"구축 완료! 총 {row_count:,}개의 일별 데이터가 적재되었습니다.")
+                            
+                        except requests.exceptions.ConnectionError:
+                             st.error(f"서버 연결 실패: Target App({TARGET_APP_URL})에 연결할 수 없습니다.")
+                             st.info("💡 Render 백엔드가 아직 시작 중일 수 있습니다. 30초 후 다시 시도해주세요.")
+                             raise
+                        except Exception as e:
+                             raise e
 
-        # STITCH style multiselect - 전체 선택 기본값
-        all_metrics = ['Active Users (DAU)', 'Conversion Rate', 'Avg Order Value', 'Retention 7d', 'Session Duration', 'Revenue', 'CTR']
-        metrics = st.multiselect(
-            "포함할 핵심 지표",
-            options=all_metrics,
-            default=all_metrics,
-            label_visibility="collapsed"
-        )
+                        # Move to dashboard
+                        import time
+                        time.sleep(1)
+                        st.session_state['page'] = 'monitor'
+                        st.rerun()
 
-        # Helper logic to parse selection to clean keys
-        clean_metrics = []
-        if any('Revenue' in m for m in metrics): clean_metrics.append('revenue')
-        if any('CTR' in m for m in metrics): clean_metrics.append('ctr')
-        if any('Conversion' in m for m in metrics): clean_metrics.append('cvr')
-        if any('Avg Order' in m for m in metrics): clean_metrics.append('aov')
-        if any('Active Users' in m for m in metrics): clean_metrics.append('arpu')
-        if any('Session' in m for m in metrics): clean_metrics.append('session_depth')
+                    except Exception as e:
+                        error_msg = str(e)
+                        st.error(f"ETL 실패: {error_msg}")
 
-        # Selected chips display
-        if metrics:
-            chips_html = '<div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:1rem 0;">'
-            for m in metrics:
-                chips_html += f'<span style="display:flex;align-items:center;gap:0.375rem;padding:0.25rem 0.75rem;border-radius:9999px;background:rgba(37,99,244,0.2);border:1px solid rgba(37,99,244,0.3);font-size:0.75rem;font-weight:500;color:#93c5fd;">{m}</span>'
-            chips_html += '</div>'
-            st.markdown(chips_html, unsafe_allow_html=True)
+                        # Show detailed diagnostics for connection errors
+                        if "pool not available" in error_msg.lower() or "connection" in error_msg.lower():
+                            with st.expander("🔍 상세 진단 정보"):
+                                st.markdown(f"""
+                                **Target App URL**: `{TARGET_APP_URL}`
 
-        st.markdown('</div>', unsafe_allow_html=True)
+                                **가능한 원인**:
+                                1. 🔄 Render 서버가 아직 시작 중 (Free tier는 15분 비활성화 후 Sleep)
+                                2. 🔐 DATABASE_URL 환경 변수가 잘못 설정됨
+                                3. 🌐 네트워크 연결 문제 (IPv6 vs IPv4)
 
-    # --- STITCH COLUMN 2: SQL Preview Panel ---
+                                **해결 방법**:
+                                1. Render Dashboard에서 Manual Deploy 실행
+                                2. `{TARGET_APP_URL}/debug/db-status?force_retry=true` 접속하여 상태 확인
+                                3. Streamlit Cloud Secrets에 DATABASE_URL 확인
+                                """)
+
+                                # Try to get debug info from server
+                                try:
+                                    debug_resp = requests.get(f"{TARGET_APP_URL}/debug/db-status", timeout=10)
+                                    if debug_resp.status_code == 200:
+                                        st.json(debug_resp.json())
+                                except Exception:
+                                    st.warning("백엔드 서버에 연결할 수 없어 상세 정보를 가져올 수 없습니다.")
+
+            st.divider()
+
+            # Data Lineage Explanation Only
+            st.markdown("**📖 데이터 흐름 (Data Lineage)**")
+            st.markdown("""
+            **Raw Data → Data Mart 변환 과정**
+
+            1. **Raw Assignments** (방문 기록)
+               - `user_id`, `variant`, `assigned_at` 등 원천 데이터
+
+            2. **Raw Events** (행동 기록)
+               - `event_name` (click_banner, purchase 등)
+               - `value` (구매 금액)
+
+            3. **JOIN & AGGREGATE** (결합 및 집계)
+               - 사용자별로 이벤트를 집계
+               - 날짜별로 그룹화
+
+            4. **Data Mart** (분석 전용 테이블)
+               - CTR, CVR, AOV, ARPU 등 지표가 미리 계산됨
+               - 대시보드에서 빠르게 조회 가능
+                """)
+
     with col_code:
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;overflow:hidden;height:100%;position:relative;"><div style="position:absolute;inset:-1px;background:linear-gradient(to right,rgba(37,99,244,0.2),transparent,rgba(139,92,246,0.2));border-radius:0.75rem;opacity:0.5;pointer-events:none;"></div><div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(11,14,20,0.3);"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#a78bfa;">💻</span> SQL 미리보기</h3></div>', unsafe_allow_html=True)
-
+        st.markdown("### 2. SQL 쿼리 생성기 (Query Generator)")
+        st.caption("선택하신 설계에 따라 자동으로 생성된 ETL 쿼리입니다. 현업에서는 이 코드가 Airflow에서 매일 새벽에 실행됩니다.")
+        
         # Real-time SQL Generation
         generated_sql = mb.generate_mart_sql(clean_metrics)
         st.code(generated_sql, language="sql")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- STITCH COLUMN 3: Lineage & Action Panel ---
-    with col_lineage:
-        # Lineage Panel
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;margin-bottom:1rem;"><h3 style="font-size:0.875rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 1.5rem 0;display:flex;align-items:center;gap:0.5rem;"><span style="color:#22c55e;">🌳</span> 데이터 계보</h3><div style="position:relative;padding-left:1rem;border-left:2px dashed rgba(100,116,139,0.5);"><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">원천</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">🗃️</span><span style="font-size:0.875rem;color:rgb(226,232,240);">raw.events</span></div></div><div style="margin-bottom:2rem;position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:#3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div><span style="font-size:0.75rem;font-weight:600;color:#3b82f6;text-transform:uppercase;">변환</span><div style="background:rgba(37,99,244,0.1);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(37,99,244,0.2);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:#3b82f6;">⚡</span><span style="font-size:0.875rem;color:white;">집계</span></div></div><div style="position:relative;"><div style="position:absolute;left:-1.3rem;top:0.25rem;width:0.625rem;height:0.625rem;border-radius:50%;background:rgb(100,116,139);"></div><span style="font-size:0.75rem;font-weight:600;color:rgb(148,163,184);text-transform:uppercase;">적재</span><div style="background:rgba(11,14,20,0.6);padding:0.75rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.1);margin-top:0.25rem;display:flex;align-items:center;gap:0.75rem;"><span style="color:rgb(148,163,184);">📊</span><span style="font-size:0.875rem;color:rgb(226,232,240);">dm_daily_kpi</span></div></div></div></div>', unsafe_allow_html=True)
-
-        # Action Panel
-        st.markdown('<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.25rem;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><span style="font-size:0.75rem;font-weight:500;color:rgb(148,163,184);">예상 소요시간</span><span style="font-size:0.75rem;font-weight:700;color:white;">약 45초</span></div>', unsafe_allow_html=True)
-
-        if st.button("🚀 ETL 실행", type="primary", use_container_width=True):
-            with st.spinner("ETL 파이프라인 가동 중..."):
-                try:
-                    sql = mb.generate_mart_sql(clean_metrics)
-                    # Supabase/PostgreSQL 직접 실행
-                    from src.data.db import is_cloud_mode, get_pg_connection, safe_write_execute
-                    if is_cloud_mode():
-                        # Supabase PostgreSQL 직접 실행
-                        with get_pg_connection() as conn:
-                            cursor = conn.cursor()
-                            cursor.execute(sql)
-                            conn.commit()
-                        result = {"status": "success"}
-                    else:
-                        # DuckDB 로컬 실행
-                        result = safe_write_execute(sql, use_coordination=False)
-
-                    if result.get("status") != "success":
-                        raise Exception(f"SQL Error: {result.get('message')}")
-
-                    check_sql = "SELECT COUNT(*) as cnt FROM dm_daily_kpi"
-                    df_res = al.run_query(check_sql)
-                    row_count = df_res.iloc[0]['cnt'] if not df_res.empty else 0
-                    st.success(f"✅ 구축 완료! {row_count:,}개 데이터 적재")
-                    import time
-                    time.sleep(1)
-                    st.session_state['page'] = 'monitor'
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"ETL 실패: {str(e)}")
-
-        st.markdown('<div style="margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;"><div style="width:0.5rem;height:0.5rem;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;"></div><span style="font-size:0.75rem;color:#22c55e;font-weight:500;">시스템 정상</span></div></div>', unsafe_allow_html=True)
+        
+        st.markdown("""
+        > [!NOTE]
+        > **왜 SQL을 직접 짜지 않고 생성하나요?**  
+        > 데이터 엔지니어링에서는 휴먼 에러를 줄이기 위해, 메타데이터(설계)를 기반으로 쿼리를 자동 생성(Templating)하는 방식을 자주 사용합니다.
+        """)
 
 # =========================================================
-# PAGE: SITUATION ROOM (DASHBOARD) - STITCH Design
+# PAGE: SITUATION ROOM (DASHBOARD)
 # =========================================================
 if st.session_state['page'] == 'monitor':
-    # --- STITCH HEADER: Page Title with Live Badge ---
-    st.markdown('<style>@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}</style><div style="display:flex;flex-direction:column;gap:1.5rem;margin-bottom:2.5rem;"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:1.5rem;"><div style="display:flex;flex-direction:column;gap:0.5rem;"><div style="display:flex;align-items:center;gap:0.5rem;color:#5a89f6;font-size:0.875rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;"><span style="width:0.5rem;height:0.5rem;border-radius:50%;background:#5a89f6;animation:pulse 2s infinite;"></span>실시간 대시보드</div><h2 style="margin:0;font-size:2.5rem;font-weight:700;letter-spacing:-0.025em;color:white;">시뮬레이션 모니터</h2><p style="color:rgb(148,163,184);font-size:1.125rem;margin:0;">A/B 테스트 환경의 실시간 인사이트를 확인하세요.</p></div><div style="display:flex;align-items:center;gap:1rem;"><div style="display:flex;padding:0.25rem;background:rgba(255,255,255,0.05);backdrop-filter:blur(4px);border-radius:9999px;border:1px solid rgba(255,255,255,0.05);"><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">24시간</button><button style="padding:0.5rem 1rem;border-radius:9999px;background:rgba(255,255,255,0.1);color:white;font-size:0.875rem;font-weight:500;border:1px solid rgba(255,255,255,0.05);cursor:pointer;">7일</button><button style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.875rem;font-weight:500;color:rgb(148,163,184);background:transparent;border:none;cursor:pointer;">30일</button></div></div></div></div>', unsafe_allow_html=True)
+    # --- HEADER SECTION ---
+    st.markdown("""
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <div>
+            <h2 style="margin:0;">🛸 종합 상황실 (Operations Center)</h2>
+            <p style="margin:0; opacity:0.7;">NovaEats 서비스의 실시간 매출 및 운영 현황을 모니터링합니다.</p>
+        </div>
+        <div style="text-align:right;">
+            <span style="background:rgba(74, 222, 128, 0.1); color:#4ade80; padding:4px 12px; border-radius:15px; font-size:0.8rem; font-weight:bold;">● Live System Online</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     check_history = al.run_query("SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'")
     has_history = not check_history.empty and check_history.iloc[0, 0] > 0
@@ -419,12 +305,88 @@ if st.session_state['page'] == 'monitor':
         if st.button("🔄 데이터 초기화 (Reset)", type="primary"):
             st.info("터미널에서 `python scripts/generate_history.py`를 실행하세요.")
     else:
-        # --- BUSINESS INTELLIGENCE (FROM MART) ---
-        st.markdown('''<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
-<div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>
-<h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; color: white;">비즈니스 분석</h2>
-<span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Business Intelligence</span>
-</div>''', unsafe_allow_html=True)
+        # --- TIER 1: REAL-TIME PULSE (LIVE) ---
+        st.markdown("### 🟢 실시간 운영 현황 (Real-time Pulse)")
+
+        # Real-time Queries (No Random Simulation)
+        # 1. Active Users (Last 30 mins)
+        sql_live = """
+            SELECT 
+                COUNT(DISTINCT user_id) as active_users,
+                (SELECT COUNT(*) FROM events 
+                 WHERE event_name = 'purchase' 
+                 AND timestamp >= CURRENT_DATE) as today_orders,
+                 (SELECT COALESCE(SUM(value), 0) FROM events 
+                 WHERE event_name = 'purchase' 
+                 AND timestamp >= CURRENT_DATE) as today_revenue
+            FROM events 
+            WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 MINUTE
+        """
+        live_stats = al.run_query(sql_live)
+        
+        if not live_stats.empty:
+            now_users = live_stats.iloc[0]['active_users']
+            today_orders = live_stats.iloc[0]['today_orders']
+            today_rev = live_stats.iloc[0]['today_revenue']
+        else:
+            now_users, today_orders, today_rev = 0, 0, 0
+
+        # Server Latency Check (Real Ping)
+        import time
+        import requests
+        start_time = time.time()
+        latency_ms = 0
+        server_status = "Offline"
+        
+        try:
+             # Check Target App server
+             requests.get(TARGET_APP_URL, timeout=3)
+             latency_ms = int((time.time() - start_time) * 1000)
+             server_status = "Online"
+        except:
+             latency_ms = 0
+             server_status = "Down"
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("현재 접속자 (30min)", f"{now_users}명", "Real-time")
+        with c2:
+            st.metric("오늘 매출 (Values)", f"₩{int(today_rev):,}", f"{today_orders} Orders")
+        with c3:
+            st.metric("시스템 상태 (Health)", server_status, f"{latency_ms}ms")
+        with c4:
+             st.metric("데이터 마트 (ETL)", "Sync Active", "Daily Updated")
+             
+        # Recent Events (Real DB Fetch)
+        st.caption("🔊 Recent Events Log (Real DB)")
+        
+        sql_log = """
+            SELECT user_id, event_name, value, timestamp 
+            FROM events 
+            ORDER BY timestamp DESC LIMIT 3
+        """
+        df_log = al.run_query(sql_log)
+        
+        log_html_items = []
+        for _, row in df_log.iterrows():
+            ts = pd.to_datetime(row['timestamp']).strftime('%H:%M:%S')
+            if row['event_name'] == 'purchase':
+                 item = f"<span style='color:#4ADE80;'>[{ts}] 💰 Purchase (User_{row['user_id'][-4:]}: ₩{int(row['value']):,})</span>"
+            else:
+                 item = f"<span style='color:#A78BFA;'>[{ts}] Action: {row['event_name']}</span>"
+            log_html_items.append(item)
+            
+        ticker_html = f"""
+        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; display:flex; gap:20px; font-family:monospace; font-size:0.9rem; overflow:hidden;">
+            {''.join(log_html_items) if log_html_items else '<span>대기 중... (No Events)</span>'}
+        </div>
+        """
+        st.markdown(ticker_html, unsafe_allow_html=True)
+        
+        st.divider()
+
+        # --- TIER 2: BUSINESS INTELLIGENCE (FROM MART) ---
+        st.markdown("### 🔵 비즈니스 분석 (Business Intelligence)")
         
         # Fetch from Data Mart
         # Using simple SELECT from pre-aggregated table
@@ -450,28 +412,25 @@ if st.session_state['page'] == 'monitor':
             latest = df_trend.iloc[-1]
             prev = df_trend.iloc[-2] if len(df_trend) > 1 else latest
             
-            # Business Metrics (delta_color 설정: 하락 시 빨간색)
+            # Business Metrics
             b1, b2, b3, b4 = st.columns(4)
             with b1:
                 if has_rev:
-                    rev_diff = int(latest['total_revenue'] - prev['total_revenue'])
-                    st.metric("일평균 매출 (Revenue)", f"₩{int(avg_rev):,}", f"{rev_diff:,}원", delta_color="normal")
+                    st.metric("일평균 매출 (Revenue)", f"₩{int(avg_rev):,}", f"{int(latest['total_revenue']-prev['total_revenue']):,}원")
                 else:
                     st.metric("일평균 매출 (Revenue)", "-", "Not Selected", help="Data Lab에서 'Revenue' 지표를 추가하세요.")
             with b2:
                 if has_aov:
-                    aov_diff = int(latest['aov'] - prev['aov'])
-                    st.metric("객단가 (AOV)", f"₩{int(avg_aov):,}", f"{aov_diff:,}원", delta_color="normal")
+                    st.metric("객단가 (AOV)", f"₩{int(avg_aov):,}", f"{int(latest['aov']-prev['aov']):,}원")
                 else:
                      st.metric("객단가 (AOV)", "-", "Not Selected", help="Data Lab에서 'AOV' 지표를 추가하세요.")
             with b3:
                 if has_cvr:
-                    cvr_diff = (latest['cvr'] - prev['cvr']) * 100
-                    st.metric("구매 전환율 (CVR)", f"{latest['cvr']*100:.2f}%", f"{cvr_diff:.2f}%", delta_color="normal")
+                    st.metric("구매 전환율 (CVR)", f"{latest['cvr']*100:.2f}%", f"{(latest['cvr']-prev['cvr'])*100:.2f}%")
                 else:
                     st.metric("구매 전환율 (CVR)", "-", "Not Selected", help="Data Lab에서 'CVR' 지표를 추가하세요.")
             with b4:
-                st.metric("재구매율 (Retention)", "28.4%", "예측치", delta_color="off")
+                st.metric("재구매율 (Retention)", "28.4%", "예측치")
 
             # Chart Area
             tab_names = []
@@ -487,14 +446,14 @@ if st.session_state['page'] == 'monitor':
                 with tabs[idx]:
                     fig = px.area(df_trend, x='report_date', y='total_revenue', title='Daily Revenue Trend', template='plotly_dark')
                     fig.update_traces(line_color='#8B5CF6', fillcolor="rgba(139, 92, 246, 0.3)")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 idx += 1
-
+                
             if has_aov:
                 with tabs[idx]:
                     fig2 = px.bar(df_trend, x='report_date', y='aov', title='Average Order Value (AOV)', template='plotly_dark')
                     fig2.update_traces(marker_color='#3B82F6')
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width="stretch")
                 idx += 1
                 
             with tabs[idx]:
@@ -505,16 +464,16 @@ if st.session_state['page'] == 'monitor':
                 v_order = latest['total_orders'] if 'total_orders' in cols_present else 0
                 
                 funnel_data = dict(
-                    number=[v_total, v_click, v_order],
+                    number=[v_total, v_click, v_order], 
                     stage=["1. 방문 (Total Users)", "2. 클릭 (Active Clicks)", "3. 구매 (Orders)"]
                 )
                 fig3 = px.funnel(funnel_data, x='number', y='stage', title=f'Conversion Funnel ({latest["report_date"]})', template='plotly_dark')
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, width="stretch")
 
         st.divider()
 
         # --- TIER 3: SYSTEM & CRISIS MONITOR ---
-        st.markdown('<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;"><div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);"></div><h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">시스템 및 위기 감지</h2><span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">System Integrity</span></div>', unsafe_allow_html=True)
+        st.markdown("### 🟠 시스템 및 위기 감지 (System Integrity)")
         
         alerts = []
         
@@ -600,7 +559,7 @@ if st.session_state['page'] == 'monitor':
                     with c_btn:
                         st.write("") # Vertical spacer
                         st.write("")
-                        if st.button(f"⚡ 개선 실험 생성", key=f"btn_{alert['title']}", type="primary", use_container_width=True):
+                        if st.button(f"⚡ 개선 실험 생성", key=f"btn_{alert['title']}", type="primary", width="stretch"):
                             st.session_state['page'] = 'study'
                             st.session_state['step'] = 1
                             st.session_state['target'] = alert['target']
@@ -617,7 +576,7 @@ if st.session_state['page'] == 'monitor':
                             if alert.get('threshold'):
                                 fig_alert.add_hline(y=alert['threshold'], line_dash="dash", line_color="yellow", annotation_text="Threshold (위험 기준)")
 
-                            st.plotly_chart(fig_alert, use_container_width=True)
+                            st.plotly_chart(fig_alert, width="stretch")
                         else:
                             st.warning("해당 지표의 상세 데이터를 불러올 수 없습니다.")
             
@@ -626,134 +585,501 @@ if st.session_state['page'] == 'monitor':
                   st.warning("터미널에서 generate_history.py를 실행하세요.")
             
 # =========================================================
-# PAGE: STUDY (WIZARD) - STITCH v3 Design
+# PAGE: STUDY (WIZARD)
 # =========================================================
 elif st.session_state['page'] == 'study':
+    
+    # --- Progress Indicators (Nebula Style) ---
+    steps = ["1. Hypothesis", "2. Design", "3. Collection", "4. Analysis"]
+    ui.render_step_progress(steps, st.session_state['step'])
+    
     curr = st.session_state['step']
 
-    # --- PostMessage Listener for STITCH Components ---
-    # JavaScript를 통해 iframe에서 보낸 데이터를 수신하고 hidden input에 저장
-    st.markdown("""
-    <script>
-    window.addEventListener('message', function(event) {
-        // STITCH 컴포넌트에서 보낸 데이터인지 확인
-        if (event.data && event.data.type) {
-            // hidden input에 데이터 저장 (Streamlit에서 읽을 수 있도록)
-            const dataStr = JSON.stringify(event.data);
+    # --- STEP 1: HYPOTHESIS ---
+    if curr == 1:
+        st.markdown(f"<h2>Step 1. 목표 정의 (Define Your Vision)</h2>", unsafe_allow_html=True)
 
-            // sessionStorage에 저장 (페이지 리로드 시에도 유지)
-            if (event.data.type === 'hypothesis_data') {
-                sessionStorage.setItem('stitch_hypothesis', dataStr);
-            } else if (event.data.type === 'design_data') {
-                sessionStorage.setItem('stitch_design', dataStr);
+        # Show current adoption status banner
+        try:
+            adoption_df = al.run_query("""
+                SELECT a.experiment_id, a.adopted_at, a.variant_config, e.hypothesis, e.target
+                FROM adoptions a
+                LEFT JOIN experiments e ON a.experiment_id = e.run_id
+                ORDER BY a.adopted_at DESC
+                LIMIT 1
+            """)
+            if not adoption_df.empty:
+                latest = adoption_df.iloc[0]
+                variant_config = latest.get('variant_config', '{}')
+                if isinstance(variant_config, str):
+                    try:
+                        variant_config = json.loads(variant_config)
+                    except:
+                        variant_config = {}
+
+                winning_variant = variant_config.get('winning_variant', 'B') if variant_config else 'B'
+                exp_target = variant_config.get('target', '') if variant_config else ''
+                exp_config = variant_config.get('config', {}) if variant_config else {}
+                exp_id = latest.get('experiment_id', 'N/A')
+                hypothesis = latest.get('hypothesis', 'N/A')
+                target = latest.get('target', exp_target) or exp_target or 'N/A'
+                adopted_at = latest.get('adopted_at', 'N/A')
+
+                with st.expander("🏆 현재 적용된 Baseline (채택된 실험)", expanded=False):
+                    col_info, col_variant = st.columns(2)
+                    with col_info:
+                        st.markdown(f"**실험 ID**: `{exp_id}`")
+                        st.markdown(f"**가설**: {hypothesis}")
+                        st.markdown(f"**타겟**: {target}")
+                        st.markdown(f"**채택일**: {adopted_at}")
+                        st.markdown(f"**Winning Variant**: **{winning_variant}**")
+                    with col_variant:
+                        if exp_config:
+                            st.markdown("**적용된 Variant 설정**:")
+                            for key, val in exp_config.items():
+                                st.markdown(f"- `{key}`: **{val}**")
+                        else:
+                            st.info("Variant 설정 정보 없음")
+
+                    # Rollback Button
+                    st.divider()
+                    col_rollback, col_spacer = st.columns([1, 2])
+                    with col_rollback:
+                        if st.button("🔄 롤백 (Rollback)", type="secondary", use_container_width=True,
+                                     help="최신 채택을 취소하고 기본 상태로 복구합니다"):
+                            # Delete the latest adoption record
+                            try:
+                                from src.data.db import safe_write_batch
+                                rollback_ops = [
+                                    (f"DELETE FROM adoptions WHERE experiment_id = '{exp_id}'", None)
+                                ]
+                                result = safe_write_batch(rollback_ops, use_coordination=True)
+
+                                if result['status'] == 'success':
+                                    st.cache_data.clear()
+                                    st.toast("✅ 롤백 완료! Baseline이 기본값으로 복구되었습니다.")
+                                    st.rerun()
+                                else:
+                                    st.error(f"롤백 실패: {result.get('message', 'Unknown error')}")
+                            except Exception as rollback_err:
+                                st.error(f"롤백 중 오류 발생: {rollback_err}")
+        except Exception as e:
+            # Show error in debug mode or if it's not a "table doesn't exist" error
+            error_msg = str(e).lower()
+            if 'does not exist' not in error_msg and 'relation' not in error_msg:
+                st.warning(f"⚠️ 채택 정보 로드 실패: {e}")
+
+        ui.edu_guide("가설(Hypothesis)", "데이터 분석은 막연한 시도가 아닙니다. **'무엇을(X) 바꾸면 어떤 지표(Y)가 좋아질 것이다'**라는 명확한 믿음을 정의하세요.")
+
+        # Component Mapping (Moved up for Iframe Logic)
+        # Component Mapping (Moved up for Iframe Logic)
+        # Component Mapping (Enhanced with Types for Robustness)
+        PAGE_MAP = {
+            "메인 홈 (/)": {
+                "url": "/",
+                "components": {
+                    "메인 배너 (Hero Banner)": {"id": "hero-banner", "type": "BANNER"},
+                    "카테고리 아이콘 (Category Icons)": {"id": "category-nav", "type": "ICON_SET"}
+                }
+            },
+            "상세 페이지 (/detail)": {
+                "url": "/detail",
+                "components": {
+                    "구매하기 버튼 (Primary CTA)": {"id": "add-to-cart-btn", "type": "BUTTON"},
+                    "상품 가격 (Price Label)": {"id": "price-tag", "type": "TEXT"}
+                }
+            },
+            "장바구니 (/cart)": {
+                "url": "/cart",
+                "components": {
+                    "주문 결제 버튼 (Checkout CTA)": {"id": "checkout-btn", "type": "BUTTON"}
+                }
+            },
+            "검색 결과 (/search)": {
+                "url": "/search",
+                "components": {
+                    "검색 결과 카드 (Result Item)": {"id": "search-result-item", "type": "LAYOUT"}
+                }
+            },
+            "주문 배달 현황 (/tracking)": {
+                "url": "/tracking",
+                "components": {
+                    "도착 예정 시간 (ETA Header)": {"id": "arrival-time", "type": "TEXT"},
+                    "라이더 마커 (Driver Icon)": {"id": "driver-marker", "type": "ICON"}
+                }
             }
         }
-    });
-    </script>
-    """, unsafe_allow_html=True)
 
-    # --- STEP 1: HYPOTHESIS (STITCH Full UI) ---
-    if curr == 1:
-        # session_state에서 기존 데이터 불러오기
-        initial_hypothesis_data = {
-            'exp_name': st.session_state.get('exp_name', '체크아웃 흐름 최적화 V2'),
-            'exp_owner': st.session_state.get('exp_owner', '김연구 박사'),
-            'independent_var': st.session_state.get('independent_var', ''),
-            'target_audience': st.session_state.get('target', ''),
-            'success_metric': st.session_state.get('success_metric', '전환율 (Conversion Rate)'),
-            'hypothesis_reason': st.session_state.get('hypothesis_reason', ''),
-            'confidence_level': st.session_state.get('confidence_level', 95)
-        }
-        render_hypothesis_wizard(height=850, initial_data=initial_hypothesis_data)
+        col_mock, col_form = st.columns([1.2, 1], gap="large")
+        
+        # Determine Current Selection
+        default_page = list(PAGE_MAP.keys())[0]
+        sel_page = st.session_state.get('builder_page', default_page)
+        sel_comp_name = st.session_state.get('builder_comp', list(PAGE_MAP[sel_page]['components'].keys())[0])
+        
+        sel_url_path = PAGE_MAP[sel_page]['url']
+        # Extract ID and Type
+        sel_comp_data = PAGE_MAP[sel_page]['components'].get(sel_comp_name, {"id": "", "type": "TEXT"})
+        sel_comp_id = sel_comp_data['id']
+        comp_type = sel_comp_data['type']
+        
+        # Use fixed demo UID for consistent display
+        # Without uid param, iframe creates new user each time -> random variant
+        # With fixed uid, iframe always shows the same variant as this user would see
+        demo_uid = "novarium_demo_viewer"  # Hash: 83 -> Variant B (matches typical demo)
+        target_url = f"{TARGET_APP_URL}{sel_url_path}?uid={demo_uid}&highlight={sel_comp_id}"
 
-        # 가설 데이터 입력 폼 (STITCH UI 하단)
-        st.markdown("---")
+        # 1. Real Target App (Iframe)
+        with col_mock:
+            with st.container(border=True):
+                st.markdown("#### 📱 NovaEats (Live Target)")
+                st.caption(f"실제 서버 화면 | 고정 UID: `{demo_uid}`")
+                try:
+                    components.iframe(target_url, height=600, scrolling=True)
+                except Exception:
+                    st.error("서버 연결 실패: Target App이 실행 중인지 확인하세요.")
 
-        # Hidden form to capture PostMessage data
-        with st.form("hypothesis_form", clear_on_submit=False):
-            st.markdown("#### 가설 데이터 확인 및 저장")
-            col1, col2 = st.columns(2)
-            with col1:
-                exp_name = st.text_input("실험 명칭", value=st.session_state.get('exp_name', '체크아웃 흐름 최적화 V2'), key="form_exp_name")
-                independent_var = st.text_input("독립 변수 (변경 대상)", value=st.session_state.get('independent_var', ''), key="form_independent_var", placeholder="예: 버튼 색상")
-            with col2:
-                exp_owner = st.text_input("담당자", value=st.session_state.get('exp_owner', '김연구 박사'), key="form_exp_owner")
-                target_audience = st.text_input("타겟 고객", value=st.session_state.get('target', ''), key="form_target", placeholder="예: 모바일 사용자")
+        # 2. Form (Glass Card) - Dynamic Builder
+        with col_form:
+            with st.container(border=True):
+                st.markdown("#### 🧬 실험 설계 (Experiment Builder)")
+                
+                # Layout Strategy: Tabs to reduce vertical height
+                tab_design, tab_strategy = st.tabs(["🎨 디자인 (Design)", "📊 전략 (Strategy)"])
+                
+                # --- TAB 1: DESIGN ---
+                with tab_design:
+                    st.caption("1. 실험 대상 선택")
 
-            success_metric = st.selectbox("성공 지표",
-                options=["전환율 (Conversion Rate)", "평균 주문 금액 (AOV)", "재방문율 (Retention)", "클릭률 (CTR)"],
-                index=0, key="form_success_metric")
+                    # [A] Page Selection (Visual Cards)
+                    st.markdown("**페이지 선택**")
+                    page_cols = st.columns(len(PAGE_MAP))
+                    selected_page_idx = list(PAGE_MAP.keys()).index(st.session_state.get('builder_page', list(PAGE_MAP.keys())[0]))
 
-            hypothesis_reason = st.text_area("가설 근거", value=st.session_state.get('hypothesis_reason', ''),
-                key="form_hypothesis_reason", placeholder="예: 밝은 색상이 사용자의 주의를 더 끌기 때문입니다.")
+                    for idx, (page_name, page_data) in enumerate(PAGE_MAP.items()):
+                        with page_cols[idx]:
+                            is_selected = (idx == selected_page_idx)
+                            border_color = "#8B5CF6" if is_selected else "#374151"
+                            bg_color = "#1F2937" if is_selected else "#111827"
 
-            confidence_level = st.slider("신뢰 수준 (%)", min_value=80, max_value=99, value=st.session_state.get('confidence_level', 95), key="form_confidence")
+                            if st.button(
+                                f"{'✓ ' if is_selected else ''}{page_name}",
+                                key=f"page_btn_{idx}",
+                                width="stretch",
+                                type="primary" if is_selected else "secondary"
+                            ):
+                                st.session_state['builder_page'] = page_name
+                                # Reset component selection when page changes
+                                st.session_state['builder_comp'] = list(page_data['components'].keys())[0]
+                                st.rerun()
 
-            col_spacer, col_btn = st.columns([3, 1])
-            with col_btn:
-                submitted = st.form_submit_button("▶ 다음: 디자인 빌더", type="primary", use_container_width=True)
+                    target_page = st.session_state.get('builder_page', list(PAGE_MAP.keys())[0])
 
-            if submitted:
-                # session_state에 저장
-                st.session_state['exp_name'] = exp_name
-                st.session_state['exp_owner'] = exp_owner
-                st.session_state['independent_var'] = independent_var
-                st.session_state['target'] = target_audience
-                st.session_state['success_metric'] = success_metric
-                st.session_state['hypothesis_reason'] = hypothesis_reason
-                st.session_state['confidence_level'] = confidence_level
+                    st.write("")
 
-                # 가설 문장 자동 생성
-                metric_short = success_metric.split(' (')[0]
-                st.session_state['hypothesis'] = f"우리가 {independent_var}을(를) 변경한다면, {target_audience}에 대해 {metric_short}이(가) 증가할 것입니다. 그 이유는 {hypothesis_reason}"
+                    # [B] Component Selection (Visual Cards)
+                    st.markdown("**요소 선택**")
+                    comp_data = PAGE_MAP[target_page]['components']
+                    comp_names = list(comp_data.keys())
 
-                st.session_state['step'] = 2
-                st.rerun()
+                    # Create grid layout (2 columns for components)
+                    comp_cols = st.columns(2)
+                    selected_comp = st.session_state.get('builder_comp', comp_names[0])
 
-    # --- STEP 2: DESIGN BUILDER (STITCH Full UI) ---
+                    for idx, comp_name in enumerate(comp_names):
+                        with comp_cols[idx % 2]:
+                            is_selected = (comp_name == selected_comp)
+
+                            if st.button(
+                                f"{'✓ ' if is_selected else ''}{comp_name}",
+                                key=f"comp_btn_{idx}",
+                                width="stretch",
+                                type="primary" if is_selected else "secondary"
+                            ):
+                                st.session_state['builder_comp'] = comp_name
+                                st.rerun()
+
+                    target_comp = selected_comp
+                    current_target = f"{target_page} > {target_comp}"
+                    st.session_state['target'] = current_target
+
+                    st.divider()
+
+                    # [B] Variables (Visual Simulator)
+                    st.write("")
+                    st.caption("2. 변인 시뮬레이션")
+
+                    bg_map = {"Red (Urgent)": "#EF4444", "Blue (Trust)": "#3B82F6", "Black (Dark Mode)": "#111827", "#EF4444 (Red)": "#EF4444", "#3B82F6 (Blue)": "#3B82F6", "#10B981 (Green)": "#10B981", "#111827 (Black)": "#111827"}
+                    
+                    st.markdown(f"**Group B (Test)** <span style='background:#4B5563; padding:2px 6px; border-radius:4px; font-size:0.7em'>{comp_type}</span>", unsafe_allow_html=True)
+                        
+                    config_data = {}
+                    variant_summary = ""
+                    
+                    # --- DYNAMIC FORM ---
+                    if comp_type == 'BANNER':
+                        config_data['title'] = st.text_input("타이틀", "첫 주문 50% 할인")
+                        config_data['badge'] = st.text_input("뱃지", "선착순 마감")
+                        config_data['theme'] = st.selectbox("테마", ["Red (Urgent)", "Blue (Trust)", "Black (Dark Mode)"])
+                        variant_summary = f"{config_data['theme']} 테마, '{config_data['title']}'"
+                        b_html = f"""<div style='background:{bg_map.get(config_data['theme'])}; border-radius:12px; padding:15px; color:white; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'><span style='background:rgba(255,255,255,0.2); font-size:10px; padding:2px 6px; border-radius:4px;'>{config_data['badge']}</span><h3 style='margin:5px 0; font-size:16px;'>{config_data['title']}</h3><button style='background:white; color:{bg_map.get(config_data['theme'])}; border:none; padding:4px 12px; border-radius:20px; font-size:10px; font-weight:bold; cursor:pointer;'>Click</button></div>"""
+                        
+                    elif comp_type == 'BUTTON':
+                        config_data['text'] = st.text_input("텍스트", "지금 주문하기")
+                        config_data['color'] = st.selectbox("색상", ["#EF4444 (Red)", "#3B82F6 (Blue)", "#10B981 (Green)", "#111827 (Black)"])
+                        variant_summary = f"{config_data['color']} 버튼"
+                        color_code = bg_map.get(config_data['color'])
+                        b_html = f"""<button style='background:{color_code}; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; box-shadow:0 10px 15px -3px {color_code}66; width:100%;'>{config_data['text']}</button>"""
+                        
+                    elif comp_type == 'ICON_SET' or comp_type == 'ICON':
+                        config_data['style'] = st.selectbox("스타일", ["3D Render (Playful)", "Flat Line (Clean)"])
+                        variant_summary = f"{config_data['style']} 아이콘"
+                        # Mock Images for demo
+                        img_url = "https://cdn-icons-png.flaticon.com/512/3075/3075977.png" if "3D" in config_data['style'] else "https://cdn-icons-png.flaticon.com/512/709/709699.png"
+                        b_html = f"""<div style='text-align:center;'><img src='{img_url}' style='width:64px; height:64px; drop-shadow:0 10px 10px rgba(0,0,0,0.2);'></div>"""
+
+                    elif comp_type == 'TEXT':
+                        config_data['content'] = st.text_input("내용", "수정된 텍스트")
+                        config_data['size'] = st.slider("크기 (px)", 12, 32, 18)
+                        config_data['color'] = st.color_picker("색상", "#EF4444")
+                        variant_summary = f"텍스트 변경"
+                        b_html = f"""<div style='font-size:{config_data['size']}px; color:{config_data['color']}; font-weight:bold; text-align:center;'>{config_data['content']}</div>"""
+                    
+                    else:
+                        val = st.text_input("변경 내용", "Layout Change")
+                        variant_summary = val
+                        b_html = f"<div style='background:#374151; padding:10px; border-radius:8px; text-align:center; color:#9CA3AF;'>{val}</div>"
+
+                    st.caption("👇 미리보기 (Preview)")
+                    st.markdown(b_html, unsafe_allow_html=True)
+                    
+                    st.success("✅ 디자인 설정 완료! 상단의 **'📊 전략 (Strategy)'** 탭으로 이동하세요.", icon="👉")
+
+                    st.session_state['exp_variant_data'] = config_data
+                    variant_val = variant_summary
+                    
+                # --- TAB 2: STRATEGY ---
+                with tab_strategy:
+                    # [C] Hypothesis
+                    st.caption("3. 가설 수립 (Hypothesis)")
+                    default_hypo = st.session_state.get('temp_hypo', "")
+                    if not default_hypo:
+                         placeholder_text = f"만약 '{target_comp}'을(를) '{variant_summary[:20]}...'으로 변경한다면, [지표]가 상승할 것이다."
+                    else:
+                         placeholder_text = ""     
+                    hypo = st.text_area("가설 구체화", value=default_hypo, placeholder=placeholder_text, height=80)
+                    
+                    if st.checkbox("💡 가설 템플릿 사용"):
+                        def_why = "클릭률(CTR)이 15%까지 회복될 것이다"
+                        h_who = st.selectbox("대상(Who)", ["모든 유저에게", "신규 유저에게", "재구매 유저에게"])
+                        h_impact = st.text_input("기대 효과(Impact)", def_why)
+                        if st.button("템플릿 적용"):
+                            st.session_state['temp_hypo'] = f"{h_who}, {target_comp}을(를) {variant_summary}로 변경하면, {h_impact}."
+                            st.rerun()
+
+                    st.divider()
+
+                    # [D] Advanced Metrics (Aligned Layout)
+                    st.markdown("#### 🎯 지표 설정")
+
+                    # Auto Recommendation logic
+                    rec_metric = "CTR (클릭률)"
+                    if comp_type == 'BUTTON': rec_metric = "CVR (전환율)"
+                    elif comp_type == 'TEXT' or comp_type == 'ICON': rec_metric = "Bounce Rate (이탈률)"
+
+                    st.success(f"🤖 AI 추천: **{rec_metric}** (요소 속성 '{comp_type}' 기반)")
+
+                    metrics_db = {
+                        "CTR (클릭률)": {"desc": "노출 대비 클릭한 비율", "formula": "Clicks / Impressions", "type": "Conversion"},
+                        "CVR (전환율)": {"desc": "방문자 중 실제 구매 비율", "formula": "Orders / Visitors", "type": "Conversion"},
+                        "AOV (평균 주문액)": {"desc": "구매 고객 1인당 평균 결제 금액", "formula": "Revenue / Orders", "type": "Revenue"},
+                        "Bounce Rate (이탈률)": {"desc": "첫 페이지만 보고 나가는 비율", "formula": "One-page / Total", "type": "Retention"},
+                    }
+
+                    # Equal-width columns for alignment
+                    c_m1, c_m2 = st.columns(2, gap="medium")
+
+                    with c_m1:
+                        st.markdown("**핵심 지표 (Primary Metric)**")
+                        m_sel = st.selectbox("지표 선택", list(metrics_db.keys()), index=list(metrics_db.keys()).index(rec_metric), label_visibility="collapsed")
+                        st.caption(f"📝 {metrics_db[m_sel]['desc']}")
+
+                        st.write("")
+                        st.markdown("**최소 목표 상승폭 (MDE)**")
+                        min_eff = st.slider("목표", 1, 30, 5, format="+%d%%", help=f"실험군(B)의 {m_sel}가 대조군(A)보다 최소 이만큼은 높아야 성공으로 간주합니다.", label_visibility="collapsed")
+
+                    with c_m2:
+                        st.markdown("**보조 지표 (Secondary Metrics)**")
+                        avail_gr = [k for k in metrics_db.keys() if k != m_sel]
+                        g_sel = st.multiselect("지표 선택", avail_gr, default=avail_gr[:1], help="주 메트릭 외에 함께 관찰할 지표입니다.", label_visibility="collapsed")
+
+                        # Show description for selected secondary metrics (matching height with primary)
+                        if g_sel:
+                            st.caption(f"📝 {metrics_db[g_sel[0]]['desc']}")
+                        else:
+                            st.caption("선택된 보조 지표가 없습니다.")
+
+                        st.write("")
+                        if g_sel:
+                            st.markdown("**안전 마진 (Safety Margin)**")
+                            guard_threshold = st.slider("경계선", 1.0, 20.0, 5.0, format="-%.1f%%", help="보조 지표가 이 기준 이상 떨어지면 주의가 필요합니다.", label_visibility="collapsed")
+                        else:
+                            guard_threshold = 5.0
+
+                st.write("")
+                if st.button("실험 설계 완료 및 다음 단계 ➡️", type="primary", width="stretch"):
+                    if not hypo:
+                        st.toast("가설을 입력해야 진행할 수 있습니다!", icon="⚠️")
+                    elif not variant_val:
+                          st.toast("Group B의 변경 사항을 입력해주세요!", icon="⚠️")
+                    else:
+                        st.session_state['hypothesis'] = hypo
+                        st.session_state['metric'] = m_sel
+                        st.session_state['guardrails'] = g_sel
+                        st.session_state['session_guard_threshold'] = guard_threshold  # Save dynamic input
+                        st.session_state['min_effect'] = min_eff
+                        st.session_state['guard_metric'] = g_sel[0] if g_sel else ""
+                        
+                        # Save Config Intent
+                        st.session_state['exp_config'] = {
+                            "page": target_page,
+                            "component": target_comp,
+                            "control": "Default",
+                            "variant": variant_val
+                        }
+
+                        # Activate experiment for A/B testing
+                        # (keeps previous adoptions as baseline, enables new A/B split)
+                        try:
+                            from src.data.db import safe_write_batch
+                            result = safe_write_batch([
+                                ("CREATE TABLE IF NOT EXISTS active_experiment (id INTEGER PRIMARY KEY, is_active BOOLEAN, started_at TIMESTAMP)", None),
+                                ("DELETE FROM active_experiment", None),
+                                ("INSERT INTO active_experiment VALUES (1, true, CURRENT_TIMESTAMP)", None)
+                            ], use_coordination=st.session_state.get('db_coordination', True))
+                            if result.get('status') == 'success':
+                                st.toast("🧪 새 실험 활성화 완료", icon="✅")
+                        except Exception as e:
+                            pass  # Table creation may fail
+
+                        st.session_state['step'] = 2
+                        st.rerun()
+
+    # --- STEP 2: EXPERIMENT DESIGN ---
     elif curr == 2:
-        # session_state에서 기존 데이터 불러오기
-        initial_design_data = {
-            'variant_name': st.session_state.get('variant_name', 'B: 테스트 변형'),
-            'hypothesis': st.session_state.get('hypothesis', ''),
-            'traffic_split': st.session_state.get('split', 50)
-        }
-        render_design_builder(height=900, initial_data=initial_design_data)
+        st.markdown(f"<h2>Step 2. 실험 설계 (Experiment Design)</h2>", unsafe_allow_html=True)
+        ui.edu_guide("실험 설계의 3요소", "트래픽 비율 → 목표 설정 → 필요 표본 계산 순서로 진행합니다.")
+        
+        # [Layout: Traffic Split -> Sample Size Calculation]
+        
+        st.markdown("#### 1️⃣ 트래픽 비율 설정 (Traffic Allocation)")
+        split = st.slider("테스트(B) 그룹 배정 비율", 10, 90, 50, format="%d%%")
+        st.caption(f"나머지 {100-split}%는 Control(A) 그룹에 배정됩니다.")
+        
+        st.divider()
+        
+        st.markdown("#### 2️⃣ 필요 표본 수 계산 (Sample Size)")
+        
+        selected_metric = st.session_state.get('metric', 'CTR (클릭률)')
+        
+        # Fetch baseline using al.run_query (handles connection properly)
+        sql_baseline = """
+        SELECT 
+            (COUNT(DISTINCT CASE WHEN e.event_name = 'click_banner' THEN e.user_id END)::FLOAT / 
+             NULLIF(COUNT(DISTINCT a.user_id), 0)) as metric_value
+        FROM assignments a
+        LEFT JOIN events e ON a.user_id = e.user_id
+        WHERE a.user_id LIKE 'user_hist_%'
+        """
+        if "CVR" in selected_metric:
+             sql_baseline = sql_baseline.replace("'click_banner'", "'purchase'")
 
-        # 디자인 데이터 입력 폼 (STITCH UI 하단)
-        st.markdown("---")
+        try:
+            df_baseline = al.run_query(sql_baseline, con=None)  # con=None: auto manages connection
+            auto_baseline = df_baseline.iloc[0, 0] if not df_baseline.empty and df_baseline.iloc[0, 0] else 0.10
+        except Exception as e:
+            st.warning(f"Baseline 조회 실패 (기본값 10% 사용): {e}")
+            auto_baseline = 0.10  # Fallback
+        
+        # Get MDE from Step 1 (Strategy Tab)
+        mde_percent = st.session_state.get('min_effect', 5) # returns int like 5
+        mde = mde_percent / 100.0
+        
+        # Calculate Sample Size
+        n_per_group = al.calculate_sample_size(auto_baseline, mde)
+        
+        # Account for traffic split
+        control_pct = split / 100.0
+        test_pct = 1.0 - control_pct
+        
+        # For 50:50 split, total = n * 2
+        # For unequal splits, we need more total traffic to get 'n' samples in each group
+        if split == 50:
+            total_needed = n_per_group * 2
+        else:
+            # Calculate based on which group needs more traffic
+            total_for_control = int(n_per_group / control_pct) if control_pct > 0 else n_per_group * 2
+            total_for_test = int(n_per_group / test_pct) if test_pct > 0 else n_per_group * 2
+            total_needed = max(total_for_control, total_for_test)
+        
+        # Display Metrics in 3 Columns
+        c1, c2, c3 = st.columns(3, gap="large")
+        
+        with c1:
+            st.metric(f"현재 수준 (Baseline)", f"{auto_baseline*100:.2f}%", help=f"최근 30일간 {selected_metric} 평균입니다.")
+        
+        with c2:
+            st.metric(f"목표 상승폭 (MDE)", f"+{mde_percent}%", help="앞 단계(전략)에서 설정한 최소 목표치입니다.")
+            
+        with c3:
+            st.metric(f"총 필요 표본 수", f"{total_needed:,}명", 
+                     delta=f"Control {int(total_needed * control_pct):,} | Test {int(total_needed * test_pct):,}", 
+                     delta_color="off",
+                     help=f"각 그룹당 최소 {n_per_group:,}명의 샘플이 필요합니다.")
+        
+        # Formula Explanation Expander
+        with st.expander("📐 표본 수 계산 공식 (Sample Size Formula)"):
+            st.markdown("""
+            #### Two-Sample Z-Test for Proportions
+            
+            ```
+            n = (2 × p̄ × (1-p̄) × (Zα + Zβ)²) / (p₁ - p₂)²
+            ```
+            
+            **파라미터:**
+            - **p₁ (baseline)**: {:.2%} ← 현재 전환율
+            - **p₂ (target)**: {:.2%} ← 목표 전환율 (baseline × (1 + MDE))
+            - **p̄ (pooled)**: {:.2%} ← (p₁ + p₂) / 2
+            - **Zα**: 1.96 ← 95% 신뢰수준 (α=0.05)
+            - **Zβ**: 0.84 ← 80% 검정력 (β=0.20)
+            
+            **계산 결과:**
+            - **그룹당 필요 샘플**: {:,}명
+            - **트래픽 분배**: Control {}% / Test {}%
+            - **총 방문자 필요**: {:,}명
+            
+            > ℹ️ 불균등 분배 시, 소수 그룹이 충분한 샘플을 얻기 위해 더 많은 총 방문자가 필요합니다.
+            """.format(
+                auto_baseline, 
+                auto_baseline * (1 + mde),
+                (auto_baseline + auto_baseline * (1 + mde)) / 2,
+                n_per_group,
+                split, 100-split,
+                total_needed
+            ))
+            
+        # Estimation Info
+        visit_est = 500 # Assumption
+        days_est = int(total_needed / visit_est)
+        st.info(f"ℹ️ 일평균 방문자 {visit_est}명 기준, 유의미한 결과를 얻기까지 약 **{days_est}일**이 소요됩니다.")
 
-        with st.form("design_form", clear_on_submit=False):
-            st.markdown("#### 실험 설계 확인 및 저장")
-            col1, col2 = st.columns(2)
-            with col1:
-                variant_name = st.text_input("변형 이름", value=st.session_state.get('variant_name', 'B: 테스트 변형'), key="form_variant_name")
-            with col2:
-                traffic_split = st.slider("실험군 (B) 트래픽 비율 (%)", min_value=10, max_value=90, value=st.session_state.get('split', 50), key="form_traffic_split")
-
-            # 가설 표시 (읽기 전용)
-            st.text_area("가설", value=st.session_state.get('hypothesis', '아직 설정되지 않았습니다.'), disabled=True)
-
-            col_back, col_spacer, col_next = st.columns([1, 2, 1])
-            with col_back:
-                back_clicked = st.form_submit_button("◀ 이전: 가설 설정", use_container_width=True)
-            with col_next:
-                next_clicked = st.form_submit_button("▶ 다음: 데이터 수집", type="primary", use_container_width=True)
-
-            if back_clicked:
-                st.session_state['step'] = 1
-                st.rerun()
-
-            if next_clicked:
-                # session_state에 저장
-                st.session_state['variant_name'] = variant_name
-                st.session_state['split'] = traffic_split
-
-                # 시뮬레이션 기본값 설정
-                st.session_state['n'] = 3000
-                st.session_state['total_needed'] = 6000
-                st.session_state['step'] = 3
-                st.rerun()
+        st.write("")
+        if st.button("다음: 데이터 수집 시작 (Simulation) ➡️", type="primary", width="stretch"):
+            st.session_state['n'] = n_per_group
+            st.session_state['total_needed'] = total_needed
+            st.session_state['split'] = split
+            st.session_state['step'] = 3
+            st.rerun()
 
     # --- STEP 3: COLLECTION (SIMULATION) ---
     elif curr == 3:
@@ -769,11 +1095,11 @@ elif st.session_state['page'] == 'study':
             col_sql, col_analyze = st.columns([1, 3])
 
             with col_sql:
-                if st.button("📊 SQL 쿼리 확인", help="세그먼트 분석 SQL 쿼리 보기", key="show_sql_btn", use_container_width=True):
+                if st.button("📊 SQL 쿼리 확인", help="세그먼트 분석 SQL 쿼리 보기", key="show_sql_btn", width="stretch"):
                     st.session_state['show_segment_sql'] = not st.session_state.get('show_segment_sql', False)
 
             with col_analyze:
-                analyze_clicked = st.button("🔄 기존 고객 분석 및 적용", help="DB의 유저/주문 패턴을 분석하여 실제 고객 분포를 반영합니다.", key="analyze_btn", use_container_width=True)
+                analyze_clicked = st.button("🔄 기존 고객 분석 및 적용", help="DB의 유저/주문 패턴을 분석하여 실제 고객 분포를 반영합니다.", key="analyze_btn", width="stretch")
 
             st.caption("기존 고객 데이터를 분석하여 에이전트 성향을 자동으로 설정합니다.")
 
@@ -782,12 +1108,12 @@ elif st.session_state['page'] == 'study':
                 st.code("""
 WITH user_metrics AS (
     SELECT
-        c.customer_id,
+        u.user_id,
         COUNT(o.order_id) as order_count,
         COALESCE(SUM(o.amount), 0) as total_spent,
-        DATE_DIFF('day', MIN(c.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
-    FROM customers c
-    LEFT JOIN orders o ON c.customer_id = o.customer_id
+        DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE) as tenure_days
+    FROM users u
+    LEFT JOIN orders o ON u.user_id = o.user_id
     GROUP BY 1
 ),
 averages AS (
@@ -880,7 +1206,7 @@ GROUP BY 1
                 col_start, col_stop = st.columns(2)
                 
                 with col_start:
-                    if st.button("▶️ Agent Swarm 투입 (Start)", type="primary", use_container_width=True, key="start_sim_btn"):
+                    if st.button("▶️ Agent Swarm 투입 (Start)", type="primary", width="stretch", key="start_sim_btn"):
                         # Generate unique run_id for this experiment
                         import time as time_module
                         current_run_id = f"run_{int(time_module.time() * 1000)}"
@@ -1017,7 +1343,7 @@ GROUP BY 1
                             st.session_state.pop('sim_process', None)
                 
                 with col_stop:
-                    if st.button("⏹️ 중지 (Stop)", type="secondary", use_container_width=True, key="stop_sim_btn"):
+                    if st.button("⏹️ 중지 (Stop)", type="secondary", width="stretch", key="stop_sim_btn"):
                         if 'sim_process' in st.session_state:
                             st.session_state['sim_stop_requested'] = True
                             st.warning("중지 요청됨... 프로세스 종료 중")
@@ -1025,7 +1351,7 @@ GROUP BY 1
                             st.info("실행 중인 시뮬레이션이 없습니다")
         
         st.write("")
-        if st.button("다음: 결과 분석 (Analysis) ➡️", type="primary", use_container_width=True):
+        if st.button("다음: 결과 분석 (Analysis) ➡️", type="primary", width="stretch"):
              st.session_state['step'] = 4
              st.rerun()
 
@@ -1470,7 +1796,7 @@ GROUP BY 1
             import pandas as pd
             df_comparison = pd.concat([df_metrics, pd.DataFrame([deltas])], ignore_index=True)
 
-            st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+            st.dataframe(df_comparison, width="stretch", hide_index=True)
             if use_sample_data:
                 st.caption("⚠️ 위 데이터는 학습용 샘플입니다. 실제 실험에서는 더 많은 트래픽을 수집하세요.")
             st.caption("💡 CTR = 클릭률, CVR = 전환율, AOV = 평균 주문액, ARPU = 유저당 평균 매출")
@@ -1546,7 +1872,7 @@ GROUP BY 1
         if not df_raw_full.empty:
             st.caption(f"총 {len(df_raw_full):,}개 이벤트 (상위 10개 샘플 표시)")
             st.caption("**포함 필드**: event_sequence (이벤트 순서), prev/next_event (이전/다음 이벤트), time_since_last_event (초), funnel_stage (퍼널 단계)")
-            st.dataframe(df_raw_full.head(10), use_container_width=True, hide_index=True)
+            st.dataframe(df_raw_full.head(10), width="stretch", hide_index=True)
         else:
             # Educational fallback: Generate sample raw data
             st.info("📚 **[학습 모드]** 실제 이벤트 데이터가 없어 샘플 로그를 표시합니다.")
@@ -1571,12 +1897,12 @@ GROUP BY 1
                 })
             df_sample = pd.DataFrame(sample_events)
             st.caption("**샘플 이벤트 로그** (학습용)")
-            st.dataframe(df_sample, use_container_width=True, hide_index=True)
+            st.dataframe(df_sample, width="stretch", hide_index=True)
             st.caption("⚠️ 위 데이터는 학습용 샘플입니다. 실제 실험 후 실 데이터가 표시됩니다.")
 
         # Show aggregated summary
         st.caption("**집계 요약 (Aggregated Summary)**")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
         
         # Report Saving
         st.divider()
@@ -1756,11 +2082,10 @@ GROUP BY 1
                 st.rerun()
 
 # =========================================================
-# PAGE: PORTFOLIO - STITCH Design
+# PAGE: PORTFOLIO
 # =========================================================
 elif st.session_state['page'] == 'portfolio':
-    # --- STITCH HEADER: Portfolio Overview ---
-    st.markdown('<div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2rem;"><div style="display:flex;flex-direction:column;gap:0.25rem;"><h2 style="margin:0;font-size:1.875rem;font-weight:700;letter-spacing:-0.025em;color:white;">Portfolio Overview</h2><p style="color:rgb(148,163,184);margin:0;">Retrospective analysis of your experiment history and learnings.</p></div></div>', unsafe_allow_html=True)
+    st.title("📚 실험 회고록 (Experiment Retrospective)")
 
     # Load all experiments data
     df_history = al.run_query("SELECT * FROM experiments ORDER BY created_at DESC")
@@ -1768,31 +2093,24 @@ elif st.session_state['page'] == 'portfolio':
     # Sidebar filters
     with st.sidebar:
         st.markdown("### 필터")
+
+        # Get unique targets for filtering
         if not df_history.empty:
             targets = ['전체'] + sorted(df_history['target'].dropna().unique().tolist())
             selected_target = st.selectbox("대상 (Target)", targets)
+
+            # Decision filter
             decisions = ['전체', 'positive', 'negative', 'neutral']
             selected_decision = st.selectbox("결과", decisions)
         else:
             selected_target = '전체'
             selected_decision = '전체'
 
-    # --- STITCH STATS CARDS ---
-    total_exp = len(df_history) if not df_history.empty else 0
-    positive_count = len(df_history[df_history['decision'] == 'positive']) if not df_history.empty and 'decision' in df_history.columns else 0
-    win_rate = (positive_count / total_exp * 100) if total_exp > 0 else 0
-    inconclusive_count = len(df_history[df_history['decision'] == 'neutral']) if not df_history.empty and 'decision' in df_history.columns else 0
-
-    st.markdown(f'''<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
-<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;width:8rem;height:8rem;background:rgba(37,99,244,0.05);border-radius:50%;filter:blur(48px);margin-right:-4rem;margin-top:-4rem;"></div><div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-weight:500;font-size:0.875rem;margin:0;">Total Experiments</p><span style="color:rgb(100,116,139);">🔬</span></div><div style="display:flex;align-items:baseline;gap:0.5rem;position:relative;z-index:10;margin-top:0.25rem;"><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0;">{total_exp}</h3><span style="color:#10b981;font-size:0.875rem;font-weight:500;display:flex;align-items:center;">📈 +12%</span></div><div style="width:100%;height:0.25rem;background:rgba(255,255,255,0.05);border-radius:9999px;overflow:hidden;margin-top:1rem;position:relative;z-index:10;"><div style="background:#3b82f6;height:100%;width:70%;"></div></div></div>
-<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;width:8rem;height:8rem;background:rgba(11,218,98,0.05);border-radius:50%;filter:blur(48px);margin-right:-4rem;margin-top:-4rem;"></div><div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-weight:500;font-size:0.875rem;margin:0;">Win Rate</p><span style="color:rgb(100,116,139);">🏆</span></div><div style="display:flex;align-items:baseline;gap:0.5rem;position:relative;z-index:10;margin-top:0.25rem;"><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0;">{win_rate:.1f}%</h3><span style="color:rgb(100,116,139);font-size:0.875rem;">Global Avg: 28%</span></div><div style="width:100%;height:0.25rem;background:rgba(255,255,255,0.05);border-radius:9999px;overflow:hidden;margin-top:1rem;position:relative;z-index:10;"><div style="background:#0bda62;height:100%;width:{min(win_rate, 100)}%;"></div></div></div>
-<div style="background:rgba(30,41,59,0.4);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.5rem;position:relative;overflow:hidden;"><div style="position:absolute;top:0;right:0;width:8rem;height:8rem;background:rgba(245,158,11,0.05);border-radius:50%;filter:blur(48px);margin-right:-4rem;margin-top:-4rem;"></div><div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:10;"><p style="color:rgb(148,163,184);font-weight:500;font-size:0.875rem;margin:0;">Inconclusive</p><span style="color:rgb(100,116,139);">❓</span></div><div style="display:flex;align-items:baseline;gap:0.5rem;position:relative;z-index:10;margin-top:0.25rem;"><h3 style="font-size:1.875rem;font-weight:700;color:white;margin:0;">{inconclusive_count}</h3><span style="color:#f59e0b;font-size:0.875rem;font-weight:500;">Needs Review</span></div><div style="width:100%;height:0.25rem;background:rgba(255,255,255,0.05);border-radius:9999px;overflow:hidden;margin-top:1rem;position:relative;z-index:10;"><div style="background:#f59e0b;height:100%;width:25%;"></div></div></div>
-</div>''', unsafe_allow_html=True)
-
     # ==========================================
     # Section 1: Adopted Experiments
     # ==========================================
-    st.markdown('<h3 style="font-size:1.125rem;font-weight:700;color:white;margin-bottom:1rem;">✅ Adopted Experiments</h3>', unsafe_allow_html=True)
+    st.markdown("### ✅ 채택된 실험 (Adopted Experiments)")
+    st.caption("플랫폼에 실제로 적용되어 비즈니스에 기여한 실험들")
 
     try:
         df_adoptions = al.run_query("""
@@ -2015,6 +2333,3 @@ elif st.session_state['page'] == 'portfolio':
         with col4:
             adoption_rate = (adopted_count / len(df_history) * 100) if len(df_history) > 0 else 0
             st.metric("채택률", f"{adoption_rate:.1f}%")
-
-# STITCH 레이아웃 종료
-ui.stitch_content_end()
