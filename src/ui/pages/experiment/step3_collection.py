@@ -7,10 +7,55 @@ import subprocess
 import sys
 import os
 import time
+import requests
 
 from src.core import stats as al
 from src.core import cache
 from src.ui import components as ui
+
+
+# Target App URL (for experiment synchronization)
+def _get_target_url():
+    """Get TARGET_APP_URL from Streamlit secrets or environment variable."""
+    try:
+        if hasattr(st, 'secrets') and 'TARGET_APP_URL' in st.secrets:
+            return str(st.secrets['TARGET_APP_URL'])
+    except Exception:
+        pass
+    return os.getenv('TARGET_APP_URL', 'http://localhost:8000')
+
+
+def _activate_experiment(run_id: str, hypothesis: str = None):
+    """Notify Target App that experiment is starting."""
+    try:
+        target_url = _get_target_url()
+        response = requests.post(
+            f"{target_url}/admin/activate_experiment",
+            json={"run_id": run_id, "hypothesis": hypothesis},
+            timeout=5
+        )
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("status") == "success":
+                return True
+    except Exception as e:
+        st.warning(f"Target App 연결 실패: {e}")
+    return False
+
+
+def _deactivate_experiment():
+    """Notify Target App that experiment has ended."""
+    try:
+        target_url = _get_target_url()
+        response = requests.post(
+            f"{target_url}/admin/deactivate_experiment",
+            timeout=5
+        )
+        if response.status_code == 200:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def render():
@@ -193,6 +238,15 @@ def _run_simulation(actual_agents, weight_multiplier, turbo):
     st.session_state['current_run_id'] = current_run_id
     st.session_state['current_weight'] = weight_multiplier
 
+    # Get hypothesis from session state (set in Step 1)
+    hypothesis = st.session_state.get('hypothesis', 'A/B Test')
+
+    # Notify Target App that experiment is starting
+    if _activate_experiment(current_run_id, hypothesis):
+        st.toast("🔗 Target App에 실험 시작 알림 완료", icon="✅")
+    else:
+        st.warning("⚠️ Target App 연동 실패 - 독립 모드로 진행")
+
     traits = ["Window", "Mission", "Rational", "Impulsive", "Cautious"]
     weights_str = ",".join([str(st.session_state['p_dist'].get(t, 20)) for t in traits])
 
@@ -288,6 +342,9 @@ def _run_simulation(actual_agents, weight_multiplier, turbo):
         st.session_state.pop('sim_process', None)
 
         if not st.session_state.get('sim_stop_requested', False):
+            # Notify Target App that experiment data collection is complete
+            _deactivate_experiment()
+
             status_container.update(
                 label=f"✅ 시뮬레이션 완료! (Exit Code: {exit_code})",
                 state="complete", expanded=False
@@ -298,6 +355,8 @@ def _run_simulation(actual_agents, weight_multiplier, turbo):
             st.rerun()
 
     except Exception as e:
+        # Deactivate experiment on error too
+        _deactivate_experiment()
         st.error(f"시뮬레이션 중 오류 발생: {e}")
         import traceback
         st.code(traceback.format_exc())

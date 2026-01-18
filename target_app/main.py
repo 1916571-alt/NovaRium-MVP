@@ -239,7 +239,18 @@ async def startup_event():
                                 adoption_id SERIAL PRIMARY KEY,
                                 experiment_id VARCHAR(255),
                                 variant_config TEXT,
-                                adopted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                                adopted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                traffic_percentage FLOAT DEFAULT 100.0
+                            )
+                        """)
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS active_experiment (
+                                id INTEGER PRIMARY KEY DEFAULT 1,
+                                run_id VARCHAR(255),
+                                hypothesis VARCHAR(500),
+                                is_active BOOLEAN DEFAULT false,
+                                started_at TIMESTAMP,
+                                ended_at TIMESTAMP
                             )
                         """)
                     conn.commit()
@@ -255,6 +266,8 @@ async def startup_event():
             with db_lock:
                 db_con.execute("CREATE TABLE IF NOT EXISTS events (event_id VARCHAR, user_id VARCHAR, event_name VARCHAR, timestamp TIMESTAMP, value DOUBLE, run_id VARCHAR)")
                 db_con.execute("CREATE TABLE IF NOT EXISTS assignments (user_id VARCHAR, experiment_id VARCHAR, variant VARCHAR, assigned_at TIMESTAMP, run_id VARCHAR, weight FLOAT DEFAULT 1.0)")
+                db_con.execute("CREATE TABLE IF NOT EXISTS adoptions (adoption_id INTEGER, experiment_id VARCHAR, variant_config VARCHAR, adopted_at TIMESTAMP, traffic_percentage FLOAT DEFAULT 100.0)")
+                db_con.execute("CREATE TABLE IF NOT EXISTS active_experiment (id INTEGER, run_id VARCHAR, hypothesis VARCHAR, is_active BOOLEAN, started_at TIMESTAMP, ended_at TIMESTAMP)")
 
             logger.info("DuckDB Connected and Tables Checked")
     except Exception as e:
@@ -409,7 +422,10 @@ def log_event(uid, variant, event_name, value=0.0, run_id=None):
         print(f"[App] Log Error: {e}")
 
 def get_adopted_variant():
-    """Check if there's an adopted experiment and return the winning variant."""
+    """
+    Check if there's an adopted experiment and return the winning variant.
+    Now includes traffic_percentage for gradual rollout support.
+    """
     global db_con
     import json
 
@@ -422,7 +438,7 @@ def get_adopted_variant():
                 try:
                     with conn.cursor() as cur:
                         cur.execute("""
-                            SELECT variant_config
+                            SELECT variant_config, COALESCE(traffic_percentage, 100.0) as traffic_pct
                             FROM adoptions
                             ORDER BY adopted_at DESC
                             LIMIT 1
@@ -434,6 +450,7 @@ def get_adopted_variant():
                 if result and result[0]:
                     variant_config = json.loads(result[0]) if isinstance(result[0], str) else result[0]
                     if variant_config and isinstance(variant_config, dict) and variant_config.get('winning_variant'):
+                        variant_config['traffic_percentage'] = result[1]
                         logger.info(f"Adopted variant detected: {variant_config}")
                         return variant_config
         else:
@@ -442,7 +459,7 @@ def get_adopted_variant():
                 return None
             with db_lock:
                 result = db_con.execute("""
-                    SELECT variant_config
+                    SELECT variant_config, COALESCE(traffic_percentage, 100.0) as traffic_pct
                     FROM adoptions
                     ORDER BY adopted_at DESC
                     LIMIT 1
@@ -451,6 +468,7 @@ def get_adopted_variant():
                 if result and result[0]:
                     variant_config = json.loads(result[0])
                     if variant_config and isinstance(variant_config, dict) and variant_config.get('winning_variant'):
+                        variant_config['traffic_percentage'] = result[1]
                         logger.info(f"Adopted variant detected: {variant_config}")
                         return variant_config
                     else:
@@ -494,11 +512,15 @@ def is_experiment_active():
 
 def get_assignment(uid: str):
     """
-    Assignment logic for continuous experimentation:
+    Assignment logic for continuous experimentation with gradual rollout:
     1. If experiment is active -> A/B split (A=current baseline, B=new variant)
-    2. If no experiment but has adoption -> everyone sees adopted variant (baseline)
+    2. If no experiment but has adoption:
+       - If traffic_percentage < 100 -> gradual rollout (partial users see adopted)
+       - If traffic_percentage = 100 -> everyone sees adopted variant
     3. If no experiment and no adoption -> default A/B split (initial state)
     """
+    import random
+
     experiment_active = is_experiment_active()
     adopted = get_adopted_variant()
 
@@ -512,10 +534,27 @@ def get_assignment(uid: str):
         return variant
 
     if adopted:
-        # No active experiment, but has adoption = show adopted variant to everyone
         winning = adopted.get('winning_variant', 'B')
-        logger.info(f"No experiment, using adopted baseline: {winning}")
-        return winning
+        traffic_pct = adopted.get('traffic_percentage', 100.0)
+
+        if traffic_pct >= 100:
+            # Full rollout: everyone sees adopted variant
+            logger.info(f"Full rollout: {uid} -> {winning}")
+            return winning
+        elif traffic_pct <= 0:
+            # 0% rollout: everyone sees original baseline (A)
+            logger.info(f"No rollout yet: {uid} -> A")
+            return 'A'
+        else:
+            # Gradual rollout: traffic_pct% see adopted, rest see A
+            # Use consistent hashing for sticky assignment
+            hash_val = int(hashlib.md5(f"rollout_{uid}".encode()).hexdigest(), 16) % 100
+            if hash_val < traffic_pct:
+                logger.info(f"Gradual rollout ({traffic_pct}%): {uid} -> {winning}")
+                return winning
+            else:
+                logger.info(f"Gradual rollout ({traffic_pct}%): {uid} -> A (control)")
+                return 'A'
 
     # Initial state: no experiment, no adoption = default A/B split
     hash_val = int(hashlib.md5(uid.encode()).hexdigest(), 16)
@@ -777,6 +816,297 @@ async def reconnect_db():
     except Exception as e:
         logger.error(f"DB reconnect error: {e}")
         return {"status": "error", "message": str(e)}
+
+
+# =============================================================================
+# Experiment Lifecycle Management APIs
+# =============================================================================
+
+class ExperimentRequest(BaseModel):
+    run_id: str
+    hypothesis: Optional[str] = None
+
+class RolloutRequest(BaseModel):
+    adoption_id: int
+    traffic_percentage: float  # 0-100
+
+@app.post("/admin/activate_experiment")
+async def activate_experiment(body: ExperimentRequest):
+    """
+    Activate an experiment - signals that A/B testing is in progress.
+    Called by Streamlit when simulation starts (Step 3).
+    """
+    global db_con
+
+    try:
+        logger.info(f"Activating experiment: {body.run_id}")
+
+        if is_cloud_mode():
+            pool = get_pg_pool()
+            if not pool:
+                return {"status": "error", "message": "PostgreSQL pool not available"}
+
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    # Upsert active experiment
+                    cur.execute("""
+                        INSERT INTO active_experiment (id, run_id, hypothesis, is_active, started_at)
+                        VALUES (1, %s, %s, true, CURRENT_TIMESTAMP)
+                        ON CONFLICT (id) DO UPDATE SET
+                            run_id = EXCLUDED.run_id,
+                            hypothesis = EXCLUDED.hypothesis,
+                            is_active = true,
+                            started_at = CURRENT_TIMESTAMP,
+                            ended_at = NULL
+                    """, (body.run_id, body.hypothesis))
+                conn.commit()
+                logger.info(f"Experiment activated: {body.run_id}")
+            finally:
+                pool.putconn(conn)
+        else:
+            if not db_con:
+                return {"status": "error", "message": "DuckDB not connected"}
+
+            with db_lock:
+                # Check if row exists
+                exists = db_con.execute("SELECT 1 FROM active_experiment WHERE id = 1").fetchone()
+                if exists:
+                    db_con.execute("""
+                        UPDATE active_experiment SET
+                            run_id = ?, hypothesis = ?, is_active = true,
+                            started_at = CURRENT_TIMESTAMP, ended_at = NULL
+                        WHERE id = 1
+                    """, [body.run_id, body.hypothesis])
+                else:
+                    db_con.execute("""
+                        INSERT INTO active_experiment (id, run_id, hypothesis, is_active, started_at)
+                        VALUES (1, ?, ?, true, CURRENT_TIMESTAMP)
+                    """, [body.run_id, body.hypothesis])
+                logger.info(f"Experiment activated: {body.run_id}")
+
+        return {
+            "status": "success",
+            "message": f"Experiment {body.run_id} activated",
+            "run_id": body.run_id,
+            "is_active": True
+        }
+
+    except Exception as e:
+        logger.error(f"Activate experiment error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/admin/deactivate_experiment")
+async def deactivate_experiment():
+    """
+    Deactivate the current experiment - signals that testing is complete.
+    Called by Streamlit when simulation ends (Step 3 complete).
+    """
+    global db_con
+
+    try:
+        logger.info("Deactivating experiment")
+
+        if is_cloud_mode():
+            pool = get_pg_pool()
+            if not pool:
+                return {"status": "error", "message": "PostgreSQL pool not available"}
+
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE active_experiment SET
+                            is_active = false,
+                            ended_at = CURRENT_TIMESTAMP
+                        WHERE id = 1
+                    """)
+                conn.commit()
+                logger.info("Experiment deactivated")
+            finally:
+                pool.putconn(conn)
+        else:
+            if not db_con:
+                return {"status": "error", "message": "DuckDB not connected"}
+
+            with db_lock:
+                db_con.execute("""
+                    UPDATE active_experiment SET
+                        is_active = false,
+                        ended_at = CURRENT_TIMESTAMP
+                    WHERE id = 1
+                """)
+                logger.info("Experiment deactivated")
+
+        return {"status": "success", "message": "Experiment deactivated", "is_active": False}
+
+    except Exception as e:
+        logger.error(f"Deactivate experiment error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/admin/experiment_status")
+async def get_experiment_status():
+    """Get current experiment status."""
+    global db_con
+
+    try:
+        if is_cloud_mode():
+            pool = get_pg_pool()
+            if not pool:
+                return {"status": "error", "message": "PostgreSQL pool not available"}
+
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT run_id, hypothesis, is_active, started_at, ended_at FROM active_experiment WHERE id = 1")
+                    row = cur.fetchone()
+                    if row:
+                        return {
+                            "status": "success",
+                            "run_id": row[0],
+                            "hypothesis": row[1],
+                            "is_active": row[2],
+                            "started_at": str(row[3]) if row[3] else None,
+                            "ended_at": str(row[4]) if row[4] else None
+                        }
+                    return {"status": "success", "is_active": False, "message": "No experiment configured"}
+            finally:
+                pool.putconn(conn)
+        else:
+            if not db_con:
+                return {"status": "error", "message": "DuckDB not connected"}
+
+            with db_lock:
+                row = db_con.execute("SELECT run_id, hypothesis, is_active, started_at, ended_at FROM active_experiment WHERE id = 1").fetchone()
+                if row:
+                    return {
+                        "status": "success",
+                        "run_id": row[0],
+                        "hypothesis": row[1],
+                        "is_active": row[2],
+                        "started_at": str(row[3]) if row[3] else None,
+                        "ended_at": str(row[4]) if row[4] else None
+                    }
+                return {"status": "success", "is_active": False, "message": "No experiment configured"}
+
+    except Exception as e:
+        logger.error(f"Experiment status error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/admin/rollback_adoption")
+async def rollback_adoption(adoption_id: int = None):
+    """
+    Rollback (delete) an adoption - revert to previous baseline.
+    If adoption_id is None, removes the most recent adoption.
+    """
+    global db_con
+
+    try:
+        logger.info(f"Rolling back adoption: {adoption_id or 'latest'}")
+
+        if is_cloud_mode():
+            pool = get_pg_pool()
+            if not pool:
+                return {"status": "error", "message": "PostgreSQL pool not available"}
+
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    if adoption_id:
+                        cur.execute("DELETE FROM adoptions WHERE adoption_id = %s RETURNING adoption_id", (adoption_id,))
+                    else:
+                        cur.execute("""
+                            DELETE FROM adoptions WHERE adoption_id = (
+                                SELECT adoption_id FROM adoptions ORDER BY adopted_at DESC LIMIT 1
+                            ) RETURNING adoption_id
+                        """)
+                    deleted = cur.fetchone()
+                conn.commit()
+                if deleted:
+                    logger.info(f"Adoption {deleted[0]} rolled back")
+                    return {"status": "success", "message": f"Adoption {deleted[0]} rolled back", "deleted_id": deleted[0]}
+                return {"status": "warning", "message": "No adoption found to rollback"}
+            finally:
+                pool.putconn(conn)
+        else:
+            if not db_con:
+                return {"status": "error", "message": "DuckDB not connected"}
+
+            with db_lock:
+                if adoption_id:
+                    result = db_con.execute("SELECT adoption_id FROM adoptions WHERE adoption_id = ?", [adoption_id]).fetchone()
+                    if result:
+                        db_con.execute("DELETE FROM adoptions WHERE adoption_id = ?", [adoption_id])
+                else:
+                    result = db_con.execute("SELECT adoption_id FROM adoptions ORDER BY adopted_at DESC LIMIT 1").fetchone()
+                    if result:
+                        db_con.execute("DELETE FROM adoptions WHERE adoption_id = ?", [result[0]])
+
+                if result:
+                    logger.info(f"Adoption {result[0]} rolled back")
+                    return {"status": "success", "message": f"Adoption {result[0]} rolled back", "deleted_id": result[0]}
+                return {"status": "warning", "message": "No adoption found to rollback"}
+
+    except Exception as e:
+        logger.error(f"Rollback adoption error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/admin/update_rollout")
+async def update_rollout(body: RolloutRequest):
+    """
+    Update traffic percentage for gradual rollout.
+    Allows ramping up from 0% to 100% over time.
+    """
+    global db_con
+
+    try:
+        if body.traffic_percentage < 0 or body.traffic_percentage > 100:
+            return {"status": "error", "message": "traffic_percentage must be between 0 and 100"}
+
+        logger.info(f"Updating rollout: adoption {body.adoption_id} -> {body.traffic_percentage}%")
+
+        if is_cloud_mode():
+            pool = get_pg_pool()
+            if not pool:
+                return {"status": "error", "message": "PostgreSQL pool not available"}
+
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE adoptions SET traffic_percentage = %s
+                        WHERE adoption_id = %s
+                    """, (body.traffic_percentage, body.adoption_id))
+                conn.commit()
+                logger.info(f"Rollout updated: {body.traffic_percentage}%")
+            finally:
+                pool.putconn(conn)
+        else:
+            if not db_con:
+                return {"status": "error", "message": "DuckDB not connected"}
+
+            with db_lock:
+                db_con.execute("""
+                    UPDATE adoptions SET traffic_percentage = ?
+                    WHERE adoption_id = ?
+                """, [body.traffic_percentage, body.adoption_id])
+                logger.info(f"Rollout updated: {body.traffic_percentage}%")
+
+        return {
+            "status": "success",
+            "message": f"Traffic now at {body.traffic_percentage}%",
+            "adoption_id": body.adoption_id,
+            "traffic_percentage": body.traffic_percentage
+        }
+
+    except Exception as e:
+        logger.error(f"Update rollout error: {e}")
+        return {"status": "error", "message": str(e)}
+
 
 if __name__ == "__main__":
     # Ensure tables exist before server start if running directly
