@@ -28,7 +28,11 @@
       "Bash(git stash:*)",
       "Bash(git pull:*)",
       "Bash(git checkout:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pytest:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:novarium-mvp-s9fouprzj5apgznzehprcr.streamlit.app)"
     ]
   }
 }

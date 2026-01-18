@@ -96,10 +96,13 @@ class HeuristicAgent:
                 )
 
             # 4. Purchase Decision (Delegated to Strategy)
+            # Now variant also affects purchase probability
             purchased = False
-            if clicked and self.behavior.should_purchase():
+            if clicked and self.behavior.should_purchase(variant):
                 purchased = True
-                order_data = {"uid": self.agent_id, "amount": random.randint(15000, 50000)}
+                # Use persona-based AOV instead of random
+                order_value = self.behavior.get_order_value()
+                order_data = {"uid": self.agent_id, "amount": order_value}
                 if self.run_id:
                     order_data["run_id"] = self.run_id
                 self.session.post(
