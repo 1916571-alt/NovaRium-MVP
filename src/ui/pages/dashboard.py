@@ -9,17 +9,15 @@ import time
 from datetime import datetime
 
 from src.core import stats as al
+from src.core import cache
 
 
 def render():
     """Render the dashboard/operations center page."""
     _render_header()
 
-    # Check for historical data
-    check_history = al.run_query(
-        "SELECT COUNT(*) as cnt FROM assignments WHERE user_id LIKE 'user_hist_%'"
-    )
-    has_history = not check_history.empty and check_history.iloc[0, 0] > 0
+    # Check for historical data (cached)
+    has_history = cache.check_historical_data()
 
     if not has_history:
         _render_no_data_warning()
@@ -57,20 +55,8 @@ def _render_realtime_pulse():
     """Render real-time pulse section."""
     st.markdown("### 🟢 실시간 운영 현황 (Real-time Pulse)")
 
-    # Real-time Queries
-    sql_live = """
-        SELECT
-            COUNT(DISTINCT user_id) as active_users,
-            (SELECT COUNT(*) FROM events
-             WHERE event_name = 'purchase'
-             AND timestamp >= CURRENT_DATE) as today_orders,
-             (SELECT COALESCE(SUM(value), 0) FROM events
-             WHERE event_name = 'purchase'
-             AND timestamp >= CURRENT_DATE) as today_revenue
-        FROM events
-        WHERE timestamp >= CURRENT_TIMESTAMP - INTERVAL 30 MINUTE
-    """
-    live_stats = al.run_query(sql_live)
+    # Real-time Queries (cached for 30 seconds)
+    live_stats = cache.get_live_stats()
 
     if not live_stats.empty:
         now_users = live_stats.iloc[0]['active_users']
@@ -118,12 +104,8 @@ def _render_recent_events():
     """Render recent events ticker."""
     st.caption("🔊 Recent Events Log (Real DB)")
 
-    sql_log = """
-        SELECT user_id, event_name, value, timestamp
-        FROM events
-        ORDER BY timestamp DESC LIMIT 3
-    """
-    df_log = al.run_query(sql_log)
+    # Use cached query (30 second TTL)
+    df_log = cache.get_recent_events(limit=3)
 
     log_html_items = []
     for _, row in df_log.iterrows():
@@ -146,9 +128,8 @@ def _render_business_intelligence():
     """Render business intelligence section."""
     st.markdown("### 🔵 비즈니스 분석 (Business Intelligence)")
 
-    # Fetch from Data Mart
-    sql_mart = "SELECT * FROM dm_daily_kpi ORDER BY report_date ASC"
-    df_trend = al.run_query(sql_mart)
+    # Fetch from Data Mart (cached for 5 minutes)
+    df_trend = cache.get_daily_kpi()
 
     if df_trend.empty:
         st.warning("데이터 마트가 비어있습니다. Data Lab에서 먼저 마트를 구축하세요.")
@@ -278,9 +259,8 @@ def _render_system_monitor():
     """Render system and crisis monitoring section."""
     st.markdown("### 🟠 시스템 및 위기 감지 (System Integrity)")
 
-    # Fetch mart data for alerts
-    sql_mart = "SELECT * FROM dm_daily_kpi ORDER BY report_date ASC"
-    df_trend = al.run_query(sql_mart)
+    # Fetch mart data for alerts (cached for 5 minutes)
+    df_trend = cache.get_daily_kpi()
 
     if df_trend.empty:
         st.info("데이터가 없어 위기 감지를 수행할 수 없습니다.")

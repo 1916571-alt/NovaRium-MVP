@@ -9,6 +9,7 @@ import os
 import time
 
 from src.core import stats as al
+from src.core import cache
 from src.ui import components as ui
 
 
@@ -89,7 +90,8 @@ GROUP BY 1
 
         if analyze_clicked:
             with st.spinner("DuckDB 분석 중: 고객 세그먼트 추출..."):
-                dist = al.get_user_segments()
+                # Use cached query (5-minute TTL)
+                dist = cache.get_user_segments()
                 st.session_state['p_dist'] = dist
                 st.toast("분석 완료! 고객 분포가 적용되었습니다.", icon="✅")
                 st.rerun()

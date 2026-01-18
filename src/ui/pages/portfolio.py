@@ -3,7 +3,7 @@ Portfolio Page - Experiment Retrospective
 """
 import streamlit as st
 
-from src.core import stats as al
+from src.core import cache
 
 
 def render():
@@ -23,19 +23,8 @@ def _render_adopted_experiments():
     st.caption("플랫폼에 실제로 적용된 성공적인 실험들")
 
     try:
-        df_adoptions = al.run_query("""
-            SELECT
-                a.experiment_id,
-                a.adopted_at,
-                a.lift,
-                a.p_value,
-                e.hypothesis,
-                e.target,
-                e.primary_metric
-            FROM adoptions a
-            LEFT JOIN experiments e ON a.experiment_id = e.run_id
-            ORDER BY a.adopted_at DESC
-        """)
+        # Use cached query (5-minute TTL)
+        df_adoptions = cache.get_adopted_experiments()
 
         if not df_adoptions.empty:
             for _, row in df_adoptions.iterrows():
@@ -66,7 +55,8 @@ def _render_all_experiments():
     """Render all experiment history."""
     st.markdown("### 📋 전체 실험 기록 (All Experiments)")
 
-    df_history = al.run_query("SELECT * FROM experiments ORDER BY created_at DESC")
+    # Use cached query (5-minute TTL)
+    df_history = cache.get_experiment_history()
 
     if df_history.empty:
         st.info("실험 기록이 없습니다.")

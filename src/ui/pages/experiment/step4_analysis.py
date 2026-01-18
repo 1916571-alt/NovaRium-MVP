@@ -9,6 +9,7 @@ import json
 import duckdb
 
 from src.core import stats as al
+from src.core import cache
 from src.ui import components as ui
 
 
@@ -62,9 +63,8 @@ def _render_no_run_id_warning():
     st.error("⚠️ 실험 데이터를 찾을 수 없습니다!")
     st.info("Step 3 (데이터 모으기)에서 시뮬레이션을 먼저 실행해주세요.")
 
-    available_runs = al.run_query(
-        "SELECT DISTINCT run_id FROM assignments WHERE run_id IS NOT NULL ORDER BY run_id DESC LIMIT 5"
-    )
+    # Use cached query (5-minute TTL)
+    available_runs = cache.get_available_runs()
     if not available_runs.empty:
         st.write("사용 가능한 실험 run_id:")
         st.dataframe(available_runs)
