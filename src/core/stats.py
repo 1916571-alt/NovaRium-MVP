@@ -1,204 +1,259 @@
-"""
-Statistics and database utilities for NovaRium Edu.
-
-This module provides:
-- Database connection management
-- SQL query execution with retry logic
-- A/B test statistical calculations
-- User segmentation analysis
-"""
 import duckdb
 import os
 import hashlib
-import logging
-import time
-from typing import Optional, Dict, Any, Union
-
 import numpy as np
 import pandas as pd
-from scipy import stats as scipy_stats
-import requests
+from scipy import stats
 import streamlit as st
+import logging
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Stats")
 
-# Constants
-DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    'novarium_local.db'
-)
-
-
-class DatabaseError(Exception):
-    """Base exception for database errors."""
+# Try to load environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
     pass
 
+# Constants (DB Paths - Split Architecture)
+# Assuming this script is in src/core/ folder, so db is two levels up
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(_BASE_DIR, 'data')
+WAREHOUSE_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_warehouse.db')  # users, orders, 30-day history
+EXPERIMENT_DB_PATH = os.path.join(DATA_DIR, 'db', 'novarium_experiment.db')  # assignments, events, experiments
 
-class QueryError(DatabaseError):
-    """Exception raised when a query fails."""
-    pass
+# Default DB_PATH points to experiment DB (most queries use this)
+DB_PATH = EXPERIMENT_DB_PATH
 
-
-class ConnectionError(DatabaseError):
-    """Exception raised when database connection fails."""
-    pass
-
-
-def get_connection() -> duckdb.DuckDBPyConnection:
-    """
-    Establish a connection to the DuckDB database.
-
-    Returns:
-        DuckDB connection object
-
-    Raises:
-        ConnectionError: If connection cannot be established
-    """
+# Cloud deployment configuration - prioritize Streamlit secrets
+def _get_secret(key: str, default: str = '') -> str:
+    """Get config from Streamlit secrets first, then env vars."""
     try:
-        return duckdb.connect(DB_PATH)
-    except Exception as e:
-        logger.error(f"Failed to connect to database: {e}")
-        raise ConnectionError(f"Failed to connect to database: {e}") from e
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
 
+DB_MODE = _get_secret('DB_MODE', 'duckdb')  # 'duckdb' for local, 'supabase' for cloud
+_raw_database_url = _get_secret('DATABASE_URL', '')  # PostgreSQL connection string
+TARGET_APP_URL = _get_secret('TARGET_APP_URL', 'http://localhost:8000')
 
-def run_query(
-    query: str,
-    con: Optional[duckdb.DuckDBPyConnection] = None,
-    max_retries: int = 5,
-    retry_delay: float = 0.5
-) -> pd.DataFrame:
+# Ensure SSL mode is set for cloud PostgreSQL connections
+def _ensure_ssl(url: str) -> str:
+    """Add sslmode=require if not present in DATABASE_URL."""
+    if not url:
+        return url
+    if 'sslmode=' not in url:
+        separator = '&' if '?' in url else '?'
+        return f"{url}{separator}sslmode=require"
+    return url
+
+DATABASE_URL = _ensure_ssl(_raw_database_url)
+
+def is_cloud_mode():
+    """Check if running in cloud mode (Supabase)."""
+    return DB_MODE == 'supabase' and bool(DATABASE_URL)
+
+def get_connection():
+    """
+    Establish a connection to the database.
+    Returns DuckDB connection for local, None for cloud (use run_query instead).
+    """
+    if is_cloud_mode():
+        return None
+    return duckdb.connect(DB_PATH)
+
+def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experiment'):
     """
     Execute a SQL query and return the result as a DataFrame.
-
-    Prioritizes Server API to avoid file locking, then falls back to direct access.
+    Supports both DuckDB (local) and PostgreSQL (Supabase cloud).
 
     Args:
-        query: SQL query string to execute
-        con: Optional existing database connection
-        max_retries: Maximum number of retry attempts for lock errors
-        retry_delay: Base delay between retries (uses exponential backoff)
-
-    Returns:
-        Query results as a pandas DataFrame. Empty DataFrame on error.
+        query: SQL query string
+        con: Optional existing connection
+        max_retries: Number of retry attempts for lock errors
+        retry_delay: Base delay between retries
+        db_type: 'experiment' (default) or 'warehouse'
     """
+    import time
+    import requests
+
+    # Cloud mode: Use PostgreSQL
+    if is_cloud_mode():
+        return _pg_query(query)
+
+    # Select DB path based on type
+    target_db = WAREHOUSE_DB_PATH if db_type == 'warehouse' else EXPERIMENT_DB_PATH
+
     if con:
-        return _execute_with_connection(query, con)
+        # If connection is provided, use it directly (no retry needed)
+        try:
+            return con.execute(query).df()
+        except Exception as e:
+            try:
+                logger.error(f"Query Error (Existing Conn): {repr(e)}")
+            except:
+                pass
+            return pd.DataFrame()
 
-    # Try via Server API first (preferred to avoid locking)
-    result = _try_server_api(query)
-    if result is not None:
-        return result
+    # 1. Try via Server API (Preferred) - only for experiment DB in local mode
+    if db_type == 'experiment':
+        try:
+            response = requests.post(f"{TARGET_APP_URL}/admin/execute_sql", json={"sql": query}, timeout=2)
+            if response.status_code == 200:
+                res_json = response.json()
+                if res_json.get("status") == "success":
+                    data = res_json.get("data")
+                    cols = res_json.get("columns", [])
 
-    # Fallback to direct DB access with retry logic
-    return _execute_with_retry(query, max_retries, retry_delay)
+                    if data is not None:
+                        if not data and not cols:
+                             return pd.DataFrame()
+                        if cols:
+                            return pd.DataFrame(data, columns=cols)
+                        return pd.DataFrame(data)
+                    else:
+                        return pd.DataFrame()
+        except:
+            pass # API failed, fallback to direct DB
 
-
-def _execute_with_connection(
-    query: str,
-    con: duckdb.DuckDBPyConnection
-) -> pd.DataFrame:
-    """Execute query using an existing connection."""
-    try:
-        return con.execute(query).df()
-    except Exception as e:
-        logger.warning(f"Query failed with existing connection: {e}")
-        return pd.DataFrame()
-
-
-def _try_server_api(query: str) -> Optional[pd.DataFrame]:
-    """
-    Try to execute query via the server API.
-
-    Returns:
-        DataFrame if successful, None if API is unavailable
-    """
-    try:
-        response = requests.post(
-            "http://localhost:8000/admin/execute_sql",
-            json={"sql": query},
-            timeout=2
-        )
-        if response.status_code == 200:
-            res_json = response.json()
-            if res_json.get("status") == "success":
-                data = res_json.get("data")
-                cols = res_json.get("columns", [])
-
-                if data is None:
-                    return pd.DataFrame()
-                if not data and not cols:
-                    return pd.DataFrame()
-                if cols:
-                    return pd.DataFrame(data, columns=cols)
-                return pd.DataFrame(data)
-    except requests.RequestException as e:
-        logger.debug(f"Server API unavailable: {e}")
-    except Exception as e:
-        logger.debug(f"Server API error: {e}")
-
-    return None
-
-
-def _execute_with_retry(
-    query: str,
-    max_retries: int,
-    retry_delay: float
-) -> pd.DataFrame:
-    """Execute query with retry logic for transient lock errors."""
+    # 2. Retry logic for transient connections (handles file locks)
     for attempt in range(max_retries):
         try:
-            with duckdb.connect(DB_PATH, read_only=True) as conn:
+            # Explicitly set read_only=True to allow concurrent reads even if locked by writer
+            with duckdb.connect(target_db, read_only=True) as conn:
                 return conn.execute(query).df()
         except Exception as e:
             error_msg = str(e).lower()
 
-            # Check if it's a lock-related error
-            is_lock_error = any(
-                keyword in error_msg
-                for keyword in ['cannot open file', 'lock', 'access', 'process']
-            )
-
-            if is_lock_error and attempt < max_retries - 1:
-                wait_time = retry_delay * (2 ** attempt)
-                logger.info(
-                    f"DB locked, retrying in {wait_time:.2f}s "
-                    f"(Attempt {attempt + 1}/{max_retries})"
-                )
-                time.sleep(wait_time)
-                continue
+            # Check if it's a lock error
+            if 'cannot open file' in error_msg or 'lock' in error_msg or 'access' in error_msg or 'process' in error_msg:
+                if attempt < max_retries - 1:
+                    # Exponential backoff
+                    wait_time = retry_delay * (2 ** attempt)
+                    try:
+                        logger.warning(f"DB locked, retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
+                    except:
+                        pass
+                    time.sleep(wait_time)
+                    continue
 
             # Non-lock error or final retry failed
-            logger.warning(f"Query failed after {attempt + 1} attempts: {e}")
+            try:
+                logger.error(f"Query failed: {repr(e)}")
+            except:
+                pass
             return pd.DataFrame()
 
-    return pd.DataFrame()
+def _convert_duckdb_to_pg(query):
+    """Convert DuckDB SQL syntax to PostgreSQL."""
+    import re
+    pg_query = query
+
+    # INTERVAL 30 MINUTE -> INTERVAL '30 minutes'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+MINUTE",
+        r"INTERVAL '\1 minutes'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # INTERVAL 1 DAY -> INTERVAL '1 day'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+DAY",
+        r"INTERVAL '\1 days'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # INTERVAL 1 HOUR -> INTERVAL '1 hour'
+    pg_query = re.sub(
+        r"INTERVAL\s+(\d+)\s+HOUR",
+        r"INTERVAL '\1 hours'",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # DATE_DIFF('day', start, end) -> EXTRACT(DAY FROM (end - start))
+    # DuckDB: DATE_DIFF('day', MIN(u.joined_at)::TIMESTAMP, CURRENT_DATE)
+    # PostgreSQL: EXTRACT(DAY FROM (CURRENT_DATE - MIN(u.joined_at)::TIMESTAMP))
+    pg_query = re.sub(
+        r"DATE_DIFF\s*\(\s*['\"]day['\"]\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)",
+        r"EXTRACT(DAY FROM (\2 - \1))",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    # DATEDIFF('second', start, end) -> EXTRACT(EPOCH FROM (end - start))
+    # Simple case without nested parentheses (complex cases should be handled in app.py directly)
+    pg_query = re.sub(
+        r"DATEDIFF\s*\(\s*['\"]second['\"]\s*,\s*([^,)]+)\s*,\s*([^)]+)\s*\)",
+        r"EXTRACT(EPOCH FROM (\2 - \1))",
+        pg_query,
+        flags=re.IGNORECASE
+    )
+
+    return pg_query
+
+def _pg_query(query):
+    """Execute query on PostgreSQL (Supabase cloud)."""
+    global _pg_pool
+    try:
+        import psycopg2
+        from psycopg2 import pool
+
+        # Convert DuckDB syntax to PostgreSQL
+        pg_query = _convert_duckdb_to_pg(query)
+
+        # Get connection from pool (create if needed)
+        if _pg_pool is None:
+            logger.info(f"Creating PostgreSQL pool (DB_MODE={DB_MODE})")
+            _pg_pool = pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=5,
+                dsn=DATABASE_URL
+            )
+            logger.info("PostgreSQL pool created successfully")
+
+        conn = _pg_pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(pg_query)
+                if cur.description:
+                    columns = [desc[0] for desc in cur.description]
+                    data = cur.fetchall()
+                    return pd.DataFrame(data, columns=columns)
+                return pd.DataFrame()
+        finally:
+            _pg_pool.putconn(conn)
+    except psycopg2.OperationalError as e:
+        logger.error(f"PostgreSQL OperationalError: {e}")
+        logger.error("Check: DATABASE_URL, password, SSL settings")
+        _pg_pool = None
+        return pd.DataFrame()
+    except psycopg2.Error as e:
+        logger.error(f"PostgreSQL Error [{e.pgcode}]: {e.pgerror or e}")
+        return pd.DataFrame()
+    except Exception as e:
+        logger.error(f"PostgreSQL query error: {type(e).__name__}: {e}")
+        return pd.DataFrame()
+
+_pg_pool = None
 
 
-@st.cache_data(ttl=3600)
-def calculate_sample_size(
-    baseline_cvr: float,
-    mde: float,
-    alpha: float = 0.05,
-    power: float = 0.8
-) -> int:
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     """
     Calculate required sample size per variation for A/B testing.
-
     Uses Z-test formula for proportions.
-
-    Args:
-        baseline_cvr: Baseline conversion rate (e.g., 0.10 for 10%)
-        mde: Minimum detectable effect as a proportion (e.g., 0.05 for 5% lift)
-        alpha: Significance level (default 0.05)
-        power: Statistical power (default 0.8)
-
-    Returns:
-        Required sample size per group as an integer
     """
-    standard_norm = scipy_stats.norm()
-    z_alpha = standard_norm.ppf(1 - alpha / 2)
-    z_beta = standard_norm.ppf(power)
+    standard_norm = stats.norm()
+    Z_alpha = standard_norm.ppf(1 - alpha/2)
+    Z_beta = standard_norm.ppf(power)
 
     p1 = baseline_cvr
     p2 = baseline_cvr * (1 + mde)
@@ -208,70 +263,44 @@ def calculate_sample_size(
     if p1 == p2:
         return 0
 
-    n = (2 * pooled_prob * (1 - pooled_prob) * (z_alpha + z_beta) ** 2) / (p1 - p2) ** 2
+    n = (2 * pooled_prob * (1 - pooled_prob) * (Z_alpha + Z_beta)**2) / (p1 - p2)**2
     return int(n)
 
-
-def get_bucket(user_id: Union[str, int], num_buckets: int = 100) -> int:
+def get_bucket(user_id, num_buckets=100):
     """
     Deterministic hashing function to bucket users.
-
-    Args:
-        user_id: User identifier
-        num_buckets: Number of buckets to distribute users into
-
-    Returns:
-        Bucket number between 0 and num_buckets-1
+    Returns an integer between 0 and num_buckets-1.
     """
     hash_obj = hashlib.md5(str(user_id).encode())
     return int(hash_obj.hexdigest(), 16) % num_buckets
 
-
-@st.cache_data(ttl=60)
-def calculate_statistics(
-    c_users: int,
-    c_conv: int,
-    t_users: int,
-    t_conv: int
-) -> Dict[str, float]:
+@st.cache_data(ttl=60)  # Cache for 1 minute (short TTL for live data)
+def calculate_statistics(c_users, c_conv, t_users, t_conv):
     """
-    Calculate A/B test statistics: conversion rates, lift, and P-value.
-
-    Args:
-        c_users: Number of users in control group
-        c_conv: Number of conversions in control group
-        t_users: Number of users in test group
-        t_conv: Number of conversions in test group
-
-    Returns:
-        Dictionary containing:
-        - control_rate: Control group conversion rate
-        - test_rate: Test group conversion rate
-        - lift: Relative lift (test vs control)
-        - p_value: Two-tailed p-value from Z-test
-        - z_score: Z-statistic
-        - se: Standard error
+    Calculate A/B test statistics: CVRs, Lift, and P-value.
+    Returns a dictionary with results.
     """
-    # Calculate rates
-    c_rate = c_conv / c_users if c_users > 0 else 0.0
-    t_rate = t_conv / t_users if t_users > 0 else 0.0
-
-    # Calculate lift
-    lift = (t_rate - c_rate) / c_rate if c_rate > 0 else 0.0
-
-    # Calculate P-value (Two-proportion Z-test)
+    # Rates
+    c_rate = c_conv / c_users if c_users > 0 else 0
+    t_rate = t_conv / t_users if t_users > 0 else 0
+    
+    # Lift
+    lift = (t_rate - c_rate) / c_rate if c_rate > 0 else 0
+    
+    # P-value (Two-proportion Z-test)
     p_val = 1.0
-    se = 0.0
-    z = 0.0
-
+    se = 0
+    z = 0
+    margin_of_error = 0
+    
     if c_users > 0 and t_users > 0:
         pooled_p = (c_conv + t_conv) / (c_users + t_users)
-        se = np.sqrt(pooled_p * (1 - pooled_p) * (1 / c_users + 1 / t_users))
-
+        se = np.sqrt(pooled_p * (1 - pooled_p) * (1/c_users + 1/t_users))
+        
         if se > 0:
             z = (t_rate - c_rate) / se
-            p_val = scipy_stats.norm.sf(abs(z)) * 2  # Two-tailed
-
+            p_val = stats.norm.sf(abs(z)) * 2  # Two-tailed
+    
     return {
         "control_rate": c_rate,
         "test_rate": t_rate,
@@ -281,58 +310,29 @@ def calculate_statistics(
         "se": se
     }
 
-
-def format_delta(val: float, is_percent: bool = True) -> str:
+def format_delta(val, is_percent=True):
     """
-    Format a delta value as a string with sign prefix.
-
-    Args:
-        val: The value to format
-        is_percent: If True, format as percentage
-
-    Returns:
-        Formatted string (e.g., "+5.00%" or "-0.12")
+    Helper to format delta strings (e.g., "+5.00%" or "-0.12")
     """
     prefix = "+" if val >= 0 else ""
     if is_percent:
-        return f"{prefix}{val * 100:.2f}%"
+        return f"{prefix}{val*100:.2f}%"
     return f"{prefix}{val:.4f}"
 
-
-def calculate_retention_rate(cohort_size: int, retained_count: int) -> float:
+def calculate_retention_rate(cohort_size, retained_count):
     """
     Calculate retention rate.
-
-    Args:
-        cohort_size: Total users in cohort
-        retained_count: Number of users retained
-
-    Returns:
-        Retention rate between 0.0 and 1.0
+    Returns value between 0.0 and 1.0.
     """
     if cohort_size <= 0:
         return 0.0
     return retained_count / cohort_size
 
-
-def get_user_segments(
-    con: Optional[duckdb.DuckDBPyConnection] = None
-) -> Dict[str, int]:
+def get_user_segments(con=None):
     """
     Analyze existing user behavior in DB to define Persona Distribution.
-
-    Segments users based on order history and spending patterns:
-    - Window: No orders (browsing only)
-    - Mission: 3+ orders (loyal customers)
-    - Rational: Above-average spending
-    - Impulsive: New users (< 30 days)
-    - Cautious: Long tenure with occasional orders
-
-    Args:
-        con: Optional database connection
-
-    Returns:
-        Dictionary with percentage values (0-100) for each segment
+    Returns a dictionary with percentage values (0-100) for each segment.
+    Uses WAREHOUSE DB (users, orders tables).
     """
     sql = """
     WITH user_metrics AS (
@@ -360,40 +360,31 @@ def get_user_segments(
     FROM user_metrics
     GROUP BY 1
     """
-
-    df = run_query(sql, con)
-
-    # Default distribution if query fails
-    default_dist = {
-        'Impulsive': 20,
-        'Rational': 20,
-        'Window': 40,
-        'Mission': 10,
-        'Cautious': 10
-    }
-
+    # Uses warehouse DB for users/orders data
+    df = run_query(sql, con, db_type='warehouse')
+    
     if df.empty:
-        logger.info("Using default user segment distribution")
-        return default_dist
-
+        # Fallback default
+        return {'Impulsive': 20, 'Rational': 20, 'Window': 40, 'Mission': 10, 'Cautious': 10}
+        
     total = df['cnt'].sum()
-    if total == 0:
-        return default_dist
-
+    if total == 0: return {}
+    
     seg_map = df.set_index('segment')['cnt'].to_dict()
-
+    
     # Normalize to 100% total (integer)
-    raw_dist = {k: (v / total) * 100 for k, v in seg_map.items()}
-
+    raw_dist = {k: (v/total)*100 for k, v in seg_map.items()}
+    
     # Fill missing keys
     keys = ['Impulsive', 'Rational', 'Window', 'Mission', 'Cautious']
     final_dist = {k: int(raw_dist.get(k, 0)) for k in keys}
-
-    # Adjust rounding error to ensure sum is 100
+    
+    # Adjust rounding error to ensure 100
     current_sum = sum(final_dist.values())
     diff = 100 - current_sum
     if diff != 0:
+        # Add diff to the largest segment
         max_key = max(final_dist, key=final_dist.get)
         final_dist[max_key] += diff
-
+        
     return final_dist

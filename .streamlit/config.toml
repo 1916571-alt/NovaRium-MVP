@@ -1,0 +1,35 @@
+# Streamlit Configuration for Cloud Deployment
+# This file configures Streamlit behavior for both local and cloud environments
+
+[server]
+# Port configuration (Streamlit Cloud uses 8501 by default)
+# port = 8501  # Uncomment for local development if needed
+
+# Enable CORS for API communication with FastAPI backend
+enableCORS = true
+enableXsrfProtection = false
+
+# File watcher (disable in production for better performance)
+runOnSave = false
+fileWatcherType = "none"
+
+[browser]
+# Don't open browser automatically in cloud deployment
+gatherUsageStats = false
+
+[theme]
+# NovaRium Dark Theme (Cosmic Glass)
+primaryColor = "#8B5CF6"
+backgroundColor = "#0d0d1a"
+secondaryBackgroundColor = "#1a1a2e"
+textColor = "#ffffff"
+font = "sans serif"
+
+[client]
+# Show error details in production
+showErrorDetails = true
+toolbarMode = "minimal"
+
+[runner]
+# Magic commands (for notebooks)
+magicEnabled = true

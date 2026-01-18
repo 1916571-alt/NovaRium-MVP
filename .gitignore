@@ -31,24 +31,31 @@ ENV/
 env.bak/
 venv.bak/
 
+# Streamlit secrets (cloud deployment)
+.streamlit/secrets.toml
+
 # VS Code
 .vscode/
 *.code-workspace
 
 # Data
-*.csv
 *.db
+*.wal
 *.parquet
 /data/
 /raw_data/
 !/raw_data/.gitkeep
-*.wal
+/data/db/
+/data/raw/*.csv
+!/data/raw/.gitkeep
+!/data/db/.gitkeep
 
 # Temporary files
 tmp*
 *.tmp
 *.bak
 *.log
+/tests/temp/
 
 # OS files
 .DS_Store
@@ -58,3 +65,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Temp HTML files
+*.html
