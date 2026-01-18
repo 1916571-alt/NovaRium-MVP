@@ -8,6 +8,12 @@ import streamlit as st
 import os
 import sys
 
+# =========================================================
+# Version Info
+# =========================================================
+__version__ = "1.4.0"
+__updated__ = "2025-01-18"
+
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -123,6 +129,10 @@ def _render_system_sidebar():
         else:
             st.warning("⚠️ 레거시 모드")
             st.caption("Target App 미실행 시만 사용")
+
+        # Version info at bottom
+        st.markdown("---")
+        st.caption(f"v{__version__} ({__updated__})")
 
 
 _render_system_sidebar()
