@@ -5,8 +5,9 @@
   <p>이론을 넘어 <b>실험 설계부터 데이터 파이프라인(ETL), 분석, 의사결정</b>까지<br>전 과정을 직접 시뮬레이션하며 구축한 개인 포트폴리오 프로젝트입니다.</p>
 
   ![Python](https://img.shields.io/badge/Python-3.12-blue)
-  ![Tests](https://img.shields.io/badge/Tests-156%20passed-brightgreen)
+  ![Tests](https://img.shields.io/badge/Tests-218%20passed-brightgreen)
   ![Type Hints](https://img.shields.io/badge/Type%20Hints-Yes-blue)
+  ![Version](https://img.shields.io/badge/Version-1.6.0-orange)
 </div>
 
 ---
@@ -64,8 +65,18 @@
 > *Demonstrated Skill: Product Analytics, Decision Making*
 
 - **Adoption System**: 실험 성공 시 winning variant를 즉시 프로덕션에 반영
+- **Gradual Rollout**: 점진적 트래픽 전환 (0% → 100%)으로 안전한 배포
 - **Experiment Retrospective**: 실험 종료 후 결과를 DB에 영구 저장하여 포트폴리오로 활용
 - **Learning Loop**: 이전 실험 결과를 바탕으로 다음 실험 설계에 반영
+
+### 5. 고급 통계 분석 (Advanced Statistical Analysis)
+> *Demonstrated Skill: Statistical Inference, Data Quality*
+
+- **SRM Detection**: Sample Ratio Mismatch 자동 감지로 실험 무결성 검증
+- **Sequential Testing**: O'Brien-Fleming/Pocock 조기 종료 경계 계산
+- **Lift Confidence Interval**: 95% 신뢰구간 시각화 및 유의성 판정
+- **Bonferroni Correction**: 다중 비교 보정으로 False Positive 방지
+- **Revenue Impact Estimation**: 연간 매출 영향 추정 및 민감도 분석
 
 ---
 
@@ -186,7 +197,7 @@ graph TD
 | **Visualization** | **Plotly** | 시계열 데이터 및 분포 시각화 |
 | **Cloud DB** | **Supabase (PostgreSQL)** | 클라우드 환경 데이터 영속성 |
 | **Caching** | **Streamlit @cache_data** | TTL 기반 쿼리 캐싱으로 성능 최적화 |
-| **Testing** | **Pytest** | 156개 자동화 테스트 |
+| **Testing** | **Pytest** | 218개 자동화 테스트 |
 | **Hosting** | **Streamlit Cloud + Render** | 무료 티어 클라우드 배포 |
 
 ---
@@ -354,8 +365,9 @@ NovaRium-MVP/
 │   ├── db/                         # DB 마이그레이션
 │   └── utils/                      # ETL 등 유틸리티
 │
-├── tests/                          # 테스트 코드 (156개)
+├── tests/                          # 테스트 코드 (218개)
 │   ├── test_analytics.py           # 통계 함수 테스트
+│   ├── test_advanced_stats.py      # 고급 통계 함수 테스트 (SRM, Sequential, CI)
 │   ├── test_behaviors.py           # 에이전트 행동 테스트
 │   ├── test_validators.py          # 입력 검증 테스트
 │   ├── test_errors.py              # 예외 클래스 테스트
@@ -397,6 +409,8 @@ NovaRium-MVP/
 
 | 버전 | 날짜 | 변경 내용 |
 |------|------|----------|
+| v1.6 | 2026-01 | 분석 심화: SRM 검사, Lift CI 시각화, 세그먼트 분석, 매출 영향 추정 |
+| v1.5 | 2026-01 | 시뮬레이션 정교화 (업계 벤치마크 CTR/CVR), 통계 신뢰성 강화, 실험 라이프사이클 관리 |
 | v1.4 | 2025-01 | 성능 최적화: TTL 기반 캐싱 레이어 추가 |
 | v1.3 | 2025-01 | 타입 힌트 전체 적용, 테스트 156개로 확장 |
 | v1.2 | 2025-01 | 에러 핸들링 및 입력 검증 모듈 추가 |
