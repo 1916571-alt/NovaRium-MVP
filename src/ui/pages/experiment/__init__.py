@@ -12,11 +12,15 @@ Steps:
 """
 import streamlit as st
 
+from src.ui import components as ui
 from src.ui.pages.experiment import step1_hypothesis
 from src.ui.pages.experiment import step2_design
 from src.ui.pages.experiment import step3_collection
 from src.ui.pages.experiment import step4_analysis
 from src.ui.pages.experiment.constants import PAGE_MAP, METRICS_DB
+
+# Step labels for progress indicator
+STEP_LABELS = ["1. Hypothesis", "2. Design", "3. Collection", "4. Analysis"]
 
 
 __all__ = [
@@ -42,6 +46,9 @@ def render():
         st.session_state['step'] = 1
 
     current_step = st.session_state.get('step', 1)
+
+    # Render progress indicator
+    ui.render_step_progress(STEP_LABELS, current_step)
 
     # Route to appropriate step
     if current_step == 1:
