@@ -3,6 +3,10 @@
 <div align="center">
   <h3>데이터 분석가를 위한 실전 A/B 테스트 & 데이터 마트 구축 프로젝트</h3>
   <p>이론을 넘어 <b>실험 설계부터 데이터 파이프라인(ETL), 분석, 의사결정</b>까지<br>전 과정을 직접 시뮬레이션하며 구축한 개인 포트폴리오 프로젝트입니다.</p>
+
+  ![Python](https://img.shields.io/badge/Python-3.12-blue)
+  ![Tests](https://img.shields.io/badge/Tests-156%20passed-brightgreen)
+  ![Type Hints](https://img.shields.io/badge/Type%20Hints-Yes-blue)
 </div>
 
 ---
@@ -65,6 +69,81 @@
 
 ---
 
+## 코드 품질 및 아키텍처 (Code Quality & Architecture)
+
+프로덕션 수준의 코드 품질을 목표로 다음과 같은 엔지니어링 프랙티스를 적용했습니다.
+
+### 모듈화된 아키텍처
+- **페이지 라우터 패턴**: `app.py`를 165줄의 라우터로 슬림화 (기존 2,335줄)
+- **단계별 실험 모듈**: `experiment/` 디렉토리에 4단계 위자드 구조로 분리
+- **관심사 분리**: Core(비즈니스 로직) / UI(프레젠테이션) / Data(데이터 접근) 레이어 분리
+
+### 타입 안전성 (Type Safety)
+```python
+# 모든 핵심 모듈에 타입 힌트 적용
+def calculate_statistics(
+    c_users: int, c_conv: int, t_users: int, t_conv: int
+) -> Dict[str, float]:
+    ...
+```
+
+### 에러 핸들링 (Error Handling)
+```python
+# 계층적 예외 구조
+NovariumError (Base)
+├── DatabaseError
+│   ├── ConnectionError
+│   ├── QueryError
+│   └── LockError
+├── ValidationError
+│   ├── ParameterError
+│   └── SampleSizeError
+└── ExperimentError
+    ├── ExperimentNotFoundError
+    └── StatisticalError
+```
+
+### 입력 검증 (Input Validation)
+- SQL Injection 방지를 위한 식별자 검증
+- 통계 파라미터 범위 검증 (Alpha, Power, MDE)
+- 실험 설정 유효성 검사
+
+### 성능 최적화 (Performance)
+```python
+# TTL 기반 캐싱 전략
+CACHE_TTL = {
+    'realtime': 30,    # 실시간 데이터
+    'short': 60,       # 단기 캐시
+    'medium': 300,     # 중기 캐시 (5분)
+    'long': 3600,      # 장기 캐시 (1시간)
+}
+```
+
+---
+
+## 테스트 (Testing)
+
+**156개의 자동화된 테스트**로 코드 품질을 보장합니다.
+
+```bash
+$ pytest tests/ -v
+========================= 156 passed in 43.68s =========================
+```
+
+### 테스트 커버리지
+
+| 모듈 | 테스트 수 | 설명 |
+|------|----------|------|
+| `test_validators.py` | 40 | 입력 검증 (SQL injection, 파라미터 범위) |
+| `test_errors.py` | 20 | 예외 계층 및 에러 메시지 |
+| `test_mart_builder.py` | 20 | SQL 생성 및 구문 검증 |
+| `test_experiment_module.py` | 35 | 실험 모듈 구조 및 상수 |
+| `test_behaviors.py` | 35 | 에이전트 페르소나 행동 |
+| `test_analytics.py` | 5 | 통계 계산 함수 |
+| `test_simulation.py` | 1 | 시뮬레이션 통합 테스트 |
+
+---
+
 ## 시스템 아키텍처 (Architecture)
 
 **User Flow**부터 **Data Flow**까지의 전체 흐름입니다.
@@ -100,12 +179,14 @@ graph TD
 
 | Category | Tech Stack | Usage |
 |----------|------------|-------|
-| **Analysis** | **DuckDB** | 고성능 로컬 OLAP 분석 및 데이터 저장소 |
-| **Logic** | **Statsmodels / Scipy** | T-test, Power Analysis 등 통계 검정 엔진 |
-| **Visual** | **Streamlit** | 인터랙티브 대시보드 및 실험 설계 도구 |
-| **App** | **FastAPI** | 실험 대상 서비스(Target App) 백엔드 구현 |
-| **Viz** | **Plotly** | 시계열 데이터 및 분포 시각화 |
+| **Database** | **DuckDB** | 고성능 로컬 OLAP 분석 및 데이터 저장소 |
+| **Statistics** | **Statsmodels / Scipy** | T-test, Power Analysis 등 통계 검정 엔진 |
+| **Dashboard** | **Streamlit** | 인터랙티브 대시보드 및 실험 설계 도구 |
+| **Backend** | **FastAPI** | 실험 대상 서비스(Target App) 백엔드 구현 |
+| **Visualization** | **Plotly** | 시계열 데이터 및 분포 시각화 |
 | **Cloud DB** | **Supabase (PostgreSQL)** | 클라우드 환경 데이터 영속성 |
+| **Caching** | **Streamlit @cache_data** | TTL 기반 쿼리 캐싱으로 성능 최적화 |
+| **Testing** | **Pytest** | 156개 자동화 테스트 |
 | **Hosting** | **Streamlit Cloud + Render** | 무료 티어 클라우드 배포 |
 
 ---
@@ -205,59 +286,90 @@ streamlit run src/app.py
 
 브라우저에서 `localhost:8501`이 열리면 **"마스터 클래스 (Lab)"** 탭으로 이동하여 나만의 A/B 테스트를 시작해보세요.
 
+### 4. 테스트 실행 (Run Tests)
+
+```bash
+# 전체 테스트 실행
+pytest tests/ -v
+
+# 특정 모듈 테스트
+pytest tests/test_validators.py -v
+```
+
 ---
 
 ## 프로젝트 구조 (Structure)
 
 ```
 NovaRium-MVP/
-├── src/                        # 메인 소스 코드
-│   ├── app.py                  # Streamlit 앱 (Entrypoint)
-│   ├── core/                   # 핵심 비즈니스 로직
-│   │   ├── stats.py            # 통계 검정 및 표본 계산 엔진
-│   │   ├── simulation.py       # 유저 행동 시뮬레이터
-│   │   └── mart_builder.py     # 데이터 마트 SQL 생성기
-│   ├── data/                   # 데이터베이스 관리
-│   │   └── db.py               # DB 연결 및 스키마 설정
-│   ├── ui/                     # Streamlit UI 컴포넌트
-│   └── utils/                  # 유틸리티 함수
+├── src/                            # 메인 소스 코드
+│   ├── app.py                      # Streamlit 앱 (Page Router, 165줄)
+│   │
+│   ├── core/                       # 핵심 비즈니스 로직
+│   │   ├── stats.py                # 통계 검정 및 DB 쿼리 엔진
+│   │   ├── simulation.py           # 유저 행동 시뮬레이터
+│   │   ├── mart_builder.py         # 데이터 마트 SQL 생성기
+│   │   ├── cache.py                # TTL 기반 쿼리 캐싱 레이어
+│   │   ├── errors.py               # 계층적 예외 클래스
+│   │   └── validators.py           # 입력 검증 함수
+│   │
+│   ├── ui/                         # Streamlit UI
+│   │   ├── components.py           # 공통 UI 컴포넌트
+│   │   └── pages/                  # 페이지별 모듈
+│   │       ├── dashboard.py        # 종합 상황실
+│   │       ├── data_lab.py         # 데이터 마트 빌더
+│   │       ├── portfolio.py        # 실험 회고록
+│   │       └── experiment/         # 실험 마스터클래스
+│   │           ├── __init__.py     # 모듈 초기화 및 상수
+│   │           ├── constants.py    # PAGE_MAP, METRICS_DB
+│   │           ├── step1_hypothesis.py
+│   │           ├── step2_design.py
+│   │           ├── step3_collection.py
+│   │           └── step4_analysis.py
+│   │
+│   ├── data/                       # 데이터베이스 관리
+│   │   └── db.py                   # DB 연결 및 스키마 설정
+│   │
+│   └── utils/                      # 유틸리티 함수
 │
-├── target_app/                 # 실험 대상 웹 앱 (FastAPI)
-│   ├── main.py                 # FastAPI 서버
-│   ├── templates/              # Jinja2 HTML 템플릿
-│   └── static/                 # CSS, JS 등 정적 파일
+├── target_app/                     # 실험 대상 웹 앱 (FastAPI)
+│   ├── main.py                     # FastAPI 서버
+│   ├── templates/                  # Jinja2 HTML 템플릿
+│   └── static/                     # CSS, JS 등 정적 파일
 │
-├── agent_swarm/                # AI 에이전트 시뮬레이션
-│   ├── agent.py                # 에이전트 클래스
-│   └── behaviors.py            # 페르소나별 행동 전략
+├── agent_swarm/                    # AI 에이전트 시뮬레이션
+│   ├── agent.py                    # 에이전트 클래스
+│   ├── runner.py                   # 시뮬레이션 실행기
+│   └── behaviors.py                # 페르소나별 행동 전략
 │
-├── data/                       # 데이터 파일 (gitignore)
-│   ├── db/                     # DuckDB 파일
-│   │   ├── novarium_experiment.db   # 실험 데이터
-│   │   └── novarium_warehouse.db    # 영구 데이터
-│   └── raw/                    # 원본 CSV 파일
-│       ├── users.csv
-│       ├── orders.csv
-│       └── ab_test_logs.csv
+├── data/                           # 데이터 파일 (gitignore)
+│   ├── db/                         # DuckDB 파일
+│   │   ├── novarium_experiment.db  # 실험 데이터
+│   │   └── novarium_warehouse.db   # 영구 데이터
+│   └── raw/                        # 원본 CSV 파일
 │
-├── scripts/                    # 유틸리티 스크립트
-│   ├── data/                   # 데이터 생성
-│   │   └── generate_history.py # 히스토리 데이터 생성
-│   ├── db/                     # DB 마이그레이션
-│   └── utils/                  # ETL 등 유틸리티
+├── scripts/                        # 유틸리티 스크립트
+│   ├── data/                       # 데이터 생성
+│   │   └── generate_history.py
+│   ├── db/                         # DB 마이그레이션
+│   └── utils/                      # ETL 등 유틸리티
 │
-├── tests/                      # 테스트 코드
-│   ├── test_analytics.py
-│   ├── test_behaviors.py
-│   └── test_simulation.py
+├── tests/                          # 테스트 코드 (156개)
+│   ├── test_analytics.py           # 통계 함수 테스트
+│   ├── test_behaviors.py           # 에이전트 행동 테스트
+│   ├── test_validators.py          # 입력 검증 테스트
+│   ├── test_errors.py              # 예외 클래스 테스트
+│   ├── test_mart_builder.py        # SQL 생성 테스트
+│   ├── test_experiment_module.py   # 실험 모듈 테스트
+│   └── test_simulation.py          # 시뮬레이션 통합 테스트
 │
-├── docs/                       # 문서
-│   └── design/                 # 설계 문서
+├── docs/                           # 문서
+│   └── design/                     # 설계 문서
 │       ├── PRD.md
 │       └── Ideation.md
 │
-├── requirements.txt            # Python 의존성
-└── README.md                   # 프로젝트 문서
+├── requirements.txt                # Python 의존성
+└── README.md                       # 프로젝트 문서
 ```
 
 ---
@@ -277,8 +389,22 @@ NovaRium-MVP/
 | `events` | 사용자 행동 로그 (event_id, user_id, event_name, value) |
 | `experiments` | 실험 메타데이터 및 결과 (hypothesis, metrics, p_value, decision) |
 | `adoptions` | 채택된 실험 기록 (experiment_id, variant_config) |
+| `dm_daily_kpi` | 일별 KPI 데이터 마트 (report_date, revenue, ctr, cvr) |
 
 ---
+
+## 최근 업데이트 (Recent Updates)
+
+| 버전 | 날짜 | 변경 내용 |
+|------|------|----------|
+| v1.4 | 2025-01 | 성능 최적화: TTL 기반 캐싱 레이어 추가 |
+| v1.3 | 2025-01 | 타입 힌트 전체 적용, 테스트 156개로 확장 |
+| v1.2 | 2025-01 | 에러 핸들링 및 입력 검증 모듈 추가 |
+| v1.1 | 2025-01 | app.py 슬림화 (2,335줄 → 165줄), 실험 모듈 분리 |
+| v1.0 | 2024-12 | 초기 릴리스 |
+
+---
+
 <div align="center">
   <p>Developed with care by <b>Geonyul Shin</b></p>
   <p><i>Building Bridges Between Theory and Practice.</i></p>
