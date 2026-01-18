@@ -43,3 +43,18 @@ venv.bak/
 /raw_data/
 !/raw_data/.gitkeep
 *.wal
+
+# Temporary files
+tmp*
+*.tmp
+*.bak
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo

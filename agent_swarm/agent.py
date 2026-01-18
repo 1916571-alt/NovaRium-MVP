@@ -66,11 +66,6 @@ class HeuristicAgent:
                     data=click_data,
                     timeout=5
                 )
-                self.session.post(
-                    f"{self.base_url}/click",
-                    data=click_data,
-                    timeout=5
-                )
                 if not is_turbo:
                     time.sleep(random.uniform(0.5, 2.0))
                 else:
