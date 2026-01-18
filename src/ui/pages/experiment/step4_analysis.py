@@ -1,5 +1,11 @@
 """
 Step 4: Analysis - Calculate statistics and make decisions.
+
+Enhanced with advanced statistical analysis:
+- SRM (Sample Ratio Mismatch) detection
+- Lift confidence intervals
+- Segment analysis by persona
+- Revenue impact estimation
 """
 import streamlit as st
 import pandas as pd
@@ -11,6 +17,13 @@ import duckdb
 from src.core import stats as al
 from src.core import cache
 from src.ui import components as ui
+
+# Import advanced stats functions
+from src.core.stats import (
+    check_srm,
+    calculate_lift_confidence_interval,
+    bonferroni_correction
+)
 
 
 def render():
@@ -44,6 +57,14 @@ def render():
         df.iloc[1]['users'], df.iloc[1]['conversions']
     )
 
+    # SRM Check - Sample Ratio Mismatch detection
+    srm_result = check_srm(df.iloc[0]['users'], df.iloc[1]['users'])
+    if srm_result['is_srm']:
+        st.error(f"⚠️ **SRM 감지됨!** 샘플 비율 불일치 (p={srm_result['p_value']:.4f})")
+        st.warning("무작위 배정에 문제가 있을 수 있습니다. 데이터 품질을 확인하세요.")
+        with st.expander("SRM 상세 정보"):
+            st.json(srm_result)
+
     c_stats, c_plot = st.columns([1, 1.5], gap="medium")
 
     with c_stats:
@@ -52,6 +73,9 @@ def render():
     with c_plot:
         _render_analysis_chart(df, primary_metric, res)
         _render_guardrail_metrics(current_run_id)
+
+    # Advanced Analysis Section
+    _render_advanced_analysis(df, res, current_run_id)
 
     _render_metrics_comparison(primary_metric, current_run_id)
     _render_raw_data(current_run_id)
@@ -295,6 +319,256 @@ def _render_guardrail_metrics(current_run_id):
     else:
         st.session_state['last_guard_results'] = []
         st.info("설정된 보조 지표가 없습니다.")
+
+
+def _render_advanced_analysis(df, res, current_run_id):
+    """Render advanced statistical analysis section."""
+    st.divider()
+    st.markdown("#### 🔬 심화 분석 (Advanced Analysis)")
+
+    tab_lift, tab_segment, tab_revenue = st.tabs([
+        "📊 Lift 신뢰구간",
+        "👥 세그먼트 분석",
+        "💰 매출 영향 추정"
+    ])
+
+    with tab_lift:
+        _render_lift_ci(df, res)
+
+    with tab_segment:
+        _render_segment_analysis(current_run_id)
+
+    with tab_revenue:
+        _render_revenue_impact(df, res, current_run_id)
+
+
+def _render_lift_ci(df, res):
+    """Render Lift Confidence Interval visualization."""
+    c_rate = df.iloc[0]['conversions'] / df.iloc[0]['users'] if df.iloc[0]['users'] > 0 else 0
+    t_rate = df.iloc[1]['conversions'] / df.iloc[1]['users'] if df.iloc[1]['users'] > 0 else 0
+
+    lift_ci = calculate_lift_confidence_interval(
+        c_rate=c_rate, c_n=df.iloc[0]['users'],
+        t_rate=t_rate, t_n=df.iloc[1]['users']
+    )
+
+    col_ci_chart, col_ci_stats = st.columns([2, 1])
+
+    with col_ci_chart:
+        # Create CI visualization
+        fig = go.Figure()
+
+        # Add confidence interval bar
+        fig.add_trace(go.Scatter(
+            x=[lift_ci['lower'] * 100, lift_ci['upper'] * 100],
+            y=[1, 1],
+            mode='lines',
+            line=dict(color='#3b82f6', width=8),
+            name='95% CI'
+        ))
+
+        # Add point estimate
+        fig.add_trace(go.Scatter(
+            x=[lift_ci['lift'] * 100],
+            y=[1],
+            mode='markers',
+            marker=dict(color='#ef4444', size=15, symbol='diamond'),
+            name='Lift'
+        ))
+
+        # Add zero line
+        fig.add_vline(x=0, line_dash="dash", line_color="gray")
+
+        # Determine color based on significance
+        if lift_ci['is_significant']:
+            if lift_ci['lower'] > 0:
+                result_text = "✅ 유의미한 개선"
+                result_color = "green"
+            else:
+                result_text = "⚠️ 유의미한 악화"
+                result_color = "red"
+        else:
+            result_text = "⚖️ 유의미하지 않음"
+            result_color = "gray"
+
+        fig.update_layout(
+            title=f"Lift 95% 신뢰구간: {result_text}",
+            xaxis_title="Lift (%)",
+            yaxis=dict(visible=False),
+            height=150,
+            margin=dict(l=20, r=20, t=40, b=20),
+            showlegend=False
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_ci_stats:
+        st.metric("Lift", f"{lift_ci['lift']*100:+.2f}%")
+        st.caption(f"95% CI: [{lift_ci['lower']*100:+.2f}%, {lift_ci['upper']*100:+.2f}%]")
+        if lift_ci['is_significant']:
+            st.success("통계적으로 유의미")
+        else:
+            st.info("유의미하지 않음")
+
+
+def _render_segment_analysis(current_run_id):
+    """Render segment analysis by user persona/behavior."""
+    # Query to get segment breakdown
+    segment_sql = f"""
+    WITH user_segments AS (
+        SELECT
+            a.variant,
+            a.user_id,
+            a.weight,
+            CASE
+                WHEN e.event_name LIKE 'banner%' AND NOT EXISTS (
+                    SELECT 1 FROM events e2
+                    WHERE e2.user_id = a.user_id AND e2.run_id = a.run_id AND e2.event_name = 'purchase'
+                ) THEN 'Browser'
+                WHEN e.event_name = 'purchase' AND e.value > 50000 THEN 'High-Value'
+                WHEN e.event_name = 'purchase' THEN 'Converter'
+                ELSE 'Visitor'
+            END as segment,
+            MAX(CASE WHEN e.event_name LIKE 'banner%' THEN 1 ELSE 0 END) as clicked,
+            MAX(CASE WHEN e.event_name = 'purchase' THEN 1 ELSE 0 END) as purchased
+        FROM assignments a
+        LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
+        WHERE a.run_id = '{current_run_id}'
+        GROUP BY a.variant, a.user_id, a.weight, segment
+    )
+    SELECT
+        segment as 세그먼트,
+        variant as 그룹,
+        CAST(ROUND(SUM(weight), 0) AS INTEGER) as 유저수,
+        CAST(ROUND(SUM(CASE WHEN clicked = 1 THEN weight ELSE 0 END), 0) AS INTEGER) as 클릭,
+        CAST(ROUND(SUM(CASE WHEN purchased = 1 THEN weight ELSE 0 END), 0) AS INTEGER) as 구매,
+        ROUND(SUM(CASE WHEN clicked = 1 THEN weight ELSE 0 END) / NULLIF(SUM(weight), 0) * 100, 2) as CTR,
+        ROUND(SUM(CASE WHEN purchased = 1 THEN weight ELSE 0 END) / NULLIF(SUM(weight), 0) * 100, 2) as CVR
+    FROM user_segments
+    GROUP BY segment, variant
+    ORDER BY segment, variant
+    """
+
+    df_segment = al.run_query(segment_sql)
+
+    if not df_segment.empty:
+        # Pivot for comparison
+        st.caption("세그먼트별 전환율 비교 (A vs B)")
+
+        # Create comparison chart
+        segments = df_segment['세그먼트'].unique()
+        fig = go.Figure()
+
+        for variant in ['A', 'B']:
+            variant_data = df_segment[df_segment['그룹'] == variant]
+            fig.add_trace(go.Bar(
+                name=f'Variant {variant}',
+                x=variant_data['세그먼트'],
+                y=variant_data['CVR'],
+                text=[f"{v:.1f}%" for v in variant_data['CVR']],
+                textposition='auto'
+            ))
+
+        fig.update_layout(
+            title="세그먼트별 CVR 비교",
+            xaxis_title="세그먼트",
+            yaxis_title="CVR (%)",
+            barmode='group',
+            height=300
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+        st.dataframe(df_segment, use_container_width=True, hide_index=True)
+    else:
+        st.info("세그먼트 분석을 위한 데이터가 부족합니다.")
+
+
+def _render_revenue_impact(df, res, current_run_id):
+    """Render revenue impact estimation."""
+    # Get revenue data
+    revenue_sql = f"""
+    SELECT
+        a.variant,
+        CAST(ROUND(SUM(a.weight), 0) AS INTEGER) as users,
+        CAST(ROUND(SUM(CASE WHEN e.event_name = 'purchase' THEN e.value * a.weight ELSE 0 END), 0) AS BIGINT) as revenue,
+        CAST(ROUND(SUM(CASE WHEN e.event_name = 'purchase' THEN a.weight ELSE 0 END), 0) AS INTEGER) as purchases
+    FROM assignments a
+    LEFT JOIN events e ON a.user_id = e.user_id AND a.run_id = e.run_id
+    WHERE a.run_id = '{current_run_id}'
+    GROUP BY a.variant
+    ORDER BY a.variant
+    """
+
+    df_revenue = al.run_query(revenue_sql)
+
+    if len(df_revenue) >= 2:
+        control_revenue = df_revenue.iloc[0]['revenue'] or 0
+        test_revenue = df_revenue.iloc[1]['revenue'] or 0
+        control_users = df_revenue.iloc[0]['users'] or 1
+        test_users = df_revenue.iloc[1]['users'] or 1
+
+        control_arpu = control_revenue / control_users
+        test_arpu = test_revenue / test_users
+        arpu_lift = (test_arpu - control_arpu) / control_arpu if control_arpu > 0 else 0
+
+        col_current, col_projected = st.columns(2)
+
+        with col_current:
+            st.markdown("##### 📊 현재 실험 결과")
+            st.metric("Control ARPU", f"₩{control_arpu:,.0f}")
+            st.metric("Test ARPU", f"₩{test_arpu:,.0f}", delta=f"{arpu_lift*100:+.1f}%")
+            st.metric("실험 기간 매출 차이", f"₩{test_revenue - control_revenue:+,.0f}")
+
+        with col_projected:
+            st.markdown("##### 🚀 연간 영향 추정")
+
+            # User inputs for projection
+            monthly_users = st.number_input(
+                "월간 예상 방문자 수",
+                min_value=1000,
+                max_value=10000000,
+                value=100000,
+                step=10000,
+                help="실제 서비스의 월간 방문자 수를 입력하세요"
+            )
+
+            if res['p_value'] < 0.05 and arpu_lift != 0:
+                annual_impact = monthly_users * 12 * (test_arpu - control_arpu)
+                st.metric(
+                    "연간 예상 매출 영향",
+                    f"₩{annual_impact:+,.0f}",
+                    delta="유의미한 변화" if res['p_value'] < 0.05 else "유의미하지 않음"
+                )
+
+                if annual_impact > 0:
+                    st.success(f"✅ B안 채택 시 연간 약 **₩{annual_impact:,.0f}** 추가 매출 예상")
+                else:
+                    st.warning(f"⚠️ B안 채택 시 연간 약 **₩{abs(annual_impact):,.0f}** 매출 감소 예상")
+            else:
+                st.info("유의미한 차이가 없어 매출 영향을 추정할 수 없습니다.")
+
+        # Sensitivity analysis
+        with st.expander("📈 민감도 분석 (Sensitivity Analysis)"):
+            st.caption("ARPU 변화에 따른 연간 매출 영향")
+
+            scenarios = [
+                ("보수적 (-20%)", arpu_lift * 0.8),
+                ("기본", arpu_lift),
+                ("낙관적 (+20%)", arpu_lift * 1.2)
+            ]
+
+            scenario_data = []
+            for name, lift in scenarios:
+                annual = monthly_users * 12 * control_arpu * lift
+                scenario_data.append({
+                    "시나리오": name,
+                    "Lift": f"{lift*100:+.1f}%",
+                    "연간 영향": f"₩{annual:+,.0f}"
+                })
+
+            st.dataframe(pd.DataFrame(scenario_data), use_container_width=True, hide_index=True)
+    else:
+        st.info("매출 영향 분석을 위한 데이터가 부족합니다.")
 
 
 def _render_metrics_comparison(primary_metric, current_run_id):
