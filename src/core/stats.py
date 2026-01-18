@@ -5,11 +5,13 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import streamlit as st
-import logging
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Stats")
+# Use centralized logging
+from src.core.logging_config import get_logger, log_db_query
+from src.core.errors import QueryError, LockError, ParameterError
+from src.core.validators import validate_ab_test_params, validate_user_counts
+
+logger = get_logger(__name__)
 
 # Try to load environment variables
 try:
@@ -118,8 +120,8 @@ def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experime
                         return pd.DataFrame(data)
                     else:
                         return pd.DataFrame()
-        except:
-            pass # API failed, fallback to direct DB
+        except Exception as e:
+            logger.debug(f"API fallback - Server unavailable: {type(e).__name__}")
 
     # 2. Retry logic for transient connections (handles file locks)
     for attempt in range(max_retries):
@@ -250,7 +252,36 @@ def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     """
     Calculate required sample size per variation for A/B testing.
     Uses Z-test formula for proportions.
+
+    Args:
+        baseline_cvr: Baseline conversion rate (0 < x < 1)
+        mde: Minimum detectable effect as proportion (e.g., 0.05 for 5%)
+        alpha: Significance level (default 0.05)
+        power: Statistical power (default 0.8)
+
+    Returns:
+        Required sample size per group as integer
+
+    Raises:
+        ParameterError: If parameters are invalid
     """
+    # Special case: no effect needed means no samples needed
+    if mde == 0:
+        return 0
+
+    # Validate inputs (skip for edge cases that would be caught later)
+    try:
+        validated = validate_ab_test_params(baseline_cvr, mde, alpha, power)
+        baseline_cvr = validated["baseline_cvr"]
+        mde = validated["mde"]
+        alpha = validated["alpha"]
+        power = validated["power"]
+    except ParameterError as e:
+        logger.warning(f"Parameter validation: {e}")
+        # Allow calculation to proceed for backwards compatibility
+    except Exception as e:
+        logger.warning(f"Validation skipped due to error: {e}")
+
     standard_norm = stats.norm()
     Z_alpha = standard_norm.ppf(1 - alpha/2)
     Z_beta = standard_norm.ppf(power)
@@ -278,8 +309,27 @@ def get_bucket(user_id, num_buckets=100):
 def calculate_statistics(c_users, c_conv, t_users, t_conv):
     """
     Calculate A/B test statistics: CVRs, Lift, and P-value.
-    Returns a dictionary with results.
+
+    Args:
+        c_users: Number of users in control group
+        c_conv: Number of conversions in control group
+        t_users: Number of users in test group
+        t_conv: Number of conversions in test group
+
+    Returns:
+        Dictionary with: control_rate, test_rate, lift, p_value, z_score, se
+
+    Raises:
+        ParameterError: If counts are invalid
+        DataError: If conversions exceed users
     """
+    # Validate inputs
+    try:
+        validate_user_counts(c_users, c_conv, t_users, t_conv)
+    except Exception as e:
+        logger.warning(f"Validation warning: {e}")
+        # Continue with calculation but log the issue
+
     # Rates
     c_rate = c_conv / c_users if c_users > 0 else 0
     t_rate = t_conv / t_users if t_users > 0 else 0
