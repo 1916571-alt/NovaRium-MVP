@@ -1,3 +1,12 @@
+"""
+Statistics and Analytics Module for A/B Testing.
+
+This module provides functions for:
+- Database connections (DuckDB local, PostgreSQL cloud)
+- Sample size calculations
+- Statistical analysis (Z-tests, p-values)
+- User segmentation
+"""
 import duckdb
 import os
 import hashlib
@@ -5,6 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import streamlit as st
+from typing import Any, Dict, Optional, Union
 
 # Use centralized logging
 from src.core.logging_config import get_logger, log_db_query
@@ -56,30 +66,42 @@ def _ensure_ssl(url: str) -> str:
 
 DATABASE_URL = _ensure_ssl(_raw_database_url)
 
-def is_cloud_mode():
+def is_cloud_mode() -> bool:
     """Check if running in cloud mode (Supabase)."""
     return DB_MODE == 'supabase' and bool(DATABASE_URL)
 
-def get_connection():
+def get_connection() -> Optional[duckdb.DuckDBPyConnection]:
     """
     Establish a connection to the database.
-    Returns DuckDB connection for local, None for cloud (use run_query instead).
+
+    Returns:
+        DuckDB connection for local mode, None for cloud mode (use run_query instead)
     """
     if is_cloud_mode():
         return None
     return duckdb.connect(DB_PATH)
 
-def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experiment'):
+def run_query(
+    query: str,
+    con: Optional[duckdb.DuckDBPyConnection] = None,
+    max_retries: int = 5,
+    retry_delay: float = 0.5,
+    db_type: str = 'experiment'
+) -> pd.DataFrame:
     """
     Execute a SQL query and return the result as a DataFrame.
+
     Supports both DuckDB (local) and PostgreSQL (Supabase cloud).
 
     Args:
         query: SQL query string
-        con: Optional existing connection
+        con: Optional existing DuckDB connection
         max_retries: Number of retry attempts for lock errors
-        retry_delay: Base delay between retries
-        db_type: 'experiment' (default) or 'warehouse'
+        retry_delay: Base delay between retries (seconds)
+        db_type: Database type - 'experiment' (default) or 'warehouse'
+
+    Returns:
+        Query results as pandas DataFrame, empty DataFrame on error
     """
     import time
     import requests
@@ -151,7 +173,7 @@ def run_query(query, con=None, max_retries=5, retry_delay=0.5, db_type='experime
                 pass
             return pd.DataFrame()
 
-def _convert_duckdb_to_pg(query):
+def _convert_duckdb_to_pg(query: str) -> str:
     """Convert DuckDB SQL syntax to PostgreSQL."""
     import re
     pg_query = query
@@ -201,7 +223,7 @@ def _convert_duckdb_to_pg(query):
 
     return pg_query
 
-def _pg_query(query):
+def _pg_query(query: str) -> pd.DataFrame:
     """Execute query on PostgreSQL (Supabase cloud)."""
     global _pg_pool
     try:
@@ -248,9 +270,15 @@ _pg_pool = None
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
+def calculate_sample_size(
+    baseline_cvr: float,
+    mde: float,
+    alpha: float = 0.05,
+    power: float = 0.8
+) -> int:
     """
     Calculate required sample size per variation for A/B testing.
+
     Uses Z-test formula for proportions.
 
     Args:
@@ -297,16 +325,27 @@ def calculate_sample_size(baseline_cvr, mde, alpha=0.05, power=0.8):
     n = (2 * pooled_prob * (1 - pooled_prob) * (Z_alpha + Z_beta)**2) / (p1 - p2)**2
     return int(n)
 
-def get_bucket(user_id, num_buckets=100):
+def get_bucket(user_id: Union[str, int], num_buckets: int = 100) -> int:
     """
     Deterministic hashing function to bucket users.
-    Returns an integer between 0 and num_buckets-1.
+
+    Args:
+        user_id: User identifier (string or integer)
+        num_buckets: Number of buckets (default 100)
+
+    Returns:
+        Integer between 0 and num_buckets-1
     """
     hash_obj = hashlib.md5(str(user_id).encode())
     return int(hash_obj.hexdigest(), 16) % num_buckets
 
 @st.cache_data(ttl=60)  # Cache for 1 minute (short TTL for live data)
-def calculate_statistics(c_users, c_conv, t_users, t_conv):
+def calculate_statistics(
+    c_users: int,
+    c_conv: int,
+    t_users: int,
+    t_conv: int
+) -> Dict[str, float]:
     """
     Calculate A/B test statistics: CVRs, Lift, and P-value.
 
@@ -360,28 +399,50 @@ def calculate_statistics(c_users, c_conv, t_users, t_conv):
         "se": se
     }
 
-def format_delta(val, is_percent=True):
+def format_delta(val: float, is_percent: bool = True) -> str:
     """
-    Helper to format delta strings (e.g., "+5.00%" or "-0.12")
+    Format delta strings (e.g., "+5.00%" or "-0.12").
+
+    Args:
+        val: Numeric value to format
+        is_percent: If True, multiply by 100 and add % suffix
+
+    Returns:
+        Formatted string with +/- prefix
     """
     prefix = "+" if val >= 0 else ""
     if is_percent:
         return f"{prefix}{val*100:.2f}%"
     return f"{prefix}{val:.4f}"
 
-def calculate_retention_rate(cohort_size, retained_count):
+def calculate_retention_rate(cohort_size: int, retained_count: int) -> float:
     """
     Calculate retention rate.
-    Returns value between 0.0 and 1.0.
+
+    Args:
+        cohort_size: Total users in cohort
+        retained_count: Users retained
+
+    Returns:
+        Retention rate between 0.0 and 1.0
     """
     if cohort_size <= 0:
         return 0.0
     return retained_count / cohort_size
 
-def get_user_segments(con=None):
+def get_user_segments(
+    con: Optional[duckdb.DuckDBPyConnection] = None
+) -> Dict[str, int]:
     """
     Analyze existing user behavior in DB to define Persona Distribution.
-    Returns a dictionary with percentage values (0-100) for each segment.
+
+    Args:
+        con: Optional existing DuckDB connection
+
+    Returns:
+        Dictionary with percentage values (0-100) for each segment:
+        - Window, Mission, Rational, Impulsive, Cautious
+
     Uses WAREHOUSE DB (users, orders tables).
     """
     sql = """

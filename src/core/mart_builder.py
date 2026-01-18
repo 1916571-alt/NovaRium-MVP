@@ -1,4 +1,11 @@
+"""
+Data Mart Builder - SQL generation for analytics data marts.
+
+This module generates SQL queries for building data marts from raw event data.
+Supports both DuckDB (local) and PostgreSQL (cloud) databases.
+"""
 import os
+from typing import List
 
 def _get_secret(key: str, default: str = '') -> str:
     """Get config from Streamlit secrets first, then env vars."""
@@ -13,9 +20,16 @@ def _get_secret(key: str, default: str = '') -> str:
 # Check if running in cloud mode (PostgreSQL)
 DB_MODE = _get_secret('DB_MODE', 'duckdb')
 
-def generate_mart_sql(selected_metrics):
+def generate_mart_sql(selected_metrics: List[str]) -> str:
     """
-    Generates the SQL query to build the Data Mart based on selected metrics.
+    Generate SQL query to build the Data Mart based on selected metrics.
+
+    Args:
+        selected_metrics: List of metric names to include (e.g., ['revenue', 'ctr', 'cvr'])
+
+    Returns:
+        SQL query string for creating the dm_daily_kpi table
+
     Supports both DuckDB (local) and PostgreSQL (Supabase cloud).
     """
 
@@ -93,9 +107,17 @@ def generate_mart_sql(selected_metrics):
     
     return sql.strip()
 
-def generate_mart_diagram(selected_metrics, scale=1.0):
+def generate_mart_diagram(selected_metrics: List[str], scale: float = 1.0) -> str:
     """
-    Generates a Graphviz DOT string to visualize the ETL flow.
+    Generate a Graphviz DOT string to visualize the ETL flow.
+
+    Args:
+        selected_metrics: List of metric names to display in schema
+        scale: Scale factor for diagram dimensions (default: 1.0)
+
+    Returns:
+        Graphviz DOT format string for rendering the diagram
+
     Layout: Left-to-Right (LR) for compact vertical fit.
     """
     # Compact Scaled Dimensions

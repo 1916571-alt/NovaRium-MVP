@@ -1,9 +1,16 @@
+"""
+Data Simulation Module for generating synthetic user and order data.
+
+This module generates fake data for testing and development purposes.
+Uses Faker library to create realistic Korean user profiles.
+"""
 import os
 import pandas as pd
 from faker import Faker
 import random
 from datetime import datetime, timedelta
 import uuid
+from typing import Dict, List, Optional
 
 # Initialize Faker with Korean locale
 fake = Faker('ko_KR')
@@ -14,14 +21,24 @@ START_DATE = datetime.now() - timedelta(days=90)  # 3 months ago
 END_DATE = datetime.now()
 RAW_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'raw_data')
 
-def setup_directories():
+def setup_directories() -> None:
+    """Create raw data directory if it doesn't exist."""
     if not os.path.exists(RAW_DATA_DIR):
         os.makedirs(RAW_DATA_DIR)
         print(f"Created directory: {RAW_DATA_DIR}")
 
-def generate_users(n=NUM_USERS):
+def generate_users(n: int = NUM_USERS) -> pd.DataFrame:
+    """
+    Generate synthetic user data.
+
+    Args:
+        n: Number of users to generate
+
+    Returns:
+        DataFrame with user records saved to users.csv
+    """
     print(f"Generating {n} users...")
-    users = []
+    users: List[Dict] = []
     for _ in range(n):
         uid = str(uuid.uuid4())
         join_date = fake.date_time_between(start_date=START_DATE, end_date=END_DATE)
@@ -49,9 +66,18 @@ def generate_users(n=NUM_USERS):
     print(f"Saved users.csv with {len(df)} records.")
     return df
 
-def generate_orders(users_df):
+def generate_orders(users_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Generate synthetic order data based on users.
+
+    Args:
+        users_df: DataFrame containing user records
+
+    Returns:
+        DataFrame with order records saved to orders.csv
+    """
     print("Generating orders...")
-    orders = []
+    orders: List[Dict] = []
     
     # Menu items with price range
     menu_items = {
@@ -97,9 +123,21 @@ def generate_orders(users_df):
     print(f"Saved orders.csv with {len(df)} records.")
     return df
 
-def generate_ab_test_logs(users_df):
+def generate_ab_test_logs(users_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Generate synthetic A/B test event logs.
+
+    Simulates an experiment with control/test groups and
+    exposure/click events with different conversion rates.
+
+    Args:
+        users_df: DataFrame containing user records
+
+    Returns:
+        DataFrame with A/B test logs saved to ab_test_logs.csv
+    """
     print("Generating A/B test logs...")
-    logs = []
+    logs: List[Dict] = []
     
     # Experiment: Push Notification for Discount
     # Control: No Push

@@ -1,6 +1,17 @@
-import streamlit as st
+"""
+UI Components for NovaRium Edu.
 
-def apply_custom_css():
+This module provides reusable UI components including:
+- Custom CSS styling (Cosmic Glass theme)
+- Navigation bar
+- Educational guide boxes
+- Progress indicators
+"""
+import streamlit as st
+from typing import List
+
+
+def apply_custom_css() -> None:
     """
     Apply global Cosmic Glass CSS styling to the Streamlit app.
     """
@@ -163,9 +174,13 @@ def apply_custom_css():
 </style>
 """, unsafe_allow_html=True)
 
-def edu_guide(title, content):
+def edu_guide(title: str, content: str) -> None:
     """
     Render an educational guide box.
+
+    Args:
+        title: Guide box title
+        content: Guide box content text
     """
     st.markdown(f"""
     <div class="edu-guide">
@@ -174,9 +189,10 @@ def edu_guide(title, content):
     </div>
     """, unsafe_allow_html=True)
 
-def render_navbar():
+def render_navbar() -> None:
     """
     Render top navigation bar (Header).
+
     Handles page switching via session state.
     """
     c_logo, c_nav = st.columns([1, 4])
@@ -204,9 +220,13 @@ def render_navbar():
                 st.session_state['page'] = 'portfolio'
                 st.rerun()
 
-def render_step_progress(steps, current_step):
+def render_step_progress(steps: List[str], current_step: int) -> None:
     """
     Render wizard progress steps (Nebula Style).
+
+    Args:
+        steps: List of step labels
+        current_step: Current step number (1-indexed)
     """
     cols = st.columns(len(steps))
     for i, s in enumerate(steps):
