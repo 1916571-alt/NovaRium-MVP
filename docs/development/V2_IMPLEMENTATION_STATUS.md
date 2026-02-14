@@ -1,0 +1,110 @@
+# V2 Implementation Status
+
+## Completed
+- V2 scaffold (`v2_core`) with FastAPI app structure
+- PostgreSQL schema migration baseline
+  - `0001_init.sql`
+  - `0002_rls.sql` with tenant isolation policies
+- Auth API
+  - `POST /v2/auth/sign-up`
+  - `POST /v2/auth/sign-in`
+  - `POST /v2/auth/refresh`
+  - `POST /v2/auth/sign-out`
+  - `GET /v2/auth/me`
+- Workspace / Project APIs
+  - `GET/POST /v2/workspaces`
+  - `POST /v2/workspaces/{workspace_id}/members`
+  - `PUT /v2/workspaces/{workspace_id}/retention` (simulation retention policy)
+  - `GET /v2/workspaces/{workspace_id}/retention-audit` (retention change history + filters)
+  - `GET/POST /v2/projects`
+  - list responses include `my_role` for role-aware UX
+- SQL Lab v1
+  - `POST /v2/sql/execute` (read-only sandbox)
+  - challenge CRUD subset + submission
+  - basic auto-grading (`columns`, `row_count`, `must_have_columns`)
+  - SQL snippet library per project (`list/create/update/delete`)
+  - snippet filters: keyword search (`q`) + tag filter (`tag`)
+  - snippet pin/favorite with pinned-first ordering
+- Experiment APIs
+  - `GET/POST /v2/experiments`
+  - activate/deactivate
+  - variant management (`list/create/update/delete`)
+  - run-level analysis with lift/p-value/SRM/recommendation
+  - analysis result persistence
+  - one-click adopt from analysis
+- Adoption + Minihome Journey
+  - create/rollout/rollback adoption
+  - journey patch/event append
+  - `GET /v2/journeys/me`
+- Community APIs
+  - post list/create
+  - comment list/create
+  - experiment fork
+- Portfolio API
+  - `GET /v2/portfolio/me`
+- Analytics API
+  - `GET /v2/analytics/templates` (commerce/content/saas setup presets)
+  - `POST /v2/analytics/projects/{project_id}/bootstrap` (synthetic experiment + event data generation)
+  - `GET /v2/analytics/projects/{project_id}/funnel` (template-aware funnel conversion/dropoff + bottleneck)
+  - deterministic seed presets (`beginner|standard|advanced`)
+  - optional starter SQL challenge seeding during bootstrap (`seed_sql_challenges`)
+- Scenario Pack API
+  - `GET /v2/scenarios/export?project_id=...&schema_version=scenario-pack-v1|scenario-pack-v2`
+  - `POST /v2/scenarios/import`
+  - `POST /v2/scenarios/import/validate` (dry-run validation only)
+  - `POST /v2/scenarios/shares` / `GET /v2/scenarios/shares/{share_token}` (signed share link with expiry)
+  - `DELETE /v2/scenarios/shares/{share_token}` (creator-side revocation)
+  - shareable project snapshot payload (experiments/variants/sql challenges/feature states/community posts)
+  - import payload normalization/safety guards (type checks, size caps, safe defaults + validation warnings)
+  - validate warnings include tag normalization/drop summaries (trim/lowercase, duplicates, empties, overflow, truncation, non-list tags)
+  - schema version gate + adapter (`scenario-pack-v1`, `scenario-pack-v2` -> internal v1 normalization)
+  - native `scenario-pack-v2` export adapter (`v1` internal model -> `v2` payload)
+- Operations script
+  - `scripts/cleanup_stale_simulations.py` for stale run cleanup (`--retention-days`, `--apply`, `--respect-workspace-policy`)
+  - scheduled cleanup example workflow: `.github/workflows/v2-cleanup-simulations.yml`
+  - `scripts/cleanup_expired_scenario_shares.py` for scenario share-link cleanup (`--apply`, optional `--include-revoked`)
+  - scheduled cleanup example workflow: `.github/workflows/v2-cleanup-scenario-shares.yml`
+- Integration test scaffold
+  - `tests/test_rls_integration.py` (env-gated)
+  - `tests/test_e2e_flow_integration.py` (env-gated)
+  - local smoke runner: `v2_core/scripts/smoke_flow.py`
+  - CI workflow: `.github/workflows/v2-tests.yml` (PostgreSQL service + migrations + unit/integration tests + nightly schedule)
+  - web smoke workflow: `.github/workflows/v2-web-smoke.yml` (Playwright login/nav + onboarding/analytics mocked smoke)
+- Frontend shell
+  - Next.js app router scaffold in `v2_core/apps/web`
+  - pages: login/workspaces/sql/experiments/analytics/scenarios/journey/community
+  - basic auth guard + token refresh retry
+  - SQL challenge create/list/submit UI
+  - SQL snippet save/load/update/delete UI
+  - SQL snippet tagging + search/filter UI
+  - experiment create/list/activate/deactivate/analyze/adopt UI
+  - experiment variant management UI (key/weight/config CRUD)
+  - home dashboard: project snapshot cards (experiments + funnel bottleneck/conversion)
+  - home dashboard: project-level community trend metrics (7d posts, fork totals)
+  - onboarding wizard: workspace -> project -> simulation bootstrap one action
+  - onboarding template selector wired to analytics templates (commerce/content/saas)
+  - onboarding/analytics supports starter SQL challenge seeding toggle
+  - home bootstrap summary drawer with navigation links
+  - deep-link prefill via query params across pages (`workspace_id`, `project_id`, `experiment_id`, `run_id`, `template`, `seed_preset`)
+  - onboarding/analytics seed preset selector (`beginner|standard|advanced`)
+  - role-based UX guards (owner/editor/viewer) for write actions in workspaces/sql/experiments/analytics/community
+  - analytics template selector (commerce/content/saas) wired to bootstrap defaults
+  - shared role UI components (`RoleBadge`, `PermissionHint`) applied across guarded pages
+  - scenario pack page for project export and workspace import flow
+  - scenario import payload preview + delta summary vs last export
+  - scenario validate-only flow in UI before import apply
+  - scenario share-link create/revoke/resolve flow in UI
+  - workspace retention policy editor UI
+  - workspace retention audit log viewer + filters
+  - 10-minute guided demo playbook: `docs/development/V2_DEMO_PLAYBOOK_10MIN.md`
+
+## Test Status
+- `v2_core/tests`: passing
+- Latest: `63 passed, 2 skipped`
+
+## Next Queue (In Order)
+- No queued items in this track.
+
+## Notes
+- Legacy scripts moved under `scripts/legacy/` with compatibility wrappers retained.
+- Root clutter scripts moved to `scripts/dev/windows/`.

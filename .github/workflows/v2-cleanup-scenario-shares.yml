@@ -1,0 +1,59 @@
+name: v2-cleanup-scenario-shares
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply_delete:
+        description: "Set true to delete (false = dry-run)"
+        required: false
+        default: "false"
+      include_revoked:
+        description: "Set true to also purge revoked links"
+        required: false
+        default: "false"
+  schedule:
+    - cron: "45 2 * * *"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.V2_DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: v2_core
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Dry-run cleanup summary (expired only)
+        if: ${{ (github.event_name == 'schedule' || github.event.inputs.apply_delete != 'true') && github.event.inputs.include_revoked != 'true' }}
+        working-directory: v2_core
+        run: |
+          python scripts/cleanup_expired_scenario_shares.py
+
+      - name: Dry-run cleanup summary (expired + revoked)
+        if: ${{ (github.event_name == 'schedule' || github.event.inputs.apply_delete != 'true') && github.event.inputs.include_revoked == 'true' }}
+        working-directory: v2_core
+        run: |
+          python scripts/cleanup_expired_scenario_shares.py --include-revoked
+
+      - name: Apply cleanup (expired only)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.apply_delete == 'true' && github.event.inputs.include_revoked != 'true' }}
+        working-directory: v2_core
+        run: |
+          python scripts/cleanup_expired_scenario_shares.py --apply
+
+      - name: Apply cleanup (expired + revoked)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.apply_delete == 'true' && github.event.inputs.include_revoked == 'true' }}
+        working-directory: v2_core
+        run: |
+          python scripts/cleanup_expired_scenario_shares.py --apply --include-revoked
